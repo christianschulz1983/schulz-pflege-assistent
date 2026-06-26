@@ -1,0 +1,15 @@
+# Große, versandfertige Artefakte (überschreiten teils das GitHub-Limit)
+Zum Senden/
+*.exe
+*.zip
+
+# Lokale Backups / Master (die Git-Historie ersetzt sie)
+Backups/
+
+# Python-Build-/Cache-Reste
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+_tess_engine/

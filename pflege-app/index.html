@@ -1,0 +1,2498 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schulz Pflege-Assistent v66.44</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #f4f6fa;
+            --bg-card: #ffffff;
+            --bg-card2: #f8fafc;
+            --bg-hover: #f1f5f9;
+            --border: #e2e8f0;
+            --border-bright: #cbd5e1;
+            --accent: #2563eb;
+            --accent-dim: rgba(37,99,235,0.06);
+            --accent-glow: rgba(37,99,235,0.08);
+            --accent2: #0d9488;
+            --accent2-dim: rgba(13,148,136,0.06);
+            --red: #dc2626;
+            --red-dim: rgba(220,38,38,0.06);
+            --yellow: #b45309;
+            --yellow-dim: rgba(180,83,9,0.06);
+            --green: #16a34a;
+            --green-dim: rgba(22,163,74,0.06);
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --font-display: 'Syne', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-display);
+            background: var(--bg-base);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image: radial-gradient(ellipse at 20% 0%, rgba(37,99,235,0.03) 0%, transparent 60%),
+                              radial-gradient(ellipse at 80% 100%, rgba(13,148,136,0.02) 0%, transparent 50%);
+        }
+
+        /* HEADER */
+        header {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+        .header-inner {
+            max-width: 1700px; margin: 0 auto; padding: 0 28px;
+            height: 64px; display: flex; align-items: center; justify-content: space-between;
+        }
+        .logo-block { display: flex; align-items: center; gap: 14px; }
+        .logo-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), #5b4bf8);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; font-weight: 800; color: white; font-style: italic;
+            box-shadow: 0 2px 10px rgba(37,99,235,0.2);
+        }
+        .logo-text { line-height: 1; }
+        .logo-title { font-size: 15px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-primary); }
+        .logo-sub { font-size: 9px; font-family: var(--font-mono); color: var(--accent); letter-spacing: 0.15em; margin-top: 3px; opacity: 0.9; }
+        .header-actions { display: flex; gap: 8px; align-items: center; }
+
+        /* STATUS BADGE */
+        .status-badge {
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+            padding: 4px 10px; border-radius: 100px; text-transform: uppercase;
+            letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;
+            background: var(--bg-card2); border: 1px solid var(--border); color: var(--text-secondary);
+        }
+        .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); }
+        .status-badge.ready .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .status-badge.ready { color: var(--green); border-color: rgba(22,163,74,0.2); }
+        .status-badge.processing .dot { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); animation: pulse 1s infinite alternate; }
+        .status-badge.processing { color: var(--yellow); border-color: rgba(180,83,9,0.2); }
+
+        @keyframes pulse { to { opacity: 0.4; } }
+
+        .btn {
+            font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+            text-transform: uppercase; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer;
+            transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn-primary { background: var(--accent); color: white; box-shadow: 0 2px 10px rgba(37,99,235,0.15); }
+        .btn-primary:hover { background: #1d4ed8; box-shadow: 0 4px 14px rgba(37,99,235,0.25); transform: translateY(-1px); }
+        .btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border); }
+        .btn-secondary:hover { border-color: var(--border-bright); color: var(--text-primary); background: var(--bg-hover); }
+        .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+        .btn-ghost:hover { color: var(--text-secondary); border-color: var(--border-bright); background: var(--bg-card2); }
+        .btn-ai {
+            background: linear-gradient(135deg, #eff6ff, #dbeafe);
+            color: #1e40af; border: 1px solid #bfdbfe;
+            box-shadow: 0 1px 3px rgba(37,126,248,0.1);
+        }
+        .btn-ai:hover { background: linear-gradient(135deg, #dbeafe, #bfdbfe); box-shadow: 0 2px 6px rgba(37,126,248,0.2); transform: translateY(-1px); }
+        .btn-ai:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-yellow {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            color: #92400e; border: 1px solid #fcd34d;
+            box-shadow: 0 1px 3px rgba(217,119,6,0.1);
+        }
+        .btn-yellow:hover {
+            background: linear-gradient(135deg, #fde68a, #fcd34d);
+            box-shadow: 0 2px 6px rgba(217,119,6,0.2); transform: translateY(-1px);
+        }
+
+        /* AI OVERLAY */
+        #ai-overlay {
+            display: none; position: fixed; inset: 0; z-index: 9000;
+            background: rgba(255,255,255,0.9); backdrop-filter: blur(12px);
+            align-items: center; justify-content: center; flex-direction: column; gap: 20px;
+        }
+        #ai-overlay.active { display: flex; }
+        .ai-spinner {
+            width: 56px; height: 56px; border-radius: 50%;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .ai-overlay-title {
+            font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+            color: var(--accent); text-transform: uppercase; letter-spacing: 0.12em;
+        }
+        .ai-overlay-sub {
+            font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary);
+            text-transform: uppercase; letter-spacing: 0.1em; margin-top: -10px;
+        }
+        .ai-progress-bar {
+            width: 300px; height: 4px; background: var(--border);
+            border-radius: 3px; overflow: hidden;
+        }
+        .ai-progress-fill {
+            height: 100%; background: var(--accent);
+            border-radius: 3px; width: 0%;
+            transition: width 0.4s ease;
+            box-shadow: 0 1px 4px rgba(37,99,235,0.4);
+        }
+
+        /* TABS */
+        nav.tabs {
+            max-width: 1700px; margin: 0 auto; padding: 0 28px;
+            border-top: 1px solid var(--border);
+            display: flex; gap: 0; overflow-x: auto;
+        }
+        .tab-btn {
+            font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+            text-transform: uppercase; padding: 14px 20px; color: var(--text-muted);
+            border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
+            transition: all 0.2s; background: none; border-top: none; border-left: none; border-right: none;
+        }
+        .tab-btn:hover { color: var(--text-secondary); }
+        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        /* LAYOUT */
+        main { max-width: 1700px; margin: 0 auto; padding: 28px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* CARDS */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+        }
+        .card-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-card2);
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+            letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-secondary);
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        }
+        .card-header .header-title-left { display: flex; align-items: center; gap: 8px; }
+        .card-header .dot {
+            width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0;
+        }
+
+        /* INPUTS */
+        .field-label {
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 0.15em;
+            text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px;
+        }
+        .field-input {
+            width: 100%; background: var(--bg-base); border: 1px solid var(--border);
+            border-radius: 8px; padding: 8px 12px; font-family: var(--font-display);
+            font-size: 12px; color: var(--text-primary); outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .field-input::placeholder { color: var(--text-muted); }
+        .field-input option { background: var(--bg-card); }
+        textarea.field-input { resize: vertical; overflow-y: auto; min-height: 120px; }
+
+        .highlight-field {
+            background: var(--accent-dim); border: 1px solid rgba(37,99,235,0.15);
+            border-radius: 10px; padding: 14px;
+        }
+        .highlight-field .field-label { color: var(--accent); }
+        .highlight-field .field-input {
+            background: var(--bg-card); border-color: rgba(37,99,235,0.3);
+            font-size: 20px; font-weight: 800; color: var(--accent);
+        }
+
+        /* NBA TABLE */
+        .grid-2col { display: grid; grid-template-columns: 1fr 380px; gap: 24px; }
+
+        table.nba-table { width: 100%; border-collapse: collapse; }
+        table.nba-table thead tr {
+            background: var(--bg-card2);
+        }
+        table.nba-table thead th {
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+            letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-secondary);
+            padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border);
+        }
+        table.nba-table thead th.center { text-align: center; }
+        .module-header-row td {
+            background: var(--bg-card2); padding: 10px 14px;
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+            letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-secondary);
+            border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+        }
+        .nba-row { border-bottom: 1px solid var(--border); transition: background 0.15s; cursor: default; }
+        .nba-row:hover { background: var(--bg-hover); }
+        .nba-row td { padding: 10px 14px; font-size: 12px; vertical-align: middle; }
+        .nba-row td.nr { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); width: 60px; text-align: center; border-right: 1px solid var(--border); }
+        .nba-row td.title { color: var(--text-primary); font-weight: 600; }
+        .nba-row td.slider-cell { width: 260px; }
+        .nba-row td.pts { width: 52px; text-align: center; font-family: var(--font-mono); font-weight: 700; color: var(--accent); border-left: 1px solid var(--border); }
+        .nba-row td.info-cell { width: 46px; text-align: center; border-left: 1px solid var(--border); }
+        .info-btn {
+            width: 26px; height: 26px; border-radius: 50%; background: var(--bg-card2);
+            border: 1px solid var(--border); color: var(--text-secondary); font-size: 11px;
+            font-family: var(--font-mono); font-weight: 700; cursor: pointer; transition: all 0.2s;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .info-btn:hover { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+        .info-btn.active { background: var(--accent); border-color: var(--accent); color: white; box-shadow: 0 0 10px rgba(37,99,235,0.3); }
+
+        /* SLIDERS */
+        .slider-wrapper { display: flex; align-items: center; gap: 10px; }
+        input[type="range"] {
+            flex: 1; appearance: none; background: var(--border); height: 4px; border-radius: 4px;
+            outline: none; cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none; width: 16px; height: 16px;
+            background: var(--accent); border-radius: 50%; cursor: pointer;
+            border: 2px solid var(--bg-card); box-shadow: 0 1px 4px rgba(37,99,235,0.3);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2); box-shadow: 0 2px 8px rgba(37,99,235,0.4);
+        }
+        .slider-label {
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+            text-align: right; min-width: 130px; color: var(--accent); text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* MODULE 5 */
+        .m5-count-box { display: flex; align-items: center; gap: 8px; }
+        .m5-period-row { display: flex; gap: 3px; margin-top: 5px; background: var(--bg-base); padding: 2px; border-radius: 6px; }
+        .m5-period-btn {
+            flex: 1; font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+            padding: 4px 0; text-align: center; border-radius: 5px; cursor: pointer;
+            color: var(--text-secondary); border: none; background: none; transition: all 0.15s;
+        }
+        .m5-period-btn.active { background: var(--accent); color: white; }
+        .m5-period-btn:hover:not(.active) { color: var(--text-primary); }
+
+        /* MODULE RESULT ROW */
+        .mod-result-row td {
+            padding: 10px 14px; font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent2);
+            background: rgba(13,148,136,0.04); border-top: 1px solid rgba(13,148,136,0.12);
+            border-bottom: 1px solid var(--border);
+        }
+        .mod-comp-row td {
+            padding: 6px 14px; font-family: var(--font-mono); font-size: 9px; font-weight: 500;
+            color: var(--text-muted); background: var(--bg-card2); border-bottom: 1px solid var(--border);
+        }
+
+        /* RESULT TABLE */
+        .result-table { width: 100%; border-collapse: collapse; }
+        .result-table thead tr { background: var(--bg-card2); }
+        .result-table thead th {
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+            letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-secondary);
+            padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border);
+        }
+        .result-table tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+        .result-table tbody tr:hover { background: var(--bg-hover); }
+        .result-table tbody td { padding: 10px 14px; font-size: 12px; }
+        .result-table .center { text-align: center; }
+        .result-table .mono { font-family: var(--font-mono); font-weight: 700; color: var(--accent); }
+        .winner-row { background: rgba(37,99,235,0.04) !important; }
+        .winner-row td { color: var(--accent) !important; font-weight: 700; }
+
+        .gap-badge {
+            font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+            padding: 3px 8px; border-radius: 5px; text-align: center;
+        }
+        .gap-green { background: var(--green-dim); color: var(--green); }
+        .gap-yellow { background: var(--yellow-dim); color: var(--yellow); }
+        .gap-red { background: var(--red-dim); color: var(--red); }
+
+        /* RESULT FOOTER */
+        .result-tfoot-row td {
+            padding: 14px; font-family: var(--font-mono); font-weight: 700; font-size: 12px;
+            border-top: 1px solid var(--border-bright); background: var(--bg-card2);
+        }
+        .pg-display {
+            font-size: 22px; font-weight: 800; text-align: center; color: var(--accent);
+            font-family: var(--font-display); letter-spacing: 0.02em;
+        }
+        .total-pts { font-size: 18px; font-weight: 800; color: var(--accent); text-align: center; }
+
+        .gap-footer {
+            padding: 14px 20px; text-align: center;
+            font-family: var(--font-mono); font-size: 14px; font-weight: 700;
+            letter-spacing: 0.08em; text-transform: uppercase;
+            border-top: 1px solid var(--border);
+        }
+        .gap-footer.danger { background: var(--red-dim); color: var(--red); }
+        .gap-footer.success { background: var(--green-dim); color: var(--green); }
+
+        /* SPECIAL BANNER */
+        .special-card {
+            background: var(--red-dim); border: 1px solid rgba(220,38,38,0.25);
+            border-radius: 12px; overflow: hidden; cursor: pointer;
+        }
+        .special-header {
+            background: rgba(220,38,38,0.06); padding: 10px 18px;
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+            letter-spacing: 0.2em; text-transform: uppercase; color: var(--red);
+            border-bottom: 1px solid rgba(220,38,38,0.15);
+        }
+        .special-body { padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+        .special-title { font-size: 13px; font-weight: 700; color: #7f1d1d; }
+
+        /* SIDEBAR */
+        .sidebar-card {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+            overflow: hidden; position: sticky; top: 110px; height: calc(100vh - 140px);
+            display: flex; flex-direction: column;
+            box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+        }
+        .sidebar-header {
+            padding: 16px 18px; border-bottom: 1px solid var(--border);
+            background: var(--bg-card2); flex-shrink: 0;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .sidebar-icon {
+            width: 32px; height: 32px; border-radius: 8px;
+            background: linear-gradient(135deg, var(--accent), #5b4bf8);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 800; color: white; font-style: italic;
+            flex-shrink: 0; box-shadow: 0 1px 6px rgba(37,99,235,0.15);
+        }
+        .sidebar-title-text {
+            font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+            letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-secondary);
+        }
+        .sidebar-empty {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.1em; text-align: center; padding: 20px;
+            opacity: 0.8;
+        }
+        .sidebar-content { flex: 1; overflow-y: auto; padding: 20px; display: none; }
+        .sidebar-content::-webkit-scrollbar { width: 4px; }
+        .sidebar-content::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        .side-item-title {
+            font-size: 16px; font-weight: 800; color: var(--accent);
+            font-style: italic; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 16px;
+        }
+        .side-section-label {
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+            letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 8px;
+        }
+        .side-check-box {
+            background: var(--bg-base); border: 1px solid var(--border); border-radius: 8px;
+            padding: 12px 14px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        .side-step {
+            background: var(--bg-card2); border: 1px solid var(--border); border-radius: 8px;
+            padding: 10px 12px; margin-bottom: 8px;
+        }
+        .side-step-label {
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+            letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px;
+        }
+        .side-step-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+        /* ORIG-REF BADGE */
+        .orig-ref-badge {
+            display: inline-block; margin-top: 4px;
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+            background: var(--accent-dim); color: var(--accent); padding: 2px 7px;
+            border-radius: 4px; border: 1px solid rgba(37,99,235,0.15); font-style: italic;
+        }
+
+        /* VORGUTACHTEN- & EIGENE-EINSCHÄTZUNG-BOXEN – gleiche Größe (Reiter "Einschätzung & Vergleich") */
+        .vorg-box, .own-box {
+            box-sizing: border-box; width: 100%; min-height: 60px;
+            display: flex; flex-direction: column; justify-content: center; gap: 5px;
+            border-radius: 8px; padding: 8px 11px;
+            background: var(--cbg); border: 1px solid var(--cbd); border-left: 4px solid var(--c);
+        }
+        /* Vorgutachten: GELB (Standard) */
+        .vorg-box {
+            margin-bottom: 8px;
+            --c: #b45309; --cbg: rgba(245,158,11,0.12); --cbd: rgba(245,158,11,0.40);
+        }
+        /* Vorgutachten: ROT + auf halbe Größe verkleinert, sobald die eigene Einschätzung höher ist */
+        .vorg-box.vorg-higher {
+            --c: #dc2626; --cbg: rgba(220,38,38,0.10); --cbd: rgba(220,38,38,0.45);
+            min-height: 30px; padding: 3px 11px; gap: 1px; margin-bottom: 8px;
+        }
+        .vorg-box.vorg-higher .vorg-tag { font-size: 7px; }
+        .vorg-box.vorg-higher .vorg-val { font-size: 11px; }
+        .vorg-box.vorg-higher .vorg-dot { width: 7px; height: 7px; }
+        /* Eigene Einschätzung: GRÜN */
+        .own-box {
+            --c: #15803d; --cbg: rgba(22,163,74,0.10); --cbd: rgba(22,163,74,0.35);
+        }
+        .vorg-tag, .own-label {
+            font-family: var(--font-mono); font-size: 8px; font-weight: 700;
+            letter-spacing: 0.12em; text-transform: uppercase; color: var(--c);
+        }
+        .vorg-content { display: flex; align-items: center; gap: 8px; }
+        .vorg-val { font-size: 15px; font-weight: 800; color: var(--c); font-style: italic; line-height: 1.1; }
+        .vorg-val.vorg-empty { color: var(--text-muted); font-style: normal; }
+        .vorg-scale { display: inline-flex; gap: 4px; margin-left: auto; }
+        .vorg-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border-bright); }
+        .vorg-dot.on { background: var(--c); box-shadow: 0 0 0 3px var(--cbg); }
+        /* Bedienelemente der eigenen Einschätzung in Grün */
+        .own-box input[type="range"]::-webkit-slider-thumb { background: var(--c); box-shadow: 0 1px 4px rgba(22,163,74,0.35); }
+        .own-box input[type="range"]::-moz-range-thumb { background: var(--c); }
+        .own-box .slider-label { color: var(--c); }
+        .own-box .m5-disp { color: var(--c) !important; }
+        .own-box .m5-period-btn.active { background: var(--c); }
+
+        /* DIAGNOSES TABLE */
+        .diag-table { width: 100%; border-collapse: collapse; }
+        .diag-table thead th {
+            background: var(--bg-card2); font-family: var(--font-mono); font-size: 9px;
+            font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-secondary);
+            padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border);
+        }
+        .diag-table tbody tr { border-bottom: 1px solid var(--border); }
+        .diag-table tbody td { padding: 6px 8px; }
+
+        /* CUSTOM MODAL CONFIRMATION */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; z-index: 9500;
+            background: rgba(15,23,42,0.4); backdrop-filter: blur(6px);
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            width: 440px; background: var(--bg-card); border: 1px solid var(--border-bright);
+            border-radius: 14px; overflow: hidden; box-shadow: 0 10px 30px rgba(15,23,42,0.1);
+        }
+        .modal-box-body { padding: 24px; }
+        .modal-title { font-size: 16px; font-weight: 800; color: var(--text-primary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .modal-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px; }
+        .modal-box-footer {
+            padding: 16px 24px; background: var(--bg-card2); border-top: 1px solid var(--border);
+            display: flex; justify-content: flex-end; gap: 12px;
+        }
+
+        /* GRID HELPERS */
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .col-span-2 { grid-column: span 2; }
+        .space-y-6 > * + * { margin-top: 24px; }
+        .space-y-4 > * + * { margin-top: 16px; }
+
+        /* RESPONSIVE */
+        @media (max-width: 1100px) {
+            .grid-2col { display: grid; grid-template-columns: 1fr; }
+            .sidebar-card { position: relative; top: 0; height: auto; }
+        }
+        @media (max-width: 768px) {
+            .grid-4 { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+
+        /* VORGUTACHTEN ORIG BANNER */
+        .orig-ref-tfoot { background: rgba(37,99,235,0.04); }
+        .orig-ref-tfoot td {
+            padding: 10px 14px; font-family: var(--font-mono); font-size: 10px;
+            font-weight: 700; color: rgba(37,99,235,0.9); font-style: italic;
+            border-top: 1px solid var(--border-bright); border-bottom: 1px solid var(--border);
+        }
+
+        /* PG THRESHOLDS HINT */
+        .pg-thresholds {
+            display: flex; gap: 4px; justify-content: center;
+            font-family: var(--font-mono); font-size: 9px; color: var(--text-muted);
+            padding: 8px 14px; border-top: 1px solid var(--border);
+            background: var(--bg-card2);
+        }
+        .pg-thresholds span { padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border); }
+
+        /* STUFE 1: IMPORT-PRÜFUNG (Human-in-the-Loop) */
+        .review-overlay { display: none; position: fixed; inset: 0; z-index: 9600; background: rgba(15,23,42,0.55); backdrop-filter: blur(4px); }
+        .review-overlay.active { display: flex; align-items: center; justify-content: center; }
+        .review-box { width: 96vw; height: 94vh; background: var(--bg-card); border: 1px solid var(--border-bright); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(15,23,42,0.2); }
+        .review-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--bg-card2); flex-shrink: 0; }
+        .review-header .rh-title { font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-secondary); }
+        .review-body { flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+        .review-pdf { border-right: 1px solid var(--border); background: #525659; overflow: auto; }
+        .review-pdf iframe { width: 100%; height: 100%; border: none; }
+        .review-form { overflow-y: auto; padding: 18px 22px; }
+        .rev-section { margin-bottom: 20px; }
+        .rev-sec-title { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+        .rev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .rev-field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-secondary); }
+        .rev-field > span { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase; }
+        .rev-field input, .rev-field select, .rev-diag input, .rev-crit select, .rev-crit input, .rev-mod-grid input, .rev-textarea { background: var(--bg-base); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 12px; color: var(--text-primary); font-family: var(--font-display); outline: none; }
+        .rev-field input:focus, .rev-field select:focus, .rev-diag input:focus, .rev-crit select:focus, .rev-crit input:focus, .rev-mod-grid input:focus, .rev-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .rev-field.rev-inline { flex-direction: row; align-items: center; gap: 8px; font-size: 12px; }
+        .rev-diag { display: flex; gap: 8px; margin-bottom: 6px; }
+        .rev-diag input:last-child { flex: 1; }
+        .rev-mod-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; align-items: center; }
+        .rev-mod-grid input { width: 100%; }
+        .rev-mod-head { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--text-muted); }
+        .rev-textarea { width: 100%; min-height: 90px; resize: vertical; line-height: 1.5; }
+        .rev-mod-label { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--accent); margin: 14px 0 6px; }
+        .rev-crit { display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 6px; margin-bottom: 4px; border: 1px solid var(--border); }
+        .rev-crit.rev-ok { background: var(--green-dim); border-color: rgba(22,163,74,0.25); }
+        .rev-crit.rev-missing { background: var(--yellow-dim); border-color: rgba(180,83,9,0.25); }
+        .rev-crit-nr { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+        .rev-crit-title { font-size: 12px; }
+        .rev-crit-ctrl { display: flex; gap: 6px; align-items: center; }
+        @media (max-width: 900px) { .review-body { grid-template-columns: 1fr; grid-template-rows: 40% 60%; } .review-pdf { border-right: none; border-bottom: 1px solid var(--border); } }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-inner">
+        <div class="logo-block">
+            <div class="logo-icon">CS</div>
+            <div class="logo-text">
+                <div class="logo-title">Pflege-Assistent</div>
+                <div class="logo-sub">Master v66.44 · Comparative Analysis System</div>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="status-badge ready" id="system-status-badge">
+                <div class="dot"></div>
+                <span id="system-status-text">Bereit</span>
+            </div>
+
+            <!-- API-Schlüssel Input für die lokale PC-Ausführung -->
+            <div style="display:flex; align-items:center; gap:4px;">
+                <input type="password" id="user-api-key" class="field-input" style="width: 150px; font-family: var(--font-mono); font-size: 10px; height: 34px; border-color: var(--border-bright);" placeholder="🔑 API-Schlüssel" oninput="userApiKey = this.value; saveApiKey()" onpaste="setTimeout(function(){ var e=document.getElementById('user-api-key'); userApiKey=e.value; saveApiKey(); }, 0)">
+                <button type="button" class="btn btn-ghost" id="api-key-toggle" title="Schlüssel anzeigen/verbergen" style="height:34px; padding:8px 10px;" onclick="toggleApiKeyVisible()">👁</button>
+                <button type="button" class="btn btn-ghost" title="Aus Zwischenablage einfügen" style="height:34px; padding:8px 10px;" onclick="pasteApiKey()">📋 Einfügen</button>
+            </div>
+
+            <button class="btn btn-primary" onclick="saveCase()">Speichern</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">Fall laden</button>
+            <input type="file" id="importFile" accept=".json" onchange="loadCase(event)" style="display:none">
+
+            <button class="btn btn-ai" onclick="document.getElementById('gutachtenFile').click()">⚡ KI Gutachten einlesen</button>
+            <input type="file" id="gutachtenFile" accept=".pdf,image/*" onchange="aiReadGutachten(event)" style="display:none">
+
+            <button class="btn btn-ghost" onclick="showConfirmModal()">Reset</button>
+        </div>
+    </div>
+    <nav class="tabs">
+        <button onclick="switchTab(1)" id="btn-tab-1" class="tab-btn active">1. Stammdaten &amp; Diagnosen</button>
+        <button onclick="switchTab(3)" id="btn-tab-3" class="tab-btn">2. Einschätzung &amp; Vergleich</button>
+        <button onclick="switchTab(4)" id="btn-tab-4" class="tab-btn">3. Auswertung</button>
+    </nav>
+</header>
+
+<main>
+
+    <section id="tab-1" class="tab-content active space-y-6">
+        <div class="card">
+            <div class="card-header"><div class="dot"></div>Begutachtungs-Informationen</div>
+            <div style="padding:20px">
+                <div class="grid-4" style="gap:16px">
+                    <div class="col-span-2">
+                        <label class="field-label">Betreffend</label>
+                        <input type="text" id="stam-betreffend" class="field-input" placeholder="Nachname, Vorname">
+                    </div>
+                    <div>
+                        <label class="field-label">Geboren am</label>
+                        <input type="date" id="stam-geboren" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Kundennummer</label>
+                        <input type="text" id="stam-kundennummer" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Kasse</label>
+                        <input type="text" id="stam-kasse" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Versicherungs-Nr.</label>
+                        <input type="text" id="stam-versnr" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Bescheiddatum</label>
+                        <input type="date" id="stam-bescheid" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Antragsdatum</label>
+                        <input type="date" id="stam-antrag" class="field-input">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="field-label">Gutachtenorganisation</label>
+                        <input type="text" id="stam-organisation" class="field-input" placeholder="z.B. MD">
+                    </div>
+                    <div>
+                        <label class="field-label">Begutachtungsdatum</label>
+                        <input type="date" id="stam-begutachtung" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Durchführungsart</label>
+                        <select id="stam-art" class="field-input">
+                            <option>Hausbesuch</option>
+                            <option>Telefonisch</option>
+                            <option>Aktenlage</option>
+                        </select>
+                    </div>
+                    <div class="col-span-2 highlight-field">
+                        <label class="field-label">Pflegegrad (Gutachten)</label>
+                        <input type="text" id="stam-pg-manual" class="field-input" placeholder="Händisch eintragen">
+                    </div>
+                    <div class="col-span-2 highlight-field">
+                        <label class="field-label">Gesamtpunkte (Gutachten)</label>
+                        <input type="text" id="stam-pts-manual" class="field-input" placeholder="Händisch eintragen">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="dot"></div>Diagnosen Matrix (ICD 10)</div>
+            <div style="overflow-x:auto">
+                <table class="diag-table">
+                    <thead>
+                        <tr><th style="width:140px;border-right:1px solid var(--border)">ICD 10 Code</th><th>Diagnosen</th></tr>
+                    </thead>
+                    <tbody id="diag-rows-container"></tbody>
+                </table>
+            </div>
+            <div style="padding:16px 20px;border-top:1px solid var(--border)">
+                <label class="field-label">Anamnese</label>
+                <textarea id="stam-anamnese" class="field-input" placeholder="Anamnese aus dem Gutachten..." oninput="autoResize(this)" style="min-height:120px"></textarea>
+            </div>
+            <div style="padding:0 20px 16px 20px">
+                <label class="field-label">Befund</label>
+                <textarea id="stam-befund" class="field-input" placeholder="Befund aus dem Gutachten..." oninput="autoResize(this)" style="min-height:120px"></textarea>
+            </div>
+        </div>
+    </section>
+
+
+    <section id="tab-3" class="tab-content"></section>
+
+    <section id="tab-4" class="tab-content">
+        <div id="auswertung-content">
+            <div class="card" style="padding:60px;text-align:center;opacity:0.4;border-style:dashed">
+                <p style="font-size:22px;font-weight:800;text-transform:uppercase;font-style:italic;color:var(--text-muted)">Vergleichsbericht</p>
+                <p style="font-size:13px;color:var(--text-muted);margin-top:8px">Wird automatisch nach Dateneingabe in Tab 2 &amp; 3 generiert.</p>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<div id="confirm-modal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-box-body">
+            <div class="modal-title">Zurücksetzen bestätigen</div>
+            <p class="modal-desc">Möchten Sie wirklich alle eingetragenen Daten löschen und die Anwendung in den Auslieferungszustand zurückversetzen? Dieser Schritt kann nicht rückgängig gemacht werden.</p>
+        </div>
+        <div class="modal-box-footer">
+            <button class="btn btn-secondary" onclick="closeConfirmModal()">Abbrechen</button>
+            <button class="btn btn-primary" style="background:var(--red); box-shadow:0 2px 8px rgba(220,38,38,0.25)" onclick="window.location.reload()">Daten zurücksetzen</button>
+        </div>
+    </div>
+</div>
+
+<div id="ai-overlay">
+    <div class="ai-spinner"></div>
+    <div class="ai-overlay-title">KI liest Gutachten aus...</div>
+    <div class="ai-overlay-sub" id="ai-overlay-step">Datei wird vorbereitet</div>
+    <div class="ai-progress-bar"><div class="ai-progress-fill" id="ai-progress-fill"></div></div>
+</div>
+
+<div id="review-overlay" class="review-overlay">
+    <div class="review-box">
+        <div class="review-header">
+            <div class="rh-title">Gutachten prüfen &amp; übernehmen</div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-secondary" onclick="closeReview()">Verwerfen</button>
+                <button class="btn btn-primary" onclick="applyReviewedImport()">✓ Werte übernehmen</button>
+            </div>
+        </div>
+        <div class="review-body">
+            <div id="review-pdf" class="review-pdf"></div>
+            <div id="review-form" class="review-form"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// API Key: Always set const apiKey = "" (empty string). The execution environment provides the key at runtime.
+const apiKey = "";
+let userApiKey = "";
+
+// API-Schlüssel lokal merken, damit er nur einmal eingetragen werden muss
+const API_KEY_STORAGE = "pflege_assistent_api_key";
+
+function saveApiKey() {
+    const el = document.getElementById('user-api-key');
+    if (!el) return;
+    userApiKey = el.value.trim();
+    try { localStorage.setItem(API_KEY_STORAGE, userApiKey); } catch (e) {}
+}
+
+function loadApiKey() {
+    const el = document.getElementById('user-api-key');
+    if (!el) return;
+    let stored = "";
+    try { stored = localStorage.getItem(API_KEY_STORAGE) || ""; } catch (e) {}
+    if (stored) {
+        el.value = stored;
+        userApiKey = stored;
+    }
+}
+
+function toggleApiKeyVisible() {
+    const el = document.getElementById('user-api-key');
+    const btn = document.getElementById('api-key-toggle');
+    if (!el) return;
+    if (el.type === 'password') {
+        el.type = 'text';
+        if (btn) btn.innerText = '🙈';
+    } else {
+        el.type = 'password';
+        if (btn) btn.innerText = '👁';
+    }
+}
+
+async function pasteApiKey() {
+    const el = document.getElementById('user-api-key');
+    if (!el) return;
+    try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+            const text = await navigator.clipboard.readText();
+            el.value = (text || "").trim();
+            saveApiKey();
+            // Kurz sichtbar machen, damit der Nutzer das Einfügen bestätigt sieht
+            el.type = 'text';
+            const btn = document.getElementById('api-key-toggle');
+            if (btn) btn.innerText = '🙈';
+            showToast("API-Schlüssel aus Zwischenablage eingefügt.", "success");
+        } else {
+            throw new Error("no-clipboard-api");
+        }
+    } catch (e) {
+        el.focus();
+        showToast("Automatisches Einfügen blockiert. Bitte ins Feld klicken und mit Strg+V einfügen.", "error");
+    }
+}
+
+const PREFIX_M3 = "Ist eine psychiatrische Erkrankung oder eine Demenz fachärztlich diagnostiziert? ";
+const M4_IMPORTANT = "<b>Wichtig:</b> Bei kognitiven Einschränkungen → Wertung unter 4.2.5 prüfen.";
+
+const ITEMS = [
+    { id:0, nr:"F 4.1.B", title:"Besondere Bedarfskonstellation", info:{ check:"Gebrauchsunfähigkeit beider Arme und Beine (§ 15 Abs. 4 SGB XI).", steps:[{l:"PG 5",d:"Sofortige Zuordnung ohne weitere Punkteprüfung."}] } },
+    { id:1, m:1, nr:"4.1.1", title:"Positionswechsel im Bett", opts:["selbständig","überwiegend selbständig","überwiegend unselbständig","unselbständig"], info:{ check:"Kann sich die Person im Bett eigenständig umdrehen, Beine bewegen oder aufrichten?", steps:[{l:"Überwiegend selbständig",d:"Nur geringfügige Hilfe nötig, z.B. Beine aus dem Bett rausheben."},{l:"Überwiegend unselbständig",d:"Hoher Unterstützungsbedarf, Lage kann danach selbst gehalten werden."},{l:"Unselbständig",d:"Lage kann nicht beibehalten werden."}] } },
+    { id:2, m:1, nr:"4.1.2", title:"Halten einer stabilen Sitzposition", opts:["selbständig","überwiegend selbständig","überwiegend unselbständig","unselbständig"], info:{ check:"Frei auf Bettkante oder Stuhl ohne Lehne sitzen.", steps:[{l:"Überwiegend selbständig",d:"Absicherung unmittelbar daneben erforderlich."}] } },
+    { id:3, m:1, nr:"4.1.3", title:"Umsetzen", opts:["selbständig","überwiegend selbständig","überwiegend unselbständig","unselbständig"], info:{ check:"Transfer Bett zu Rollstuhl / Sessel zu WC.", steps:[{l:"Unselbständig",d:"Muss komplett gehoben werden."}] } },
+    { id:4, m:1, nr:"4.1.4", title:"Fortbewegen innerhalb des Wohnbereichs", opts:["selbständig","überwiegend selbständig","überwiegend unselbständig","unselbständig"], info:{ check:"Weg zum WC oder ca. 8 m in der Wohnung.", rule:"Rollator oder Rollstuhl (selbst angetrieben) → selbständig." } },
+    { id:5, m:1, nr:"4.1.5", title:"Treppensteigen", opts:["selbständig","überwiegend selbständig","überwiegend unselbständig","unselbständig"], info:{ check:"Ganze Etage in aufrechter Haltung überwinden.", rule:"Treppengeländer allein genutzt → selbständig." } },
+    { id:6, m:2, nr:"4.2.1", title:"Personen aus dem näheren Umfeld erkennen", opts:["unbeeinträchtigt","größtenteils vorh.","gering vorh.","nicht vorh."], info:{ check:"Erkennt Bezugspersonen jederzeit sicher?", rule:"Brille/Hörgerät zählt nicht." } },
+    { id:7, m:2, nr:"4.2.2", title:"Örtliche Orientierung", opts:["unbeeinträchtigt","größtenteils vorh.","gering vorh.","nicht vorh."], info:{ check:"Sicher zurechtfinden in Wohnung und nahem Umfeld?", rule:"Türbeschriftungen / Handy-App allein genutzt → unbeeinträchtigt." } },
+    { id:8, m:2, nr:"4.2.3", title:"Zeitliche Orientierung", opts:["unbeeinträchtigt","größtenteils vorh.","gering vorh.","nicht vorh."], info:{ check:"Tageszeit, Wochentag, Monat bekannt?", steps:[{l:"Nicht vorhanden",d:"Hat jegliches Zeitgefühl verloren."}] } },
+    { id:9, m:2, nr:"4.2.4", title:"Erinnern an wesentliche Ereignisse", opts:["unbeeinträchtigt","größtenteils vorh.","gering vorh.","nicht vorh."], info:{ check:"Bericht über letzte 24 Stunden möglich? Rein kognitiv." } },
+    { id:10, m:2, nr:"4.2.5", title:"Steuern von mehrschrittigen Alltagshandlungen", opts:["unbeeinträchtigt","größtenteils vorh.","gering vorh.","nicht vorh."], info:{ check:"Planen (z.B. Kaffee kochen)? Rein kognitiv!", rule:"Checkliste selbständig genutzt → unbeeinträchtigt." } },
+    { id:11, m:2, nr:"4.2.6", title:"Treffen von Entscheidungen im Alltagsleben", opts:["unbeeinträchtigt","größtenteils vorh.","gering vorh.","nicht vorh."], info:{ check:"Zweckmäßig entscheiden (Kleidung)?", steps:[{l:"Gering vorhanden",d:"Trifft unlogische Entscheidungen."}] } },
+    { id:12, m:2, nr:"4.2.7", title:"Verstehen von Sachverhalten und Informationen", opts:["unbeeinträchtigt","größtenteils vorh.","gering vorh.","nicht vorh."], info:{ check:"Begreift Person Inhalte? NICHT Gehör bewerten!" } },
+    { id:13, m:2, nr:"4.2.8", title:"Erkennen von Risiken und Gefahren", opts:["unbeeinträchtigt","größtenteils vorh.","gering vorh.","nicht vorh."], info:{ check:"Herdplatte, Verkehr?", rule:"Warnsysteme allein genutzt → unbeeinträchtigt." } },
+    { id:14, m:2, nr:"4.2.9", title:"Mitteilen von elementaren Bedürfnissen", opts:["unbeeinträchtigt","größtenteils vorh.","gering vorh.","nicht vorh."], info:{ check:"Hunger, Schmerz, Toilettengang verständlich äußern?" } },
+    { id:15, m:2, nr:"4.2.10", title:"Verstehen von Aufforderungen", opts:["unbeeinträchtigt","größtenteils vorh.","gering vorh.","nicht vorh."], info:{ check:"'Komm bitte zum Essen'. Kognition + Gehör." } },
+    { id:16, m:2, nr:"4.2.11", title:"Beteiligen an einem Gespräch", opts:["unbeeinträchtigt","größtenteils vorh.","gering vorh.","nicht vorh."], info:{ check:"Einer Runde folgen, Thema halten?", rule:"Sprachcomputer / Hörgerät → selbständig." } },
+    { id:17, m:3, nr:"4.3.1", title:"Motorisch geprägte Verhaltensauffälligkeiten", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5], info:{ check:PREFIX_M3+"Bewegungsdrang? Zielloses Umherlaufen?" } },
+    { id:18, m:3, nr:"4.3.2", title:"Nächtliche Unruhe", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5], info:{ check:PREFIX_M3+"Geistert die Person nachts durch das Haus?" } },
+    { id:19, m:3, nr:"4.3.3", title:"Selbstschädigendes und autoaggressives Verhalten", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5] },
+    { id:20, m:3, nr:"4.3.4", title:"Beschädigen von Gegenständen", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5] },
+    { id:21, m:3, nr:"4.3.5", title:"Physisch aggressives Verhalten gegenüber anderen Personen", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5] },
+    { id:22, m:3, nr:"4.3.6", title:"Verbale Aggression", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5] },
+    { id:23, m:3, nr:"4.3.7", title:"Andere pflegerelevante vokale Auffälligkeiten", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5] },
+    { id:24, m:3, nr:"4.3.8", title:"Abwehr von pflegerischen Maßnahmen", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5], info:{ check:PREFIX_M3+"Psychische Abwehr. Keine körperliche Steifheit bewerten." } },
+    { id:25, m:3, nr:"4.3.9", title:"Wahnvorstellungen und Halluzinationen", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5] },
+    { id:26, m:3, nr:"4.3.10", title:"Ängste", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5] },
+    { id:27, m:3, nr:"4.3.11", title:"Antriebslosigkeit bei depressiver Stimmungslage", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5], info:{ check:"Depression diagnostiziert? Motor aus?" } },
+    { id:28, m:3, nr:"4.3.12", title:"Sozial inadäquate Verhaltensweisen", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5] },
+    { id:29, m:3, nr:"4.3.13", title:"Sonstige pflegerelevante psychische Problemlagen", opts:["nie/selten","selten","häufig","täglich"], val:[0,1,3,5] },
+    { id:30, m:4, nr:"4.4.1", title:"Waschen des vorderen Oberkörpers", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"], info:{ check:"Gesicht, Hände, Arme. "+M4_IMPORTANT } },
+    { id:31, m:4, nr:"4.4.2", title:"Körperpflege im Bereich des Kopfes", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:32, m:4, nr:"4.4.3", title:"Waschen des Intimbereichs", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:33, m:4, nr:"4.4.4", title:"Duschen und Baden einschließlich Haarewaschen", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:34, m:4, nr:"4.4.5", title:"An- und Auskleiden des Oberkörpers", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:35, m:4, nr:"4.4.6", title:"An- und Auskleiden des Unterkörpers", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:36, m:4, nr:"4.4.7", title:"Mundgerechtes Zubereiten der Nahrung und Eingießen von Getränken", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:37, m:4, nr:"4.4.8", title:"Essen", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"], val:[0,3,6,9] },
+    { id:38, m:4, nr:"4.4.9", title:"Trinken", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"], val:[0,2,4,6] },
+    { id:39, m:4, nr:"4.4.10", title:"Benutzen einer Toilette oder eines Toilettenstuhls", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"], val:[0,2,4,6] },
+    { id:40, m:4, nr:"4.4.11", title:"Bewältigen der Folgen einer Harninkontinenz und Umgang mit Dauerkatheter", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:41, m:4, nr:"4.4.12", title:"Bewältigen der Folgen einer Stuhlinkontinenz und Umgang mit Stoma", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:42, m:4, nr:"4.4.13", title:"Ernährung parenteral oder über Sonde", opts:["selbständig / nicht tägl.","tägl. zusätzlich oral","ausschließlich"], val:[0,6,3] },
+    { id:43, m:5, nr:"4.5.1", title:"Medikation", group:"A", info:{ check:"Tabletten, Tropfen, Aerosole." } },
+    { id:44, m:5, nr:"4.5.2", title:"Injektionen", group:"A" },
+    { id:45, m:5, nr:"4.5.3", title:"Versorgung intravenöser Zugänge (Port)", group:"A" },
+    { id:46, m:5, nr:"4.5.4", title:"Absaugen und Sauerstoffgabe", group:"A" },
+    { id:47, m:5, nr:"4.5.5", title:"Einreibungen oder Kälte- und Wärmeanwendungen", group:"A" },
+    { id:48, m:5, nr:"4.5.6", title:"Messung und Deutung von Körperzuständen", group:"A" },
+    { id:49, m:5, nr:"4.5.7", title:"Versorgung mit körpernahen Hilfsmitteln", group:"A" },
+    { id:50, m:5, nr:"4.5.8", title:"Verbandwechsel und Wundversorgung", group:"B" },
+    { id:51, m:5, nr:"4.5.9", title:"Versorgung mit Stoma", group:"B" },
+    { id:52, m:5, nr:"4.5.10", title:"Regelmäßige Einmalkatheterisierung und Nutzung von Abführmethoden", group:"B" },
+    { id:53, m:5, nr:"4.5.11", title:"Therapiemaßnahmen in häuslicher Umgebung", group:"B" },
+    { id:54, m:5, nr:"4.5.12", title:"Zeit- und technikintensive Maßnahmen", group:"C", factor:{D:60,W:8.6,M:2} },
+    { id:55, m:5, nr:"4.5.13", title:"Arztbesuche", group:"C", factor:{W:4.3,M:1} },
+    { id:56, m:5, nr:"4.5.14", title:"Besuch anderer med./therapeutischer Einrichtungen (bis 3h)", group:"C", factor:{W:4.3,M:1} },
+    { id:57, m:5, nr:"4.5.15", title:"Zeitlich ausgedehnte Besuche med./therapeutischer Einrichtungen (über 3h)", group:"C", factor:{W:8.6,M:2} },
+    { id:58, m:5, nr:"4.5.16", title:"Einhalten einer Diät oder krankheitsbedingter Verhaltensvorschriften", group:"D", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"], val:[0,1,2,3] },
+    { id:59, m:6, nr:"4.6.1", title:"Gestaltung des Tagesablaufs und Anpassung an Veränderungen", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:60, m:6, nr:"4.6.2", title:"Ruhen und Schlafen", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:61, m:6, nr:"4.6.3", title:"Sichbeschäftigen", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:62, m:6, nr:"4.6.4", title:"Vornehmen von in die Zukunft gerichteten Planungen", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:63, m:6, nr:"4.6.5", title:"Interaktion mit Personen im direkten Kontakt", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] },
+    { id:64, m:6, nr:"4.6.6", title:"Kontaktpflege zu Personen außerhalb des direkten Umfelds", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] }
+];
+
+let stateOrig = { special:0, values:{} };
+let stateEigene = { special:0, values:{} };
+
+// Mitschrift des Erstgesprächs (Reiter "Auswertung"). Wird in die KI-Begründung eingearbeitet.
+let erstgespraechNotes = "";
+// Zwischengespeicherter KI-Entwurf, damit er beim Tab-Wechsel nicht verloren geht.
+let appealDraft = "";
+
+// ROBUST DATUM-PARSER FOR BROWSER DATE PICKERS (YYYY-MM-DD)
+function formatToYYYYMMDD(dateStr) {
+    if (!dateStr) return "";
+    let clean = dateStr.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+
+    // DD.MM.YYYY
+    let ddmmyyyy = clean.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (ddmmyyyy) {
+        let day = ddmmyyyy[1].padStart(2, '0');
+        let month = ddmmyyyy[2].padStart(2, '0');
+        let year = ddmmyyyy[3];
+        return `${year}-${month}-${day}`;
+    }
+
+    // German Month Names
+    const months = {
+        "jan": "01", "feb": "02", "mär": "03", "apr": "04", "mai": "05", "jun": "06",
+        "jul": "07", "aug": "08", "sep": "09", "okt": "10", "nov": "11", "dez": "12",
+        "januar": "01", "februar": "02", "märz": "03", "april": "04", "juni": "06",
+        "juli": "07", "august": "08", "september": "09", "oktober": "10", "november": "11", "dezember": "12"
+    };
+    let matchWord = clean.match(/^(\d{1,2})\.?\s+([a-zA-ZäöüÄÖÜß\.]+)\s+(\d{4})$/);
+    if (matchWord) {
+        let day = matchWord[1].padStart(2, '0');
+        let monthName = matchWord[2].toLowerCase().replace(/\./g, '');
+        let month = months[monthName] || "01";
+        let year = matchWord[3];
+        return `${year}-${month}-${day}`;
+    }
+
+    try {
+        let d = new Date(clean);
+        if (!isNaN(d.getTime())) {
+            let day = String(d.getDate()).padStart(2, '0');
+            let month = String(d.getMonth() + 1).padStart(2, '0');
+            let year = d.getFullYear();
+            return `${year}-${month}-${day}`;
+        }
+    } catch(e) {}
+
+    return "";
+}
+
+function switchTab(id) {
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-'+id).classList.add('active');
+    document.getElementById('btn-tab-'+id).classList.add('active');
+    if (id === 4) renderAuswertung();
+}
+
+function autoResize(t) {
+    if (!t) return;
+    t.style.height='auto';
+    t.style.height=t.scrollHeight+'px';
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// EXPONENTIAL BACKOFF FOR API CALLS (WITH RESILIENCE FOR RATE LIMITS)
+async function callGeminiWithRetry(url, payload) {
+    let delay = 1000;
+    for (let i = 0; i < 5; i++) {
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) {
+                return await response.json();
+            }
+            // Echte Fehlermeldung von Google auslesen (sonst sieht der Nutzer nur "400")
+            let apiMsg = "";
+            try {
+                const errBody = await response.json();
+                apiMsg = (errBody && errBody.error && errBody.error.message) ? errBody.error.message : "";
+            } catch (e2) {}
+            if (response.status === 400 && /api key not valid/i.test(apiMsg)) {
+                throw new Error("API Fehler: 400 – Der API-Schlüssel ist ungültig. Bitte prüfen Sie den oben rechts eingetragenen Google Gemini API-Schlüssel (aistudio.google.com).");
+            }
+            if (response.status === 429) {
+                if (i === 4) throw new Error("Anfragenlimit überschritten (Rate Limit 429). Bitte warten Sie ca. 1 Minute, bevor Sie es erneut versuchen.");
+            } else if (response.status >= 500 && response.status < 600) {
+                if (i === 4) throw new Error(`API Fehler: ${response.status} ${apiMsg || response.statusText}`);
+            } else {
+                throw new Error(`API Fehler: ${response.status} ${apiMsg || response.statusText}`);
+            }
+        } catch (e) {
+            if (e.message && (e.message.includes("400") || e.message.includes("403") || e.message.includes("404") || e.message.includes("429"))) {
+                throw e;
+            }
+            if (i === 4) throw e;
+        }
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2;
+    }
+}
+
+// INTELLIGENTES KI-FALLBACK-SYSTEM FÜR MODELLANFRAGEN (VERMEIDET 404 BEI PERSÖNLICHEN KEYS UND UNTERDRÜCKT FEHLER-OVERLAYS)
+async function callGeminiWithFallback(payload, systemPrompt) {
+    const domApiKey = document.getElementById('user-api-key') ? document.getElementById('user-api-key').value.trim() : "";
+    const cleanApiKey = (domApiKey || userApiKey.trim() || apiKey.trim()).trim();
+
+    if (!cleanApiKey) {
+        throw new Error("Bitte tragen Sie zuerst oben rechts Ihren Google Gemini API-Schlüssel ein!");
+    }
+
+    // Alle Modelle laufen über den v1beta-Endpunkt: nur dieser kennt "systemInstruction"
+    // sowie "responseMimeType"/"responseSchema" für strukturiertes JSON (v1 würde 400 werfen).
+    let models = [];
+    if (domApiKey || userApiKey.trim() !== "") {
+        models = [
+            { name: "gemini-2.5-flash", version: "v1beta" },
+            { name: "gemini-2.0-flash", version: "v1beta" },
+            { name: "gemini-1.5-flash", version: "v1beta" },
+            { name: "gemini-1.5-pro", version: "v1beta" }
+        ];
+    } else {
+        models = [
+            { name: "gemini-2.5-flash-preview-09-2025", version: "v1beta" },
+            { name: "gemini-2.5-flash", version: "v1beta" },
+            { name: "gemini-1.5-flash", version: "v1beta" }
+        ];
+    }
+
+    // Zuletzt erfolgreiches Modell zuerst probieren -> spart Anfragen (weniger 429),
+    // wenn der Schlüssel manche Modelle gar nicht unterstützt.
+    try {
+        const pref = localStorage.getItem('pflege_pref_model');
+        if (pref) {
+            const i = models.findIndex(m => m.name === pref);
+            if (i > 0) { const [m] = models.splice(i, 1); models.unshift(m); }
+        }
+    } catch (e) {}
+
+    let lastError = null;
+    for (const model of models) {
+        const url = `https://generativelanguage.googleapis.com/${model.version}/models/${model.name}:generateContent?key=${cleanApiKey}`;
+        const fullPayload = { ...payload, systemInstruction: { parts: [{ text: systemPrompt }] } };
+        try {
+            const response = await callGeminiWithRetry(url, fullPayload);
+            if (response) { try { localStorage.setItem('pflege_pref_model', model.name); } catch (e) {} return response; }
+        } catch (e) {
+            lastError = e;
+            if (e.message && e.message.includes("429")) throw e;
+
+            // Sicherheitsnetz: kennt das Modell die Schema-Felder nicht, ohne sie erneut versuchen.
+            if (e.message && /responseMimeType|responseSchema|generation_config/i.test(e.message) && fullPayload.generationConfig) {
+                try {
+                    const stripped = JSON.parse(JSON.stringify(fullPayload));
+                    if (stripped.generationConfig) {
+                        delete stripped.generationConfig.responseMimeType;
+                        delete stripped.generationConfig.responseSchema;
+                        if (Object.keys(stripped.generationConfig).length === 0) delete stripped.generationConfig;
+                    }
+                    const resp2 = await callGeminiWithRetry(url, stripped);
+                    if (resp2) { try { localStorage.setItem('pflege_pref_model', model.name); } catch (e) {} return resp2; }
+                } catch (e2) {
+                    lastError = e2;
+                    if (e2.message && e2.message.includes("429")) throw e2;
+                }
+            }
+            console.warn(`Model ${model.name} failed:`, e);
+        }
+    }
+    throw lastError || new Error("Keines der KI-Modelle konnte erreicht werden.");
+}
+
+function showConfirmModal() {
+    document.getElementById('confirm-modal').classList.add('active');
+}
+function closeConfirmModal() {
+    document.getElementById('confirm-modal').classList.remove('active');
+}
+
+function showOverlay(title, step) {
+    document.getElementById('ai-overlay').classList.add('active');
+    document.querySelector('.ai-overlay-title').innerText = title;
+    document.getElementById('ai-overlay-step').innerText = step;
+    document.getElementById('ai-progress-fill').style.width = '10%';
+    document.getElementById('system-status-badge').className = "status-badge processing";
+    document.getElementById('system-status-text').innerText = "Verarbeitet...";
+}
+function updateOverlay(step, pct) {
+    document.getElementById('ai-overlay-step').innerText = step;
+    document.getElementById('ai-progress-fill').style.width = pct + '%';
+}
+function hideOverlay() {
+    document.getElementById('ai-overlay').classList.remove('active');
+    document.getElementById('system-status-badge').className = "status-badge ready";
+    document.getElementById('system-status-text').innerText = "Bereit";
+}
+
+// STUFE 2: optionaler lokaler Extraktions-/OCR-Server (Alternative B).
+// Liefert den lokal ausgelesenen Gutachten-Text oder null (dann Direktweg an Gemini).
+const LOCAL_SERVER_URL = "http://127.0.0.1:8765";
+let lastServerReachable = false; // wurde der lokale Server beim letzten Versuch erreicht?
+async function tryLocalExtract(base64Data, mimeType) {
+    // 1) Schnelle Erreichbarkeitsprüfung (max 2,5s) – verhindert Hängen, wenn der Server aus ist.
+    lastServerReachable = false;
+    try {
+        const pc = new AbortController();
+        const pt = setTimeout(() => pc.abort(), 2500);
+        const pr = await fetch(LOCAL_SERVER_URL + "/ping", { signal: pc.signal, cache: "no-store" });
+        clearTimeout(pt);
+        if (!pr.ok) return null;
+        lastServerReachable = true;
+    } catch (e) {
+        console.info("Lokaler Server nicht erreichbar – Direktweg an Gemini.", e && e.message);
+        return null;
+    }
+    // 2) Eigentliche Extraktion (großzügiges Zeitlimit – gescannte PDFs brauchen OCR-Zeit).
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 180000);
+        const resp = await fetch(LOCAL_SERVER_URL + "/extract", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data: base64Data, mime: mimeType }),
+            signal: controller.signal
+        });
+        clearTimeout(timer);
+        if (!resp.ok) return null;
+        const json = await resp.json();
+        return (json && json.ok) ? json : null;
+    } catch (e) {
+        console.info("Lokale Extraktion fehlgeschlagen – Direktweg an Gemini.", e && e.message);
+        return null;
+    }
+}
+
+// Lokal ausgelesene Stammdaten/Diagnosen/Texte (vom Server) ins Datenformat der App bringen.
+function localMetaToData(local) {
+    const m = (local && local.meta) ? local.meta : {};
+    return {
+        stam_betreffend: m.betreffend || '',
+        stam_geboren: m.geboren || '',
+        stam_kasse: m.kasse || '',
+        stam_versnr: m.versnr || '',
+        stam_bescheid: m.bescheid || '',
+        stam_antrag: m.antrag || '',
+        stam_organisation: m.organisation || '',
+        stam_begutachtung: m.begutachtung || '',
+        stam_pg_manual: m.pg || '',
+        stam_pts_manual: m.pts || '',
+        anamnese: m.anamnese || '',
+        befund: m.befund || '',
+        diagnoses: Array.isArray(m.diagnoses) ? m.diagnoses : []
+    };
+}
+
+// Stufe 3: koordinatengenau lokal ausgelesene Werte (vom Server) in das values_orig-Format
+// der App umwandeln. Diese haben Vorrang vor der KI-Schätzung der Einzelkriterien.
+function serverValuesToValuesOrig(sv) {
+    const arr = [];
+    ITEMS.forEach(i => {
+        if (!i.nr) return;
+        const v = sv[i.nr];
+        if (!v) return;
+        if (i.m === 5 && i.group !== 'D') {
+            arr.push({ id: i.id, val_obj_count: (v.count != null ? v.count : 0), val_obj_period: (v.period || 'W') });
+        } else if (i.opts) {
+            let idx = (v.idx != null ? v.idx : 0);
+            if (idx < 0) idx = 0;
+            if (idx > i.opts.length - 1) idx = i.opts.length - 1;
+            arr.push({ id: i.id, val_num: idx });
+        }
+    });
+    return arr;
+}
+
+// AI PDF / IMAGE GUTACHTEN PARSER (WITH SYSTEMATIC LOKALISIERUNG FOR SPECIFIED SECTIONS)
+async function aiReadGutachten(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    showOverlay("KI liest Gutachten aus...", "Datei wird vorbereitet");
+
+    const reader = new FileReader();
+    reader.onerror = () => {
+        hideOverlay();
+        showToast("Die Datei konnte nicht gelesen werden.", "error");
+        event.target.value = '';
+    };
+    reader.onload = async () => {
+        try {
+            updateOverlay("Inhalt an Gemini übergeben...", 30);
+            const base64Data = reader.result.split(',')[1];
+            const mimeType = file.type;
+
+            const systemPrompt = `Du bist ein hochqualifizierter KI-Assistent für das deutsche Pflegerecht (SGB XI) und das Neue Begutachtungsassessment (NBA).
+            Deine Aufgabe ist es, aus dem übermittelten Dokument (Pflegegutachten des MD, MEDICPROOF etc.) alle relevanten Stammdaten, ICD-10 Diagnosen, Anamnesedaten, Befunddaten sowie die exakten Modulbewertungen des VORGUTACHTENS (Originalgutachten) zu extrahieren.
+
+            EXAKTE LOKALISIERUNGS- UND EXTRAKTIONSREGELN FÜR DIE STAMMDATEN:
+            1. Name (stam_betreffend): IMMER im Format "Herr Vorname Nachname" bzw. "Frau Vorname Nachname" (Anrede + Vorname + Nachname). Die Anrede (Herr/Frau) aus dem Adress-/Briefkopf übernehmen (z.B. "Herrn Jürgen Maier" -> "Herr Jürgen Maier"). NICHT als "Nachname, Vorname" zurückgeben.
+            2. Geburtsdatum (stam_geboren): MUSS immer ausgelesen werden. IMMER im Format tt.mm.jjjj zurückgeben (z.B. "12.04.1941"). Das gilt für ALLE Datumsfelder (geboren, Antrag, Bescheid, Begutachtung).
+            3. Kundennummer (stam_kundennummer): MUSS immer zwingend leer bzw. ein leerer String sein (""). Sie wird nicht automatisch befüllt, da sie für das händische Ausfüllen freigelassen wird.
+            4. Kasse (stam_kasse): Extrahiere die zuständige Pflegekasse/Krankenkasse.
+            5. Versicherungs-Nr. (stam_versnr): Extrahiere die Versichertennummer des Patienten.
+            6. Bescheiddatum (stam_bescheid): MUSS immer von der ersten Seite des Bescheids der jeweiligen Krankenkasse ausgelesen werden.
+            7. Antragsdatum (stam_antrag): MUSS auf den ersten paar Seiten des Gutachtens des Medizinischen Dienstes (MD) gesucht werden. Wichtig: Bei Medicproof-Gutachten ist das Antragsdatum nicht vorhanden – in diesem Fall MUSS es zwingend leer gelassen werden ("").
+            8. Gutachtenorganisation (stam_organisation): MUSS die tatsächliche Prüforganisation sein, NICHT die Krankenkasse/Pflegekasse (wie "AOK"). IMMER kanonisch formatieren als entweder "Medizinischer Dienst <Region>" (z.B. "Medizinischer Dienst Berlin-Brandenburg", "Medizinischer Dienst Baden-Württemberg") ODER "Medicproof GmbH". Suche im Briefkopf/Stempel/Logo der ersten Seiten.
+            9. Begutachtungsdatum (stam_begutachtung): Steht immer relativ am Anfang des Gutachtens und MUSS von dort ausgelesen werden.
+            10. Pflegegrad (stam_pg_manual): MUSS automatisch aus dem Gutachtenergebnis (z.B. "Pflegegrad 3" oder "Ergebnis: Pflegegrad 2") als einfache Zahl (0-5) extrahiert werden. Darf nicht leer gelassen werden!
+            11. Gesamtpunkte (stam_pts_manual): MUSS automatisch aus dem Gutachten extrahiert werden (z.B. die Gesamtpunktzahl wie "62.50" oder "37.5"). Darf nicht leer gelassen werden!
+            12. Diagnosen (diagnoses): Diese sind immer im Gutachten unter "Punkt 3. Pflegebegründende Diagnosen" (oder ähnlich formuliert) eingetragen. Extrahiere alle dort genannten Diagnosen. Falls im Text kein expliziter ICD-10-Code dabeisteht, recherchiere oder ergänze den passenden ICD-10-Code medizinisch korrekt (z.B. M16.9 bei Coxarthrose, G20 bei Parkinson, F32.9 bei Depression, G62.1 bei Alkohol-Polyneuropathie, M54.5 bei Rückenschmerzen). Liefere ein Array von Objekten mit "icd" (z.B. "M16.9") und "text" (z.B. "Koxarthrose, beidseitig") zurück.
+            13. Anamnese (anamnese): MUSS immer vollständig unter "Punkt 1.2" (Anamnese) aus den Gutachten des medizinischen Dienstes ausgelesen und als Fließtext übergeben werden.
+            14. Befund (befund): MUSS vollständig aus dem Gutachten ausgelesen werden. Lies alle Seiten des Gutachtens vollständig durch. Der gutachterliche Befund beginnt unter Kapitel "2." (Befunde zur Beeinträchtigung der Selbstständigkeit..." oder "Erhobene Befunde" oder "Befunde zur Beeinträchtigung" oder "Befunde zur Beeinträchtigung der Selbstständigkeit/Fähigkeiten") und endet erst dort, wo Kapitel "3." (Diagnosen) anfängt. Extrahiere alle strukturierten medizinischen und funktionellen Erhebungen vollständig dazwischen lückenlos (oft über 2-3 Seiten gehend) mit allen Stichpunkten, Zeilenumbrüchen (\\n) und Stichpunkten. Höre niemals am Ende der ersten Befundseite auf! Lese den Befund wortwörtlich und ungekürzt aus.
+            15. Modulwertungen (Modul-Ergebnisse):
+                Suche nach der Tabelle "Anlage: Berechnungs- und Bewertungsregeln zur Ermittlung der Pflegegrade" oder der Zusammenfassung der Modulwertungen des Originalgutachtens.
+                Extrahiere die exakten Einzelpunkte ("raw") and gewichteten Punkte ("weight") für jedes der 6 Module:
+                - Modul 1 (modul_1_raw, modul_1_weight)
+                - Modul 2 (modul_2_raw, modul_2_weight)
+                - Modul 3 (modul_3_raw, modul_3_weight)
+                - Modul 4 (modul_4_raw, modul_4_weight)
+                - Modul 5 (modul_5_raw, modul_5_weight)
+                - Modul 6 (modul_6_raw, modul_6_weight)
+                - Gesamtpunkte (total_weight)
+                - Pflegegrad (pflegegrad)
+
+            EXTRAKTIONSREGELN FÜR DIE MODULBEWERTUNGEN (values_orig):
+            Lies systematisch alle Kriterien-Bewertungen aus dem Originalgutachten aus.
+            - Beim Medizinischen Dienst (MD) findest du diese unter den Abschnitten "4.1" (Modul 1), "4.2" (Modul 2), "4.3" (Modul 3), "4.4" (Modul 4), "4.5" (Modul 5), "4.6" (Modul 6).
+            - Bei MEDICPROOF findest du diese unter den Abschnitten "5.1" (Modul 1), "5.2" (Modul 2), "5.3" (Modul 3), "5.4" (Modul 4), "5.5" (Modul 5), "5.6" (Modul 6).
+            Extrahiere die Einzelbewertung für jedes Kriterium und ordne sie der entsprechenden ID (0-64) in values_orig zu.
+
+            SEHR WICHTIG – SPALTENGENAUES LESEN DER ANKREUZTABELLEN:
+            Der übergebene Text ist layoutgetreu aufbereitet: Spalten sind durch mehrere Leerzeichen voneinander getrennt und stehen untereinander. Jede Kriterienzeile (z.B. "4.1.1 Positionswechsel im Bett") hat mehrere Bewertungsspalten. Nur EINE Spalte ist markiert.
+            - Module 1, 2, 4, 6: Spalten sind "selbständig | überwiegend selbständig | überwiegend unselbständig | unselbständig" (Modul 2: "unbeeinträchtigt | größtenteils vorhanden | gering vorhanden | nicht vorhanden"). Bestimme anhand der horizontalen Position der Markierung GENAU, welche Spalte angekreuzt ist. Eine Markierung ist ein gefülltes Feld/Kreis/Kreuz (z.B. ●, ⊙, ⊠, X, ☒, "1"); leere Felder (○, ☐, "0") bedeuten NICHT markiert. Wähle val_num = Spaltenindex 0..3.
+            - Modul 3 (4.3.x): Spalten "nie/selten=0 | selten=1 | häufig=2 | täglich=3"; val_num entsprechend 0..3.
+            - Modul 5 (4.5.1–4.5.15): Hier zählt die HÄUFIGKEIT. In den Spalten "pro Tag | pro Woche | pro Monat" steht eine ZAHL. Lies die Zahl UND die zugehörige Spalte: val_obj_count = die Zahl, val_obj_period = "D" (pro Tag), "W" (pro Woche) oder "M" (pro Monat). Steht nichts/entfällt -> count 0. Ordne die Zahl exakt der Spalte zu, unter der sie steht.
+            - Modul 5: 4.5.16 (Diät) ist KEINE Häufigkeit, sondern selbständig..unselbständig -> val_num 0..3.
+            Verwechsle Spalten niemals: die horizontale Ausrichtung im Text entscheidet. Erfinde keine Werte; wenn eine Zeile leer/entfällt ist, gib 0 bzw. count 0 an.
+
+            Liefere alle Ergebnisse strictly als valides JSON-Objekt zurück.`;
+
+            const responseSchema = {
+                type: "OBJECT",
+                properties: {
+                    stam_betreffend: { type: "STRING" },
+                    stam_geboren: { type: "STRING" },
+                    stam_kundennummer: { type: "STRING" },
+                    stam_kasse: { type: "STRING" },
+                    stam_versnr: { type: "STRING" },
+                    stam_bescheid: { type: "STRING" },
+                    stam_antrag: { type: "STRING" },
+                    stam_organisation: { type: "STRING" },
+                    stam_begutachtung: { type: "STRING" },
+                    stam_art: { type: "STRING" },
+                    stam_pg_manual: { type: "STRING" },
+                    stam_pts_manual: { type: "STRING" },
+                    modul_1_raw: { type: "INTEGER" },
+                    modul_1_weight: { type: "NUMBER" },
+                    modul_2_raw: { type: "INTEGER" },
+                    modul_2_weight: { type: "NUMBER" },
+                    modul_3_raw: { type: "INTEGER" },
+                    modul_3_weight: { type: "NUMBER" },
+                    modul_4_raw: { type: "INTEGER" },
+                    modul_4_weight: { type: "NUMBER" },
+                    modul_5_raw: { type: "INTEGER" },
+                    modul_5_weight: { type: "NUMBER" },
+                    modul_6_raw: { type: "INTEGER" },
+                    modul_6_weight: { type: "NUMBER" },
+                    total_weight: { type: "NUMBER" },
+                    pflegegrad: { type: "INTEGER" },
+                    diagnoses: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                icd: { type: "STRING" },
+                                text: { type: "STRING" }
+                            },
+                            required: ["icd", "text"]
+                        }
+                    },
+                    anamnese: { type: "STRING" },
+                    befund: { type: "STRING" },
+                    special_orig: { type: "INTEGER" },
+                    values_orig: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                id: { type: "INTEGER" },
+                                val_num: { type: "INTEGER" },
+                                val_obj_count: { type: "INTEGER" },
+                                val_obj_period: { type: "STRING" }
+                            },
+                            required: ["id"]
+                        }
+                    }
+                },
+                required: ["diagnoses", "values_orig"]
+            };
+
+            // Stufe 2 (lokaler Server / Alternative B): falls erreichbar, Text lokal extrahieren
+            // (inkl. OCR) und nur den Text an Gemini schicken. Die Einzelkriterien liefert der
+            // Server koordinatengenau selbst (Stufe 3); die KI übernimmt dann nur noch
+            // Stammdaten, Diagnosen, Anamnese, Befund und die Modul-Zusammenfassung.
+            // Lokal vorbereiten: Text (inkl. OCR bei Scans) + präzise Kriterien (Text-PDFs).
+            updateOverlay("Lokaler Server liest aus (Scans: OCR, ~30 Sek.)...", 25);
+            const local = await tryLocalExtract(base64Data, mimeType);
+            const haveLocalText = !!(local && local.ok && local.text && local.text.trim().length > 40);
+            const haveLocalValues = !!(local && local.values && Object.keys(local.values).length);
+
+            // Google liest Stammdaten/Diagnosen/Anamnese/Befund (genau). Bei vorhandenem lokalem
+            // Text wird nur dieser kleine Text geschickt (statt großes Bild) -> deutlich weniger 429.
+            let userParts;
+            if (haveLocalText) {
+                userParts = [{ text: "Lies aus folgendem Gutachten-Text die Stammdaten, Diagnosen, Anamnese und Befund vollständig aus.\n\n=== GUTACHTEN-TEXT ===\n" + local.text }];
+                updateOverlay("Stammdaten/Diagnosen werden gelesen...", 55);
+            } else {
+                userParts = [
+                    { text: "Hier ist das Gutachten zur Analyse. Extrahiere alle Daten lückenlos." },
+                    { inlineData: { mimeType: mimeType, data: base64Data } }
+                ];
+                updateOverlay("KI analysiert das Dokument...", 60);
+            }
+            // Liegen die Kriterien lokal präzise vor, muss Google sie nicht liefern (kleinere Antwort).
+            if (haveLocalValues) { delete responseSchema.properties.values_orig; responseSchema.required = ["diagnoses"]; }
+
+            const payload = {
+                contents: [{ role: "user", parts: userParts }],
+                generationConfig: { responseMimeType: "application/json", responseSchema: responseSchema }
+            };
+
+            let data = null, aiError = null;
+            try {
+                const response = await callGeminiWithFallback(payload, systemPrompt);
+                const extractedText = response && response.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!extractedText) throw new Error("Keine Textantwort von der KI erhalten.");
+                let jsonText = extractedText.trim();
+                const fence = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/i);
+                if (fence) jsonText = fence[1].trim();
+                data = JSON.parse(jsonText);
+            } catch (e) {
+                aiError = e;
+            }
+
+            updateOverlay("Ergebnisse aufbereiten...", 85);
+
+            if (data) {
+                // Google erfolgreich -> präzise lokale Kriterien (Text-PDFs) haben Vorrang
+                if (haveLocalValues) { data.values_orig = serverValuesToValuesOrig(local.values); data._localValues = true; }
+                openImportReview(file, data, mimeType);
+                showToast("Gutachten gelesen ✓ – bitte prüfen und übernehmen.", "success");
+            } else {
+                // Google nicht verfügbar (z.B. 429) -> lokale Reserve, damit nichts blockiert
+                const fb = (local && local.ok) ? localMetaToData(local) : {};
+                if (haveLocalValues) { fb.values_orig = serverValuesToValuesOrig(local.values); }
+                fb._localValues = true;
+                openImportReview(file, fb, mimeType);
+                if (!lastServerReachable) {
+                    showToast("Lokaler Server nicht erreicht und Google nicht verfügbar. Bitte 'Pflege-Server starten.bat' starten und die App über http://127.0.0.1:8765 öffnen.", "error");
+                } else {
+                    showToast("Google-Limit erreicht – Felder wurden lokal vorab gefüllt (ggf. unvollständig). Bitte anhand der PDF prüfen/ergänzen. Tipp: ein neuer, kostenloser API-Schlüssel löst das Limit sofort.", "error");
+                }
+            }
+
+        } catch (err) {
+            console.warn("Analyse-Fehler abgefangen:", err);
+            showToast("Fehler beim Einlesen: " + err.message, "error");
+        } finally {
+            hideOverlay();
+            event.target.value = '';
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+// ===== STUFE 1: HUMAN-IN-THE-LOOP IMPORT-PRÜFUNG =====
+let reviewData = null;      // normalisierte Daten des aktuellen Imports (bearbeitbar)
+let reviewBlobUrl = null;   // Blob-URL der Original-Datei für die PDF-Vorschau
+
+// Wandelt die rohe KI-Antwort in eine bearbeitbare Struktur + Konfidenz-Info um.
+function normalizeImport(data) {
+    const valuesMap = {};
+    const provided = new Set();
+    ITEMS.forEach(i => { valuesMap[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+    if (Array.isArray(data.values_orig)) {
+        data.values_orig.forEach(v => {
+            const item = ITEMS.find(it => it.id === v.id);
+            if (!item) return;
+            provided.add(v.id);
+            if (item.m === 5 && item.group !== 'D') {
+                valuesMap[v.id] = { count: v.val_obj_count !== undefined ? v.val_obj_count : 0, period: v.val_obj_period || 'W' };
+            } else {
+                valuesMap[v.id] = v.val_num !== undefined ? v.val_num : 0;
+            }
+        });
+    }
+    return {
+        stam: {
+            betreffend: data.stam_betreffend || '', geboren: formatToYYYYMMDD(data.stam_geboren) || '',
+            kasse: data.stam_kasse || '', versnr: data.stam_versnr || '',
+            bescheid: formatToYYYYMMDD(data.stam_bescheid) || '', antrag: formatToYYYYMMDD(data.stam_antrag) || '',
+            organisation: data.stam_organisation || '', begutachtung: formatToYYYYMMDD(data.stam_begutachtung) || '',
+            art: data.stam_art || 'Hausbesuch',
+            pg: data.stam_pg_manual !== undefined && data.stam_pg_manual !== null ? String(data.stam_pg_manual) : '',
+            pts: data.stam_pts_manual !== undefined && data.stam_pts_manual !== null ? String(data.stam_pts_manual) : ''
+        },
+        diagnoses: (Array.isArray(data.diagnoses) ? data.diagnoses : []).slice(0, 6).map(d => ({ icd: d.icd || '', text: d.text || '' })),
+        anamnese: data.anamnese || '',
+        befund: data.befund || '',
+        special: data.special_orig || 0,
+        // Bei lokal präzise ausgelesenen Kriterien das Vorgutachten-Modulergebnis aus eben
+        // diesen Kriterien berechnen (extracted = null), statt aus der KI-Zusammenfassung.
+        extracted: data._localValues ? null : {
+            raws: [data.modul_1_raw, data.modul_2_raw, data.modul_3_raw, data.modul_4_raw, data.modul_5_raw, data.modul_6_raw].map(x => x !== undefined && x !== null ? x : 0),
+            weights: [data.modul_1_weight, data.modul_2_weight, data.modul_3_weight, data.modul_4_weight, data.modul_5_weight, data.modul_6_weight].map(x => x !== undefined && x !== null ? x : 0),
+            total: data.total_weight !== undefined && data.total_weight !== null ? data.total_weight : (data.stam_pts_manual ? parseFloat(data.stam_pts_manual) : 0),
+            pg: data.pflegegrad !== undefined && data.pflegegrad !== null ? data.pflegegrad : (data.stam_pg_manual ? parseInt(data.stam_pg_manual) : 0)
+        },
+        valuesMap, provided
+    };
+}
+
+// Bearbeitungs-Handler (mutieren reviewData)
+function rvStam(k, v) { reviewData.stam[k] = v; }
+function rvDiag(idx, field, v) { if (!reviewData.diagnoses[idx]) reviewData.diagnoses[idx] = { icd: '', text: '' }; reviewData.diagnoses[idx][field] = v; }
+function rvText(k, v) { reviewData[k] = v; }
+function rvExtract(kind, idx, v) {
+    if (!reviewData || !reviewData.extracted) return;
+    if (kind === 'total') reviewData.extracted.total = parseFloat(v) || 0;
+    else if (kind === 'pg') reviewData.extracted.pg = parseInt(v) || 0;
+    else reviewData.extracted[kind][idx] = parseFloat(v) || 0;
+}
+function rvMarkEdited(id) { const el = document.getElementById('rev-row-' + id); if (el) { el.classList.remove('rev-missing'); el.classList.add('rev-ok'); } }
+function rvValNum(id, v) { reviewData.valuesMap[id] = parseInt(v); rvMarkEdited(id); }
+function rvM5Count(id, v) { if (typeof reviewData.valuesMap[id] !== 'object') reviewData.valuesMap[id] = { count: 0, period: 'W' }; reviewData.valuesMap[id].count = Number(v); rvMarkEdited(id); }
+function rvM5Period(id, v) { if (typeof reviewData.valuesMap[id] !== 'object') reviewData.valuesMap[id] = { count: 0, period: 'W' }; reviewData.valuesMap[id].period = v; rvMarkEdited(id); }
+
+function openImportReview(file, data, mimeType) {
+    reviewData = normalizeImport(data);
+    if (reviewBlobUrl) { try { URL.revokeObjectURL(reviewBlobUrl); } catch (e) {} }
+    reviewBlobUrl = URL.createObjectURL(file);
+    const left = document.getElementById('review-pdf');
+    if (mimeType && mimeType.startsWith('image/')) {
+        left.innerHTML = `<img src="${reviewBlobUrl}" alt="Gutachten" style="max-width:100%;display:block;margin:0 auto;">`;
+    } else {
+        left.innerHTML = `<iframe src="${reviewBlobUrl}" title="Gutachten"></iframe>`;
+    }
+    document.getElementById('review-form').innerHTML = buildReviewForm(reviewData);
+    document.getElementById('review-overlay').classList.add('active');
+}
+
+function closeReview() {
+    document.getElementById('review-overlay').classList.remove('active');
+    if (reviewBlobUrl) { try { URL.revokeObjectURL(reviewBlobUrl); } catch (e) {} reviewBlobUrl = null; }
+}
+
+// Übernimmt die (geprüften/korrigierten) Werte in die App.
+function applyImportedData(rev) {
+    init();
+    // WICHTIG: zuerst ALLE Stammfelder leeren, damit keine Daten eines vorherigen Falls
+    // (anderer Person) stehen bleiben.
+    document.querySelectorAll('#tab-1 [id^="stam-"]').forEach(el => {
+        if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+    });
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined && val !== null) el.value = val; };
+    setVal('stam-betreffend', rev.stam.betreffend);
+    setVal('stam-geboren', rev.stam.geboren);
+    const elKunde = document.getElementById('stam-kundennummer'); if (elKunde) elKunde.value = '';
+    setVal('stam-kasse', rev.stam.kasse);
+    setVal('stam-versnr', rev.stam.versnr);
+    setVal('stam-bescheid', rev.stam.bescheid);
+    setVal('stam-antrag', rev.stam.antrag);
+    setVal('stam-organisation', rev.stam.organisation);
+    setVal('stam-begutachtung', rev.stam.begutachtung);
+    setVal('stam-art', rev.stam.art || 'Hausbesuch');
+    setVal('stam-pg-manual', rev.stam.pg);
+    setVal('stam-pts-manual', rev.stam.pts);
+    setVal('stam-anamnese', rev.anamnese);
+    setVal('stam-befund', rev.befund);
+    (rev.diagnoses || []).forEach((d, idx) => { if (idx < 6) { setVal(`diag-icd-${idx + 1}`, d.icd); setVal(`diag-txt-${idx + 1}`, d.text); } });
+
+    stateOrig = { special: rev.special || 0, values: {} };
+    stateEigene = { special: rev.special || 0, values: {} };
+    appealDraft = "";
+    erstgespraechNotes = "";
+    // extracted nur setzen, wenn es eine KI-Zusammenfassung gibt; sonst wird das
+    // Vorgutachten aus den (präzisen) Einzelkriterien berechnet.
+    if (rev.extracted) {
+        stateOrig.extracted = { raws: rev.extracted.raws.slice(), weights: rev.extracted.weights.slice(), total: rev.extracted.total, pg: rev.extracted.pg };
+    }
+
+    ITEMS.forEach(i => {
+        const v = rev.valuesMap[i.id];
+        if (i.m === 5 && i.group !== 'D') {
+            const o = (v && typeof v === 'object') ? { count: Number(v.count) || 0, period: v.period || 'W' } : { count: 0, period: 'W' };
+            stateOrig.values[i.id] = { count: o.count, period: o.period };
+            stateEigene.values[i.id] = { count: o.count, period: o.period };
+        } else {
+            const n = Number(v) || 0;
+            stateOrig.values[i.id] = n;
+            stateEigene.values[i.id] = n;
+        }
+    });
+
+    fillTable('orig'); fillTable('own'); calculate('orig'); calculate('own'); syncSpecialUI();
+    setTimeout(() => { autoResize(document.getElementById('stam-anamnese')); autoResize(document.getElementById('stam-befund')); }, 200);
+}
+
+function applyReviewedImport() {
+    applyImportedData(reviewData);
+    closeReview();
+    switchTab(1);
+    showToast("Werte geprüft und übernommen.", "success");
+}
+
+function buildReviewForm(rev) {
+    const esc = escapeHtml;
+    const modNames = ["Mobilität", "Kognitive Fähigkeiten", "Verhaltensweisen", "Selbstversorgung", "Krankheitsbed. Anforderungen", "Alltagsgestaltung"];
+    let html = '';
+
+    const tf = (label, k, type) => `<label class="rev-field"><span>${label}</span><input type="${type || 'text'}" value="${esc(rev.stam[k] || '')}" oninput="rvStam('${k}',this.value)"></label>`;
+    html += `<div class="rev-section"><div class="rev-sec-title">Stammdaten</div><div class="rev-grid">`;
+    html += tf('Betreffend', 'betreffend');
+    html += tf('Geboren am', 'geboren', 'date');
+    html += tf('Kasse', 'kasse');
+    html += tf('Versicherungs-Nr.', 'versnr');
+    html += tf('Bescheiddatum', 'bescheid', 'date');
+    html += tf('Antragsdatum', 'antrag', 'date');
+    html += tf('Gutachtenorganisation', 'organisation');
+    html += tf('Begutachtungsdatum', 'begutachtung', 'date');
+    html += `<label class="rev-field"><span>Durchführungsart</span><select onchange="rvStam('art',this.value)">${['Hausbesuch', 'Telefonisch', 'Aktenlage'].map(o => `<option ${rev.stam.art === o ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
+    html += tf('Pflegegrad (Gutachten)', 'pg');
+    html += tf('Gesamtpunkte (Gutachten)', 'pts');
+    html += `</div></div>`;
+
+    html += `<div class="rev-section"><label class="rev-field rev-inline"><input type="checkbox" ${rev.special == 1 ? 'checked' : ''} onchange="reviewData.special=this.checked?1:0"> <span>Besondere Bedarfskonstellation (§ 15 Abs. 4) – Gebrauchsunfähigkeit beider Arme und Beine</span></label></div>`;
+
+    html += `<div class="rev-section"><div class="rev-sec-title">Diagnosen</div>`;
+    for (let idx = 0; idx < 6; idx++) {
+        const d = rev.diagnoses[idx] || { icd: '', text: '' };
+        html += `<div class="rev-diag"><input placeholder="ICD 10" style="width:120px" value="${esc(d.icd || '')}" oninput="rvDiag(${idx},'icd',this.value)"><input placeholder="Diagnose" value="${esc(d.text || '')}" oninput="rvDiag(${idx},'text',this.value)"></div>`;
+    }
+    html += `</div>`;
+
+    // Modul-Zusammenfassung nur anzeigen, wenn sie von der KI kam. Bei lokal ausgelesenen
+    // Kriterien wird das Vorgutachten automatisch aus den Einzelkriterien berechnet.
+    if (rev.extracted) {
+        html += `<div class="rev-section"><div class="rev-sec-title">Modul-Ergebnisse laut Gutachten</div><div class="rev-mod-grid"><div class="rev-mod-head">Modul</div><div class="rev-mod-head">Einzelpkt</div><div class="rev-mod-head">Gew. Pkt</div>`;
+        for (let m = 0; m < 6; m++) {
+            html += `<div>${m + 1}. ${modNames[m]}</div><div><input type="number" step="1" value="${rev.extracted.raws[m]}" oninput="rvExtract('raws',${m},this.value)"></div><div><input type="number" step="0.01" value="${rev.extracted.weights[m]}" oninput="rvExtract('weights',${m},this.value)"></div>`;
+        }
+        html += `<div><b>Gesamt / PG</b></div><div><input type="number" step="1" value="${rev.extracted.pg}" oninput="rvExtract('pg',0,this.value)" title="Pflegegrad"></div><div><input type="number" step="0.01" value="${rev.extracted.total}" oninput="rvExtract('total',0,this.value)" title="Gesamtpunkte"></div>`;
+        html += `</div></div>`;
+    }
+
+    html += `<div class="rev-section"><div class="rev-sec-title">Anamnese</div><textarea class="rev-textarea" oninput="rvText('anamnese',this.value)">${esc(rev.anamnese || '')}</textarea></div>`;
+    html += `<div class="rev-section"><div class="rev-sec-title">Befund</div><textarea class="rev-textarea" oninput="rvText('befund',this.value)">${esc(rev.befund || '')}</textarea></div>`;
+
+    html += `<div class="rev-section"><div class="rev-sec-title">Einzelkriterien (NBA) — <span style="color:var(--green)">grün = erkannt</span> · <span style="color:var(--yellow)">gelb = nicht erkannt</span></div>`;
+    for (let m = 1; m <= 6; m++) {
+        html += `<div class="rev-mod-label">Modul ${m}: ${modNames[m - 1]}</div>`;
+        ITEMS.filter(i => i.m === m).forEach(i => {
+            const ok = rev.provided.has(i.id);
+            const v = rev.valuesMap[i.id];
+            let control = '';
+            if (i.m === 5 && i.group !== 'D') {
+                const noDaily = [55, 56, 57].includes(i.id);
+                const cnt = (v && typeof v === 'object') ? v.count : 0;
+                const per = (v && typeof v === 'object') ? v.period : 'W';
+                control = `<input type="number" min="0" max="60" step="1" value="${cnt}" style="width:60px" oninput="rvM5Count(${i.id},this.value)"><select onchange="rvM5Period(${i.id},this.value)">${(noDaily ? ['W', 'M'] : ['D', 'W', 'M']).map(p => `<option value="${p}" ${per === p ? 'selected' : ''}>${p === 'D' ? 'Tag' : p === 'W' ? 'Woche' : 'Monat'}</option>`).join('')}</select>`;
+            } else if (i.opts) {
+                const cur = (typeof v === 'number') ? v : 0;
+                control = `<select onchange="rvValNum(${i.id},this.value)">${i.opts.map((o, oi) => `<option value="${oi}" ${cur === oi ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+            }
+            html += `<div class="rev-crit ${ok ? 'rev-ok' : 'rev-missing'}" id="rev-row-${i.id}"><span class="rev-crit-nr">${i.nr}</span><span class="rev-crit-title">${esc(i.title)}</span><span class="rev-crit-ctrl">${control}</span></div>`;
+        });
+    }
+    html += `</div>`;
+    return html;
+}
+
+// ===== FAMILIARA STELLUNGNAHME (Format 1:1 wie Muster-PDF) =====
+const FAMILIARA_LOGO = "data:image/jpeg;base64,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";
+
+const STELLUNGNAHME_CSS = `
+#appeal-document{background:#fff;color:#000;border:1px solid #cbd5e1;border-radius:8px;padding:46px 54px;max-width:900px;margin:0 auto;overflow-x:auto;}
+.stmt{font-family:Cambria,'Times New Roman',Georgia,serif;color:#000;font-size:12pt;line-height:1.45;text-align:justify;}
+.stmt .stmt-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:34px;}
+.stmt .stmt-logo{height:46px;width:auto;display:block;}
+.stmt .stmt-address{font-family:Arial,Helvetica,sans-serif;font-size:9pt;line-height:1.4;color:#333;text-align:left;white-space:nowrap;}
+.stmt .stmt-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;}
+.stmt .stmt-top .left div{line-height:1.3;}
+.stmt .stmt-top .right{white-space:nowrap;}
+.stmt h1{color:#366091;font-size:13pt;font-weight:bold;margin:16px 0 6px;text-align:left;}
+.stmt h2{color:#366091;font-size:13pt;font-weight:bold;margin:22px 0 8px;text-align:left;}
+.stmt p{margin:9px 0;}
+.stmt .data-block{margin:10px 0;}
+.stmt .data-row{display:flex;}
+.stmt .data-row .k{width:210px;flex-shrink:0;}
+.stmt hr{border:none;border-top:1px solid #9aa3b2;margin:18px 0;}
+.stmt table.cmp{width:100%;border-collapse:collapse;margin:10px 0 6px;font-size:11pt;text-align:left;}
+.stmt table.cmp th,.stmt table.cmp td{border:1px solid #000;padding:6px 9px;vertical-align:top;}
+.stmt table.cmp thead th{font-weight:bold;text-align:center;}
+.stmt table.cmp td.num{text-align:center;width:130px;}
+.stmt .crit{margin:11px 0;}
+.stmt .crit .ct{font-weight:bold;}
+.stmt ul.aa{margin:8px 0 8px 24px;}
+.stmt ul.aa li{margin:3px 0;}
+.stmt .stmt-footer{margin-top:34px;border-top:1px solid #ccc;padding-top:8px;display:flex;justify-content:space-between;font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#333;}
+.stmt .stmt-footer .ft-left b{color:#0B5394;}
+.stmt .stmt-footer a{color:#0B5394;text-decoration:none;}
+`;
+
+function injectStellungnahmeCss() {
+    if (document.getElementById('stmt-style')) return;
+    const s = document.createElement('style');
+    s.id = 'stmt-style';
+    s.textContent = STELLUNGNAHME_CSS;
+    document.head.appendChild(s);
+}
+
+function formatDE(ymd) {
+    if (!ymd) return '';
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
+    if (m) return m[3] + '.' + m[2] + '.' + m[1];
+    return ymd;
+}
+function todayDE() {
+    const d = new Date();
+    const p = n => String(n).padStart(2, '0');
+    return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear();
+}
+function expandLabel(s) {
+    if (!s) return s;
+    return s
+        .replace(/überw\./g, 'überwiegend')
+        .replace(/unselbst\./g, 'unselbständig')
+        .replace(/selbst\./g, 'selbständig')
+        .replace(/vorh\./g, 'vorhanden');
+}
+
+// Baut die Stellungnahme im Familiara-Format aus den App-Daten (Gutachten/Bescheide).
+function buildStellungnahme(notesOverride) {
+    const g = id => (document.getElementById(id)?.value || '').trim();
+    const esc = escapeHtml;
+    const f2 = n => Number(n).toFixed(2).replace('.', ',');
+
+    // Name immer als "Herr/Frau Vorname Nachname". Liegt noch "Nachname, Vorname" vor,
+    // wird umgedreht (Anrede ergänzt die Auslese).
+    let name = g('stam-betreffend');
+    const cm = name.match(/^([^,]+),\s*(.+)$/);
+    if (cm && !/^(herr|frau)/i.test(name)) name = (cm[2] + ' ' + cm[1]).trim();
+    if (!name) name = 'Herr/ Frau';
+    const geb = formatDE(g('stam-geboren'));
+    const kasse = g('stam-kasse');
+    const versnr = g('stam-versnr');
+    const bescheid = formatDE(g('stam-bescheid'));
+    const org = g('stam-organisation') || 'Medizinischer Dienst';
+    const begut = formatDE(g('stam-begutachtung'));
+    const art = g('stam-art');
+    const antrag = formatDE(g('stam-antrag')) || '__.__.____';
+
+    const notesEl = document.getElementById('erstgespraech-notes');
+    if (notesEl) erstgespraechNotes = notesEl.value;
+    const notes = (typeof notesOverride === 'string' ? notesOverride : (erstgespraechNotes || '')).trim();
+
+    const rO = calculateInternal('orig');
+    const rE = calculateInternal('own');
+    const origPG = g('stam-pg-manual') || String(rO.pg);
+    const origPts = g('stam-pts-manual') || f2(rO.total);
+
+    // Abweichende Einzelkriterien ermitteln
+    const diffs = [];
+    ITEMS.forEach(i => {
+        if (!i.m) return; // Sonderbedarf (id 0) auslassen
+        const vO = stateOrig.values[i.id];
+        const vE = stateEigene.values[i.id];
+        if (i.m === 5 && i.group !== 'D') {
+            const oO = (vO && typeof vO === 'object') ? vO : { count: 0, period: 'W' };
+            const oE = (vE && typeof vE === 'object') ? vE : { count: 0, period: 'W' };
+            if (oO.count !== oE.count || oO.period !== oE.period) {
+                const fp = o => `${o.count}x pro ${o.period === 'D' ? 'Tag' : o.period === 'W' ? 'Woche' : 'Monat'}`;
+                diffs.push({ nr: i.nr, title: i.title, o: fp(oO), e: fp(oE) });
+            }
+        } else if (i.opts) {
+            if (vO !== vE) {
+                diffs.push({ nr: i.nr, title: i.title, o: expandLabel(i.opts[vO] || '—'), e: expandLabel(i.opts[vE] || '—') });
+            }
+        }
+    });
+
+    const row = (label, o, e, bold) => `<tr><td${bold ? ' style="font-weight:bold"' : ''}>${esc(label)}</td><td class="num">${o}</td><td class="num">${e}</td></tr>`;
+    const tableRows = [
+        row('4.1 Mobilität', f2(rO.weights[0]), f2(rE.weights[0])),
+        row('4.2 Kognitive und kommunikative Fähigkeiten', f2(rO.weights[1]), f2(rE.weights[1])),
+        row('4.3 Verhaltensweisen und psychische Problemlagen', f2(rO.weights[2]), f2(rE.weights[2])),
+        row('Höchster Wert aus Modul 2 und Modul 3', f2(Math.max(rO.weights[1], rO.weights[2])), f2(Math.max(rE.weights[1], rE.weights[2])), true),
+        row('4.4 Selbstversorgung', f2(rO.weights[3]), f2(rE.weights[3])),
+        row('4.5 Krankheits- und therapiebedingten Anforderungen', f2(rO.weights[4]), f2(rE.weights[4])),
+        row('4.6 Gestaltung des Alltagslebens und sozialer Kontakte', f2(rO.weights[5]), f2(rE.weights[5])),
+        row('Summe der gewichteten Punkte', f2(rO.total), f2(rE.total), true),
+        row('Pflegegrad', esc(origPG), String(rE.pg), true)
+    ].join('');
+
+    const critHtml = diffs.length
+        ? diffs.map(d => `<div class="crit"><div class="ct">${esc(d.nr)}: ${esc(d.title)}</div><div>Gutachterliche Bewertung: „${esc(d.o)}“</div><div>Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „${esc(d.e)}“ ableitbar.</div></div>`).join('')
+        : `<p>Es wurden keine von der Begutachtung abweichenden Einzelkriterien erfasst.</p>`;
+
+    const notesBullets = notes
+        ? `<ul class="aa">${notes.split(/\r?\n/).filter(l => l.trim()).map(l => `<li>${esc(l.trim())}</li>`).join('')}</ul>`
+        : '';
+
+    const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}</span><span>: ${esc(v || '')}</span></div>`;
+
+    return `<div class="stmt">
+    <div class="stmt-head">
+      <img class="stmt-logo" src="${FAMILIARA_LOGO}" alt="Familiara">
+      <div class="stmt-address">Familiara GmbH<br>Wiesbadener Straße 3<br>12161 Berlin<br><br>Telefon 030 577 015 900<br>Fax 030 577 015 901<br><br>Geschäftsführer: Dr. med. Jörg A. Zimmermann<br><br>HRB 184522 B<br>Amtsgericht Berlin-Charlottenburg<br>Umsatzsteuer-ID: DE311459777<br><br>www.familiara.de<br>kontakt@familiara.de</div>
+    </div>
+
+    <div class="stmt-top">
+      <div class="left">
+        <div>Christian Schulz</div>
+        <div>Pflegeberater</div>
+        <div>B.Sc. in Pflege- und Gesundheitsmanagement</div>
+      </div>
+      <div class="right">${esc(todayDE())}</div>
+    </div>
+
+    <h1>Pflegefachliche Stellungnahme</h1>
+    <p>auf Grundlage der Richtlinien des Medizinischen Dienstes Bund zur Feststellung der Pflegebedürftigkeit nach dem SGB XI vom 21. Dezember 2023</p>
+
+    <div class="data-block">
+      ${dataRow('Betreffend', name)}
+      ${dataRow('geboren am', geb)}
+      ${dataRow('Kasse', kasse)}
+      ${dataRow('Versicherungs-Nr.', versnr)}
+      ${dataRow('Antragsdatum', antrag !== '__.__.____' ? antrag : '')}
+      ${dataRow('Bescheiddatum', bescheid)}
+      ${dataRow('Gutachtenorganisation', org)}
+      ${dataRow('Begutachtungsdatum', begut)}
+      ${dataRow('Durchführungsart', art)}
+      ${dataRow('Pflegegrad', origPG)}
+      ${dataRow('Gesamtpunkte', origPts)}
+    </div>
+
+    <p>${esc(name)} erhebt Widerspruch gegen den Bescheid vom ${esc(bescheid || '—')} der ${esc(kasse || 'Kasse')}. Diese pflegefachliche Stellungnahme dient der Unterstützung des Rechtsbeistands von ${esc(name)} bei der Begründung des Widerspruchs. Dazu habe ich ${esc(name)} persönlich befragt und Befunde erhoben sowie das Gutachten des ${esc(org)} vom ${esc(begut || '—')} gewürdigt.</p>
+
+    <hr>
+
+    <h2>Allgemeine Angaben</h2>
+    <p>Im Gutachten des ${esc(org)} vom ${esc(begut || '—')} erfolgte die Einstufung mit ${esc(origPts)} gewichteten Punkten, woraus sich ein Pflegegrad ${esc(origPG)} ergeben hat. Die Verteilung der gewichteten Punkte auf die einzelnen Module ist der nachfolgenden Übersicht zu entnehmen.</p>
+    ${notesBullets}
+    <p>Ich bin in mehreren dieser Module zu abweichenden Einschätzungen gekommen. Dies ergibt eine höhere Punktzahl in den Modulen und in der Folge eine höhere Gesamtpunktzahl. Die nachfolgende Übersicht stellt die Ergebnisse des Vorgutachtens und meiner Beurteilung einander gegenüber:</p>
+
+    <h2>Gegenüberstellung des Gutachtens und der abweichenden Bepunktung</h2>
+    <table class="cmp">
+      <thead>
+        <tr><th rowspan="2">Modul</th><th>Vorgutachten</th><th>Beurteilung</th></tr>
+        <tr><th>Gewichtete Punkte</th><th>Gewichtete Punkte</th></tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+
+    <h2>Befund und Stellungnahme</h2>
+    ${critHtml}
+
+    <hr>
+
+    <h2>Fazit</h2>
+    <p>Das vorliegende Gutachten des ${esc(org)} vom ${esc(begut || '—')} mit einem Pflegegrad ${esc(origPG)} und ${esc(origPts)} Punkten berücksichtigt die tatsächlichen Einschränkungen von ${esc(name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${f2(rE.total)} Gesamtpunkten, der gemäß den Richtlinien den Pflegegrad ${rE.pg} ab dem ${esc(antrag)} (Antragsdatum) rechtfertigt.</p>
+  </div>`;
+}
+
+// Korrigiert ausschließlich Rechtschreibung/Grammatik/Zeichensetzung (Google-Gemini-Code, unverändert genutzt).
+async function correctText(text) {
+    const systemPrompt = "Du bist ein professioneller Korrektor für deutschsprachige Texte. Korrigiere ausschließlich Rechtschreibung, Grammatik und Zeichensetzung des dir übergebenen Textes. Ändere weder Inhalt, Bedeutung noch Stil; füge nichts hinzu und lasse nichts weg. Behalte vorhandene Zeilenumbrüche exakt bei. Gib ausschließlich den korrigierten Text zurück – ohne Anführungszeichen, ohne Kommentare, ohne Einleitung.";
+    const payload = { contents: [{ role: "user", parts: [{ text: text }] }] };
+    const result = await callGeminiWithFallback(payload, systemPrompt);
+    const out = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!out || !out.trim()) throw new Error("Keine Korrektur erhalten.");
+    return out.trim();
+}
+
+// Erzeugt die Stellungnahme im Familiara-Format (gefüllt aus den App-Daten, mit Rechtschreibkorrektur der Notizen).
+async function generateAppealText() {
+    try {
+        injectStellungnahmeCss();
+
+        // Notizen einlesen und – falls vorhanden und API-Schlüssel gesetzt – Rechtschreibung/Grammatik korrigieren
+        const notesEl = document.getElementById('erstgespraech-notes');
+        if (notesEl) erstgespraechNotes = notesEl.value;
+        let notes = (erstgespraechNotes || '').trim();
+
+        const keyPresent = ((document.getElementById('user-api-key')?.value || '').trim() || userApiKey.trim() || apiKey.trim());
+        if (notes && keyPresent) {
+            showOverlay("Stellungnahme wird erstellt...", "Rechtschreibung & Grammatik werden geprüft");
+            try {
+                const corrected = await correctText(notes);
+                if (corrected) {
+                    notes = corrected;
+                    erstgespraechNotes = corrected;
+                    if (notesEl) notesEl.value = corrected; // korrigierte Fassung auch im Notizfeld übernehmen
+                }
+            } catch (e) {
+                console.warn("Korrektur übersprungen:", e);
+                showToast("Rechtschreibprüfung übersprungen (" + e.message + "). Stellungnahme wurde mit Originaltext erstellt.", "error");
+            } finally {
+                hideOverlay();
+            }
+        }
+
+        const html = buildStellungnahme(notes);
+        appealDraft = html;
+        const docEl = document.getElementById('appeal-document');
+        const cont = document.getElementById('appeal-result-container');
+        if (docEl) docEl.innerHTML = html;
+        if (cont) cont.style.display = 'block';
+        showToast("Stellungnahme im Familiara-Format erstellt.", "success");
+        if (docEl) docEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) {
+        hideOverlay();
+        console.warn(e);
+        showToast("Fehler bei der Erstellung: " + e.message, "error");
+    }
+}
+
+function copyAppealText() {
+    const docEl = document.getElementById('appeal-document');
+    const text = docEl ? docEl.innerText : '';
+    if (!text.trim()) { showToast("Bitte zuerst die Stellungnahme erstellen.", "error"); return; }
+    const done = () => showToast("Stellungnahme in die Zwischenablage kopiert!", "success");
+    const fallback = () => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.left = '-9999px';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); }
+        catch (e) { showToast("Kopieren nicht möglich. Bitte Text manuell markieren.", "error"); }
+        document.body.removeChild(ta);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(fallback);
+    } else { fallback(); }
+}
+
+function printAppealText() {
+    const docEl = document.getElementById('appeal-document');
+    if (!docEl || !docEl.innerHTML.trim()) { showToast("Bitte zuerst die Stellungnahme erstellen.", "error"); return; }
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        showToast("Druckfenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.", "error");
+        return;
+    }
+    const title = escapeHtml(document.getElementById('stam-betreffend').value || 'Stellungnahme');
+    printWindow.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Pflegefachliche Stellungnahme - ${title}</title><style>${STELLUNGNAHME_CSS}
+        body{margin:0;}
+        #appeal-document, .stmt{max-width:none;border:none;border-radius:0;}
+        #appeal-document{padding:0;}
+        body{padding:16mm 15mm;}
+        @page{margin:14mm;}
+    </style></head><body><div id="appeal-document">${docEl.innerHTML}</div><script>window.onload=function(){window.print();}<\/script></body></html>`);
+    printWindow.document.close();
+}
+
+function renderNBASection(prefix) {
+    const isEig = (prefix === 'own');
+    return `
+    <div class="grid-2col">
+        <div class="space-y-6">
+            <div class="special-card" onclick="selectItem(0,'${prefix}')">
+                <div class="special-header">⚠ Besondere Bedarfskonstellation (§ 15 Abs. 4 SGB XI)</div>
+                <div class="special-body">
+                    <span class="special-title">Gebrauchsunfähigkeit beider Arme und Beine</span>
+                    <div style="display:flex;align-items:center;gap:12px;flex-shrink:0" onclick="event.stopPropagation()">
+                        <input type="range" id="special-${prefix}" min="0" max="1" step="1" value="0" oninput="updateSpecial('${prefix}',this.value)" style="width:100px">
+                        <span id="special-label-${prefix}" style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--red);min-width:28px;text-align:right">Nein</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <table class="nba-table">
+                    <thead>
+                        <tr>
+                            <th style="width:60px;border-right:1px solid var(--border);text-align:center">Nr.</th>
+                            <th>Kriterien (BRi offiziell)</th>
+                            <th style="width:270px;text-align:center">Einstufung (Slider)</th>
+                            <th style="width:52px;text-align:center;border-left:1px solid var(--border)">Pkt</th>
+                            <th style="width:46px;text-align:center;border-left:1px solid var(--border)">Info</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body-${prefix}"></tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Ergebnis: ${isEig ? 'EIGENE EINSCHÄTZUNG' : 'VORGUTACHTEN'}</div>
+                <div style="overflow-x:auto">
+                    <table class="result-table">
+                        <thead>
+                            <tr>
+                                <th style="width:35%">Modulbezeichnung</th>
+                                <th class="center">Gew. Pkt</th>
+                                <th class="center">Einzel Pkt</th>
+                                ${isEig ? `<th class="center" style="color:var(--accent);opacity:0.7">Gew. Pkt (Vorg.)</th><th class="center" style="color:var(--accent);opacity:0.7">Einzel (Vorg.)</th>` : ''}
+                                <th>Fehlende Pkt / Nächste Stufe</th>
+                            </tr>
+                        </thead>
+                        <tbody id="res-grid-${prefix}"></tbody>
+                        <tfoot>
+                            ${isEig ? `
+                            <tr class="orig-ref-tfoot">
+                                <td style="text-align:right">Summe laut Vorgutachten:</td>
+                                <td id="total-w-orig-ref" class="center" style="font-size:15px;font-family:var(--font-mono);font-weight:700"></td>
+                                <td colspan="4" id="pg-title-orig-ref" style="font-size:13px;font-family:var(--font-mono);font-weight:700;text-align:center">—</td>
+                            </tr>` : ''}
+                            <tr class="result-tfoot-row">
+                                <td style="text-align:right;font-size:11px;font-family:var(--font-mono);color:var(--text-muted)">NBA Gesamtpunkte:</td>
+                                <td id="total-w-${prefix}" class="total-pts"></td>
+                                <td colspan="${isEig?'4':'2'}" id="pg-title-${prefix}" class="pg-display">—</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div id="gap-footer-${prefix}" class="gap-footer danger" style="display:none"></div>
+                <div class="pg-thresholds">
+                    <span>PG1: 12,5</span><span>PG2: 27</span><span>PG3: 47,5</span><span>PG4: 70</span><span>PG5: 90</span>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="sidebar-card">
+                <div class="sidebar-header">
+                    <div class="sidebar-icon">i</div>
+                    <div class="sidebar-title-text">Experten-Assistent</div>
+                </div>
+                <div class="sidebar-empty" id="sidebar-empty-${prefix}">Info-Button (i) wählen</div>
+                <div class="sidebar-content" id="sidebar-content-${prefix}">
+                    <div class="side-item-title" id="side-title-${prefix}"></div>
+                    <div class="side-section-label">Laien-Check</div>
+                    <div class="side-check-box" id="side-check-${prefix}"></div>
+                    <div class="side-section-label">Offizielle Abstufungen</div>
+                    <div id="side-steps-${prefix}"></div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function syncSpecialUI() {
+    [['orig', stateOrig], ['own', stateEigene]].forEach(([pref, st]) => {
+        const slider = document.getElementById('special-' + pref);
+        const label = document.getElementById('special-label-' + pref);
+        if (slider) slider.value = st.special ? 1 : 0;
+        if (label) label.innerText = st.special == 1 ? 'Ja' : 'Nein';
+    });
+}
+
+function init() {
+    const diagBody = document.getElementById('diag-rows-container');
+    diagBody.innerHTML = '';
+    for(let i=1;i<=6;i++){
+        diagBody.innerHTML += `<tr>
+            <td style="border-right:1px solid var(--border)"><input type="text" id="diag-icd-${i}" class="field-input" style="border:none;background:transparent;border-radius:0" placeholder="..."></td>
+            <td><input type="text" id="diag-txt-${i}" class="field-input" style="border:none;background:transparent;border-radius:0" placeholder="Diagnose eingeben..."></td>
+        </tr>`;
+    }
+
+    // Reiter "Laut Vorgutachten" entfällt – die Vorgutachten-Werte kommen aus dem Import
+    // (Prüfansicht) und werden in Reiter "Einschätzung & Vergleich" je Kriterium angezeigt.
+    document.getElementById('tab-3').innerHTML = renderNBASection('own');
+    fillTable('own');
+    calculate('own');
+    syncSpecialUI();
+}
+
+function fillTable(pref) {
+    const table = document.getElementById('table-body-'+pref);
+    if(!table) return;
+    table.innerHTML='';
+    const modNames = ["Mobilität","Kognitive Fähigkeiten","Verhaltensweisen","Selbstversorgung","Krankheitsbedingte Anforderungen","Alltagsgestaltung"];
+    const st = pref === 'orig' ? stateOrig : stateEigene;
+    for(let m=1;m<=6;m++){
+        table.innerHTML += `<tr class="module-header-row"><td colspan="5">${m}. ${modNames[m-1]}</td></tr>`;
+        ITEMS.filter(i=>i.m===m).forEach(i=>{
+            if(!st.values[i.id]) st.values[i.id] = (i.m===5 && i.group!=='D') ? {count:0,period:'W'} : 0;
+            table.innerHTML += renderRow(i, pref);
+        });
+        table.innerHTML += `
+        <tr class="mod-result-row">
+            <td colspan="2">Modul-Ergebnis ${m}</td>
+            <td>Gewichtet: <span id="mod-w-${pref}-${m}">0,00</span></td>
+            <td id="mod-r-${pref}-${m}" style="text-align:center;border-left:1px solid var(--border)">0</td>
+            <td></td>
+        </tr>
+        ${pref==='own' ? `<tr class="mod-comp-row">
+            <td colspan="2" style="padding-left:28px">↳ laut Vorgutachten</td>
+            <td>Gew.: <span id="mod-w-comp-${m}">0,00</span></td>
+            <td id="mod-r-comp-${m}" style="text-align:center;border-left:1px solid var(--border)">0</td>
+            <td></td>
+        </tr>` : ''}`;
+    }
+}
+
+function renderRow(i, pref) {
+    const st = pref === 'orig' ? stateOrig : stateEigene;
+    // Prominenter Vorgutachten-Balken ÜBER der eigenen Einschätzung (nur Reiter "own").
+    const vorgBox = pref === 'own' ? `<div class="vorg-box" id="origref-own-${i.id}">${getOriginalRef(i.id)}</div>` : '';
+    const hasInfo = !!(i.info && (i.info.check || i.info.steps));
+
+    if(i.m===5 && i.group!=='D'){
+        const val = st.values[i.id];
+        const noDaily = [55,56,57].includes(i.id);
+        return `<tr id="row-${pref}-${i.id}" class="nba-row">
+            <td class="nr">${i.nr}</td>
+            <td class="title">${i.title}</td>
+            <td class="slider-cell">
+                ${vorgBox}
+                <div class="own-box">
+                    <div class="own-label">Eigene Einschätzung</div>
+                    <div class="m5-count-box">
+                        <input type="range" min="0" max="15" step="1" value="${val.count}" oninput="updateM5Count('${pref}',${i.id},this.value)">
+                        <span class="m5-disp" id="m5-disp-${pref}-${i.id}" style="font-family:var(--font-mono);font-size:13px;font-weight:700;min-width:22px;text-align:right">${val.count}</span>
+                    </div>
+                    <div class="m5-period-row">
+                        ${!noDaily?`<button class="m5-period-btn ${val.period==='D'?'active':''}" onclick="updateM5Period('${pref}',${i.id},'D')">Tägl.</button>`:''}
+                        <button class="m5-period-btn ${val.period==='W'?'active':''}" onclick="updateM5Period('${pref}',${i.id},'W')">Wöch.</button>
+                        <button class="m5-period-btn ${val.period==='M'?'active':''}" onclick="updateM5Period('${pref}',${i.id},'M')">Mon.</button>
+                    </div>
+                </div>
+            </td>
+            <td class="pts" id="pts-${pref}-${i.id}">0</td>
+            <td class="info-cell"><button class="info-btn" onclick="selectItem(${i.id},'${pref}',this)">${hasInfo?'i':'—'}</button></td>
+        </tr>`;
+    }
+    const curIdx = st.values[i.id] || 0;
+    return `<tr id="row-${pref}-${i.id}" class="nba-row">
+        <td class="nr">${i.nr}</td>
+        <td class="title">${i.title}</td>
+        <td class="slider-cell">
+            ${vorgBox}
+            <div class="own-box">
+                <div class="own-label">Eigene Einschätzung</div>
+                <div class="slider-wrapper">
+                    <input type="range" min="0" max="${i.opts.length-1}" step="1" value="${curIdx}" oninput="updateValue('${pref}',${i.id},this.value)">
+                    <span class="slider-label" id="label-${pref}-${i.id}">${i.opts[curIdx]}</span>
+                </div>
+            </div>
+        </td>
+        <td class="pts" id="pts-${pref}-${i.id}">0</td>
+        <td class="info-cell"><button class="info-btn" onclick="selectItem(${i.id},'${pref}',this)">${hasInfo?'i':'—'}</button></td>
+    </tr>`;
+}
+
+// Inhalt des Vorgutachten-Balkens: Wert groß + visuelle Punkte-Skala (markierte Stufe).
+function getOriginalRef(itemId) {
+    const item = ITEMS.find(it=>it.id===itemId);
+    const val = stateOrig.values[itemId];
+    const tag = '<span class="vorg-tag">Vorgutachten</span>';
+    if(val===undefined || val===null) {
+        return tag + '<div class="vorg-content"><span class="vorg-val vorg-empty">—</span></div>';
+    }
+    if(item.m===5 && item.group!=='D'){
+        const c = (val && typeof val==='object') ? val.count : 0;
+        const p = (val && typeof val==='object') ? val.period : 'W';
+        const pTxt = p==='D' ? 'pro Tag' : p==='W' ? 'pro Woche' : 'pro Monat';
+        return tag + `<div class="vorg-content"><span class="vorg-val">${c}× ${pTxt}</span></div>`;
+    }
+    const idx = (typeof val==='number') ? val : 0;
+    const label = (item.opts && item.opts[idx]) ? item.opts[idx] : '-';
+    let dots = '';
+    if(item.opts){ for(let k=0;k<item.opts.length;k++){ dots += `<span class="vorg-dot${k===idx?' on':''}"></span>`; } }
+    return tag + `<div class="vorg-content"><span class="vorg-val">${escapeHtml(label)}</span><span class="vorg-scale">${dots}</span></div>`;
+}
+
+// Aktualisiert nur die "Vorgutachten:"-Anzeige einer einzelnen Zeile (statt der ganzen Tabelle).
+function refreshOrigRef(id) {
+    const el = document.getElementById('origref-own-' + id);
+    if (el) el.innerHTML = getOriginalRef(id);
+    applyVorgHighlight(id);
+}
+
+// Vergleich eigene Einschätzung vs. Vorgutachten: 1 = eigene höher, -1 = niedriger, 0 = gleich/kein Vorwert.
+function ownVsVorg(id) {
+    const item = ITEMS.find(it=>it.id===id);
+    const ov = stateEigene.values[id];
+    const vv = stateOrig.values[id];
+    if (vv === undefined || vv === null) return 0; // ohne Vorgutachten-Wert keine Rot-Markierung
+    if (item && item.m===5 && item.group!=='D') {
+        const daily = v => { if(!v || typeof v!=='object') return 0; let d=Number(v.count)||0; if(v.period==='W') d/=7; else if(v.period==='M') d/=30; return d; };
+        const o = daily(ov), w = daily(vv);
+        return o>w ? 1 : (o<w ? -1 : 0);
+    }
+    const oi = (typeof ov==='number') ? ov : 0;
+    const wi = (typeof vv==='number') ? vv : 0;
+    return oi>wi ? 1 : (oi<wi ? -1 : 0);
+}
+
+// Färbt die Vorgutachten-Box rot, wenn die eigene Einschätzung höher ist (sonst gelb).
+function applyVorgHighlight(id) {
+    const box = document.getElementById('origref-own-' + id);
+    if (box) box.classList.toggle('vorg-higher', ownVsVorg(id) === 1);
+}
+
+function updateValue(pref, id, idx) {
+    const st = pref==='orig' ? stateOrig : stateEigene;
+    if (pref === 'orig') { delete stateOrig.extracted; }
+    st.values[id] = parseInt(idx);
+    const labelEl = document.getElementById('label-'+pref+'-'+id);
+    if(labelEl) labelEl.innerText = ITEMS.find(it=>it.id===id).opts[idx];
+    calculate(pref);
+    if(pref==='orig'){ refreshOrigRef(id); calculate('own'); updateLiveCompRows(); }
+}
+function updateM5Count(pref, id, val) {
+    const st = pref==='orig' ? stateOrig : stateEigene;
+    if (pref === 'orig') { delete stateOrig.extracted; }
+    if(!st.values[id]) st.values[id]={count:0,period:'W'};
+    st.values[id].count = Number(val);
+    const disp = document.getElementById('m5-disp-'+pref+'-'+id);
+    if(disp) disp.innerText = val;
+    calculate(pref);
+    if(pref==='orig'){ refreshOrigRef(id); calculate('own'); updateLiveCompRows(); }
+}
+function updateM5Period(pref, id, p) {
+    const st = pref==='orig' ? stateOrig : stateEigene;
+    if (pref === 'orig') { delete stateOrig.extracted; }
+    if(!st.values[id]) st.values[id]={count:0,period:'W'};
+    st.values[id].period = p;
+    fillTable(pref); calculate(pref);
+    if(pref==='orig'){ refreshOrigRef(id); calculate('own'); updateLiveCompRows(); }
+}
+function updateSpecial(pref, val) {
+    const st = pref==='orig' ? stateOrig : stateEigene;
+    if (pref === 'orig') { delete stateOrig.extracted; }
+    st.special = parseInt(val);
+    document.getElementById('special-label-'+pref).innerText = val==1 ? 'Ja' : 'Nein';
+    calculate(pref);
+    if(pref==='orig') calculate('own');
+}
+
+function calculateInternal(pref) {
+    const st = pref==='orig' ? stateOrig : stateEigene;
+
+    if (pref === 'orig' && stateOrig.extracted) {
+        return {
+            raws: stateOrig.extracted.raws,
+            weights: stateOrig.extracted.weights,
+            total: stateOrig.extracted.total,
+            pg: stateOrig.extracted.pg
+        };
+    }
+
+    const getV = (id) => { const item=ITEMS.find(it=>it.id===id); const v=st.values[id]; return (typeof v==='number')?(item.val?item.val[v]:v):0; };
+    let s1=ITEMS.filter(i=>i.m===1).reduce((s,i)=>s+(Number(st.values[i.id])||0),0);
+    let s2=ITEMS.filter(i=>i.m===2).reduce((s,i)=>s+(Number(st.values[i.id])||0),0);
+    let s3=ITEMS.filter(i=>i.m===3).reduce((s,i)=>s+getV(i.id),0);
+    let s4=ITEMS.filter(i=>i.m===4).reduce((s,i)=>s+getV(i.id),0);
+    let s6=ITEMS.filter(i=>i.m===6).reduce((s,i)=>s+(Number(st.values[i.id])||0),0);
+    // Modul 5 nach BRi: Häufigkeiten je Gruppe ZUERST aufsummieren und in einen
+    // Durchschnitt pro Tag umrechnen, dann der GRUPPE EINEN Punktwert zuordnen
+    // (nicht je Einzelkriterium). Gruppe A: 4.5.1–4.5.7, Gruppe B: 4.5.8–4.5.11.
+    let ptsM5=0, sumA=0, sumB=0, sumC=0;
+    ITEMS.filter(i=>i.m===5).forEach(i=>{
+        if(i.group==='D'){ptsM5+=getV(i.id);return;}
+        let d=st.values[i.id]||{count:0,period:'W'};
+        let daily=Number(d.count); if(d.period==='W')daily/=7; if(d.period==='M')daily/=30;
+        if(i.group==='A') sumA+=daily;
+        else if(i.group==='B') sumB+=daily;
+        else if(i.group==='C') sumC+=(Number(d.count)*(i.factor[d.period]||0));
+    });
+    sumA=Math.round(sumA*10000)/10000;
+    sumB=Math.round(sumB*10000)/10000;
+    let pA=sumA>8?3:sumA>3?2:sumA>=1?1:0;
+    let pB=sumB>=3?3:sumB>=1?2:sumB>=0.1429?1:0;
+    let pC=sumC>=60?6:sumC>=12.9?3:sumC>=8.6?2:sumC>=4.3?1:0;
+    ptsM5+=pA+pB+pC;
+    let w1=s1>=10?10:s1>=7?7.5:s1>=4?5:s1>=2?2.5:0;
+    let p2=s2>=17?15:s2>=11?11.25:s2>=6?7.5:s2>=2?3.75:0;
+    let p3=s3>=7?15:s3>=5?11.25:s3>=3?7.5:s3>=1?3.75:0;
+    let w4=s4>=37?40:s4>=19?30:s4>=8?20:s4>=3?10:0;
+    let w5=ptsM5>=6?20:ptsM5>=4?15:ptsM5>=2?10:ptsM5>=1?5:0;
+    let w6=s6>=12?15:s6>=7?11.25:s6>=4?7.5:s6>=1?3.75:0;
+    let wm23=Math.max(p2,p3);
+    let total=st.special==1?100:(w1+wm23+w4+w5+w6);
+    let pg=total>=90?5:total>=70?4:total>=47.5?3:total>=27?2:total>=12.5?1:0;
+    return {raws:[s1,s2,s3,s4,ptsM5,s6], weights:[w1,p2,p3,w4,w5,w6], total, pg};
+}
+
+function calculate(pref) {
+    const st = pref==='orig' ? stateOrig : stateEigene;
+    const res = calculateInternal(pref);
+    const {raws:[s1,s2,s3,s4,ptsM5,s6], weights:[w1,p2,p3,w4,w5,w6], total, pg} = res;
+
+    const getV = (id) => { const item=ITEMS.find(it=>it.id===id); const v=st.values[id]; return (typeof v==='number')?(item.val?item.val[v]:v):0; };
+    // Modul 5 nach BRi: Häufigkeiten je Gruppe summieren -> EIN Punktwert je Gruppe.
+    // Anzeige: der Gruppen-Punktwert erscheint NUR auf der untersten Zeile der Gruppe
+    // (wie die "Summe"-Zeile im BRi), die übrigen Zeilen zeigen "–" – damit nicht der
+    // Eindruck einer Mehrfachzählung entsteht.
+    let sumA=0, sumB=0, sumC=0;
+    ITEMS.filter(i=>i.m===5).forEach(i=>{
+        if(i.group==='D'){const el=document.getElementById('pts-'+pref+'-'+i.id);if(el)el.innerText=getV(i.id);return;}
+        let d=st.values[i.id]||{count:0,period:'W'};
+        let daily=Number(d.count); if(d.period==='W')daily/=7; if(d.period==='M')daily/=30;
+        if(i.group==='A') sumA+=daily;
+        else if(i.group==='B') sumB+=daily;
+        else if(i.group==='C') sumC+=(Number(d.count)*(i.factor[d.period]||0));
+    });
+    sumA=Math.round(sumA*10000)/10000;
+    sumB=Math.round(sumB*10000)/10000;
+    let pA=sumA>8?3:sumA>3?2:sumA>=1?1:0;
+    let pB=sumB>=3?3:sumB>=1?2:sumB>=0.1429?1:0;
+    let pC=sumC>=60?6:sumC>=12.9?3:sumC>=8.6?2:sumC>=4.3?1:0;
+    const showGroupPts = (grp, val, range) => {
+        const ids = ITEMS.filter(i=>i.m===5 && i.group===grp).map(i=>i.id);
+        ids.forEach((id, k) => {
+            const el = document.getElementById('pts-'+pref+'-'+id);
+            if(!el) return;
+            if(k === ids.length-1){ el.innerText = val; el.title = 'Gruppen-Einzelpunkte '+range+' (gemeinsam gewertet)'; }
+            else { el.innerText = '–'; el.title = 'Punkte werden je Gruppe '+range+' gemeinsam vergeben (Wert in der untersten Zeile der Gruppe)'; }
+        });
+    };
+    showGroupPts('A', pA, '4.5.1–4.5.7');
+    showGroupPts('B', pB, '4.5.8–4.5.11');
+    showGroupPts('C', pC, '4.5.12–4.5.15');
+    ITEMS.filter(i=>i.m&&i.m!==5).forEach(i=>{const el=document.getElementById('pts-'+pref+'-'+i.id);if(el)el.innerText=getV(i.id);});
+    if(pref==='own'){ ITEMS.forEach(it=>applyVorgHighlight(it.id)); }
+
+    const setEl = (id,v) => { const el=document.getElementById(id); if(el)el.innerText=v; };
+    setEl('mod-w-'+pref+'-1',w1.toFixed(2)); setEl('mod-r-'+pref+'-1',s1);
+    setEl('mod-w-'+pref+'-2',p2.toFixed(2)); setEl('mod-r-'+pref+'-2',s2);
+    setEl('mod-w-'+pref+'-3',p3.toFixed(2)); setEl('mod-r-'+pref+'-3',s3);
+    setEl('mod-w-'+pref+'-4',w4.toFixed(2)); setEl('mod-r-'+pref+'-4',s4);
+    setEl('mod-w-'+pref+'-5',w5.toFixed(2)); setEl('mod-r-'+pref+'-5',ptsM5);
+    setEl('mod-w-'+pref+'-6',w6.toFixed(2)); setEl('mod-r-'+pref+'-6',s6);
+    setEl('total-w-'+pref, total.toFixed(2).replace('.',','));
+    setEl('pg-title-'+pref, pg>0?'PFLEGEGRAD '+pg:'KEIN PG');
+
+    const tiers={1:[2,4,7,10],2:[2,6,11,17],3:[2,6,11,17],4:[3,8,19,37],5:[1,2,4,6],6:[1,4,7,12]};
+    const getGap=(mod,sum)=>{
+        const next=tiers[mod].find(t=>t>sum);
+        if(!next)return{t:'Max ✓',cls:'gap-green'};
+        const diff=next-sum;
+        const prev=[...tiers[mod]].reverse().find(t=>t<=sum)||0;
+        const pct=Math.round((diff/(next-prev))*100);
+        return{t:`-${diff} (${pct}%)`,cls:pct<50?'gap-green':'gap-red'};
+    };
+
+    const grid=document.getElementById('res-grid-'+pref);
+    if(grid){
+        const mNames=['Mobilität','Kognition','Verhalten','Selbstversorgung','Med. Anf.','Alltagsgest.'];
+        if(pref==='own'){
+            const rO=calculateInternal('orig');
+            grid.innerHTML=[1,2,3,4,5,6].map(m=>{
+                const rw=[w1,p2,p3,w4,w5,w6][m-1];
+                const rv=[s1,s2,s3,s4,ptsM5,s6][m-1];
+                const isWin=(m===2&&p2>=p3)||(m===3&&p3>p2);
+                const gap=getGap(m,rv);
+                return `<tr class="${isWin?'winner-row':''}">
+                    <td>${m}. ${mNames[m-1]}</td>
+                    <td class="center mono">${rw.toFixed(2)}</td>
+                    <td class="center mono">${rv}</td>
+                    <td class="center" style="color:var(--accent);opacity:0.7;font-family:var(--font-mono);font-weight:700">${rO.weights[m-1].toFixed(2)}</td>
+                    <td class="center" style="color:var(--accent);opacity:0.7;font-family:var(--font-mono)">${rO.raws[m-1]}</td>
+                    <td class="center"><span class="gap-badge ${gap.cls}">${gap.t}</span></td>
+                </tr>`;
+            }).join('');
+            setEl('total-w-orig-ref', rO.total.toFixed(2).replace('.',','));
+            setEl('pg-title-orig-ref', rO.pg>0?'VORGUTACHTEN: PG '+rO.pg:'VORGUTACHTEN: KEIN PG');
+            updateLiveCompRows();
+        } else {
+            grid.innerHTML=[1,2,3,4,5,6].map(m=>{
+                const rw=[w1,p2,p3,w4,w5,w6][m-1];
+                const rv=[s1,s2,s3,s4,ptsM5,s6][m-1];
+                const gap=getGap(m,rv);
+                return `<tr>
+                    <td>${m}. ${mNames[m-1]}</td>
+                    <td class="center mono">${rw.toFixed(2)}</td>
+                    <td class="center mono">${rv}</td>
+                    <td class="center"><span class="gap-badge ${gap.cls}">${gap.t}</span></td>
+                </tr>`;
+            }).join('');
+        }
+    }
+
+    const nextT=[12.5,27,47.5,70,90].find(t=>t>total);
+    const footEl=document.getElementById('gap-footer-'+pref);
+    if(footEl){
+        footEl.style.display='block';
+        if(nextT){
+            footEl.className='gap-footer danger';
+            const pgNext=[1,2,3,4,5][[12.5,27,47.5,70,90].indexOf(nextT)];
+            footEl.innerText=`Noch ${(nextT-total).toFixed(2).replace('.',',')} Pkt. bis Pflegegrad ${pgNext}`;
+        } else {
+            footEl.className='gap-footer success';
+            footEl.innerText='✓ Maximaler Pflegegrad erreicht';
+        }
+    }
+}
+
+function updateLiveCompRows() {
+    const rO=calculateInternal('orig');
+    for(let m=1;m<=6;m++){
+        const ew=document.getElementById('mod-w-comp-'+m);
+        const er=document.getElementById('mod-r-comp-'+m);
+        if(ew)ew.innerText=rO.weights[m-1].toFixed(2);
+        if(er)er.innerText=rO.raws[m-1];
+    }
+}
+
+let activeSidebarBtn = {};
+function selectItem(id, pref, btn) {
+    const item=ITEMS.find(i=>i.id===id);
+    if(!item || !item.info) return;
+    if(activeSidebarBtn[pref] && activeSidebarBtn[pref] !== btn) activeSidebarBtn[pref].classList.remove('active');
+    if(btn){ btn.classList.toggle('active'); if(!btn.classList.contains('active')){ document.getElementById('sidebar-empty-'+pref).style.display='flex'; document.getElementById('sidebar-content-'+pref).style.display='none'; activeSidebarBtn[pref]=null; return; } }
+    activeSidebarBtn[pref]=btn;
+    document.getElementById('sidebar-empty-'+pref).style.display='none';
+    document.getElementById('sidebar-content-'+pref).style.display='block';
+    document.getElementById('side-title-'+pref).innerText=(item.nr?item.nr+' ':'')+item.title;
+    document.getElementById('side-check-'+pref).innerHTML=item.info?.check||'—';
+    const steps=item.info?.steps;
+    const stepsEl=document.getElementById('side-steps-'+pref);
+    if(steps && steps.length){
+        stepsEl.innerHTML=steps.map(s=>`<div class="side-step"><div class="side-step-label">${s.l}</div><div class="side-step-text">${s.d}</div></div>`).join('');
+    } else if(item.info?.rule){
+        stepsEl.innerHTML=`<div class="side-step"><div class="side-step-label">Hinweis</div><div class="side-step-text">${item.info.rule}</div></div>`;
+    } else { stepsEl.innerHTML='<div style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono)">Keine weiteren Details.</div>'; }
+}
+
+function renderAuswertung() {
+    const rO=calculateInternal('orig');
+    const rE=calculateInternal('own');
+    const mNames=['Mobilität','Kognition','Verhalten','Selbstversorgung','Med. Anf.','Alltagsgest.'];
+    const diff=(rE.total-rO.total).toFixed(2).replace('.',',');
+    const diffSign=rE.total>=rO.total?'+':'';
+    const pgDiff=rE.pg-rO.pg;
+    const pgDiffTxt=pgDiff>0?`+${pgDiff}`:pgDiff===0?'±0':pgDiff;
+    const pgDiffClr=pgDiff>0?'var(--green)':pgDiff===0?'var(--text-muted)':'var(--red)';
+
+    document.getElementById('auswertung-content').innerHTML=`
+    <div class="space-y-6">
+        <div class="card" style="border: 1px solid rgba(13,148,136,0.25);">
+            <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Allgemeine Angaben / Anamnese (Mitschrift Erstgespräch)</div>
+            <div style="padding:20px;">
+                <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px; line-height:1.6">
+                    Notieren Sie hier alle Anmerkungen aus dem Erstgespräch. Diese Mitschrift wird beim Erzeugen der Widerspruchsbegründung berücksichtigt – sie fließt in die modulbezogene Argumentation ein und erscheint zusätzlich als zusammenfassender Fließtext in der Begründung.
+                </p>
+                <textarea id="erstgespraech-notes" class="field-input" style="min-height:160px; font-size:13px; line-height:1.6; padding:14px;" placeholder="Mitschrift des Erstgesprächs / allgemeine Angaben / Anamnese ..." oninput="erstgespraechNotes = this.value; autoResize(this)"></textarea>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Vergleichsbericht: Vorgutachten vs. Eigene Einschätzung</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)">
+                ${[
+                    ['PG laut Vorgutachten', rO.pg>0?'PG '+rO.pg:'Kein PG', 'var(--accent)'],
+                    ['PG Eigene Einschätzung', rE.pg>0?'PG '+rE.pg:'Kein PG', 'var(--accent2)'],
+                    ['Differenz Pflegegrad', pgDiffTxt, pgDiffClr]
+                ].map(([l,v,c])=>`<div style="background:var(--bg-card2);padding:20px;text-align:center">
+                    <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-secondary);margin-bottom:8px">${l}</div>
+                    <div style="font-size:28px;font-weight:800;color:${c}">${v}</div>
+                </div>`).join('')}
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)">
+                ${[
+                    ['Punkte Vorgutachten', rO.total.toFixed(2).replace('.',','), 'var(--text-primary)'],
+                    ['Punkte Eigene Einschätzung', rE.total.toFixed(2).replace('.',','), 'var(--text-primary)'],
+                    ['Differenz Punkte', diffSign+diff, rE.total>=rO.total?'var(--green)':'var(--red)']
+                ].map(([l,v,c])=>`<div style="background:var(--bg-card);padding:16px;text-align:center">
+                    <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-secondary);margin-bottom:6px">${l}</div>
+                    <div style="font-size:22px;font-weight:800;color:${c};font-family:var(--font-mono)">${v}</div>
+                </div>`).join('')}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="dot"></div>Modul-Vergleich</div>
+            <table class="result-table">
+                <thead><tr>
+                    <th>Modul</th>
+                    <th class="center">Gew. Pkt (Vorg.)</th><th class="center">Einzel (Vorg.)</th>
+                    <th class="center">Gew. Pkt (Eigen)</th><th class="center">Einzel (Eigen)</th>
+                    <th class="center">Differenz</th>
+                </tr></thead>
+                <tbody>${[1,2,3,4,5,6].map(m=>{
+                    const dw=rE.weights[m-1]-rO.weights[m-1];
+                    const dr=rE.raws[m-1]-rO.raws[m-1];
+                    const dwStr=(dw>=0?'+':'')+dw.toFixed(2);
+                    const drStr=(dr>=0?'+':'')+dr;
+                    const clr=dw>0?'var(--green)':dw<0?'var(--red)':'var(--text-muted)';
+                    return `<tr>
+                        <td>${m}. ${mNames[m-1]}</td>
+                        <td class="center mono">${rO.weights[m-1].toFixed(2)}</td>
+                        <td class="center mono">${rO.raws[m-1]}</td>
+                        <td class="center" style="color:var(--accent2);font-family:var(--font-mono);font-weight:700">${rE.weights[m-1].toFixed(2)}</td>
+                        <td class="center" style="color:var(--accent2);font-family:var(--font-mono)">${rE.raws[m-1]}</td>
+                        <td class="center"><span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:${clr}">${dwStr} (${drStr})</span></td>
+                    </tr>`;
+                }).join('')}</tbody>
+            </table>
+        </div>
+
+        <div class="card" style="border-color:var(--border);">
+            <div class="card-header"><div class="dot" style="background:var(--accent)"></div>Mathematische Berechnungsgrundlage (SGB XI)</div>
+            <div style="padding:20px; font-family:var(--font-mono); font-size:11px; line-height:1.6; color:var(--text-secondary);">
+                <p style="margin-bottom:12px;">Die SGB XI Gesamtpunktzahl wird anhand der gewichteten Modulergebnisse berechnet. Modul 2 und 3 werden als Verbund gewertet, wobei nur das Modul mit der höheren Punktzahl in die Summe einfließt:</p>
+                <div style="background:var(--bg-base); padding:16px; border-radius:8px; text-align:center; color:var(--accent); font-size:14px; margin-bottom:12px; border:1px solid var(--border)">
+                    T = W_1 + max(W_2, W_3) + W_4 + W_5 + W_6
+                </div>
+                <p>Wobei:</p>
+                <ul style="list-style-type:none; padding-left:14px; margin-top:8px;">
+                    <li>- W_1: Gewichtete Punkte Mobilität (max 10 Pkt)</li>
+                    <li>- W_2: Kognitive Fähigkeiten (max 15 Pkt)</li>
+                    <li>- W_3: Verhaltensweisen (max 15 Pkt)</li>
+                    <li>- W_4: Selbstversorgung (max 40 Pkt)</li>
+                    <li>- W_5: Krankheitsbed. Anforderungen (max 20 Pkt)</li>
+                    <li>- W_6: Gestaltung Alltagsleben (max 15 Pkt)</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card" style="border: 1px solid rgba(37,99,235,0.2);">
+            <div class="card-header">
+                <div class="header-title-left"><div class="dot" style="background:var(--accent)"></div>Widerspruchs- &amp; Begründungs-Assistent (KI)</div>
+            </div>
+            <div style="padding:24px;">
+                <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px; line-height:1.6">
+                    Erstellt auf Knopfdruck eine formatgetreue „Pflegefachliche Stellungnahme" im Familiara-Layout. Alle Daten werden automatisch aus den eingegebenen bzw. eingelesenen Gutachten- und Bescheiddaten, dem Modulvergleich und Ihrer Mitschrift übernommen. Die Vorschau ist frei editierbar und kann als PDF gedruckt werden.
+                </p>
+                <button class="btn btn-yellow" onclick="generateAppealText()">⚡ Stellungnahme / Widerspruch erstellen</button>
+
+                <div id="appeal-result-container" style="display:none; margin-top:20px;">
+                    <label class="field-label">Generierte Stellungnahme (Vorschau – frei editierbar)</label>
+                    <div id="appeal-document" contenteditable="true" spellcheck="false" oninput="appealDraft = this.innerHTML"></div>
+
+                    <div style="display:flex; gap:12px; margin-top:16px;">
+                        <button class="btn btn-primary" onclick="copyAppealText()">Kopieren</button>
+                        <button class="btn btn-secondary" onclick="printAppealText()">Drucken / PDF speichern</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    // Eingaben nach dem Neu-Rendern wiederherstellen (Tab-Wechsel baut den Inhalt neu auf)
+    injectStellungnahmeCss();
+    const notesEl = document.getElementById('erstgespraech-notes');
+    if (notesEl) { notesEl.value = erstgespraechNotes; autoResize(notesEl); }
+    if (appealDraft) {
+        const appealEl = document.getElementById('appeal-document');
+        const cont = document.getElementById('appeal-result-container');
+        if (appealEl && cont) {
+            appealEl.innerHTML = appealDraft;
+            cont.style.display = 'block';
+        }
+    }
+}
+
+function saveCase() {
+    const stammdaten={};
+    document.querySelectorAll('[id^="stam-"], [id^="diag-"]').forEach(el=>stammdaten[el.id]=el.value);
+    const notesEl = document.getElementById('erstgespraech-notes');
+    if (notesEl) erstgespraechNotes = notesEl.value;
+    const data={stateOrig,stateEigene,stammdaten,erstgespraechNotes};
+    const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+    const name=(document.getElementById('stam-betreffend').value||'Fall').replace(/\s/g,'_');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${name}_PflegeAssistent.json`; a.click();
+}
+
+function loadCase(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.name.endsWith('.json') && file.type !== 'application/json') {
+        showToast('Bitte eine gültige .json-Datei laden (zuvor mit "Speichern" erstellt).', 'error');
+        e.target.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        try {
+            const data = JSON.parse(ev.target.result);
+            if (!data.stateOrig || !data.stateEigene) throw new Error('Ungueltiges Format');
+            stateOrig = data.stateOrig;
+            stateEigene = data.stateEigene;
+            erstgespraechNotes = data.erstgespraechNotes || "";
+            appealDraft = "";
+            init();
+            setTimeout(() => {
+                Object.keys(data.stammdaten || {}).forEach(k => {
+                    const el = document.getElementById(k);
+                    if (el) el.value = data.stammdaten[k];
+                });
+                autoResize(document.getElementById('stam-anamnese'));
+                autoResize(document.getElementById('stam-befund'));
+            }, 100);
+            showToast('Fall erfolgreich geladen!', 'success');
+        } catch(err) {
+            showToast('Fehler: Keine gültige Pflege-Assistent-Datei.', 'error');
+        }
+        e.target.value = '';
+    };
+    reader.readAsText(file);
+}
+
+function showToast(msg, type) {
+    type = type || 'success';
+    const existing = document.getElementById('toast-msg');
+    if (existing) existing.remove();
+    const t = document.createElement('div');
+    t.id = 'toast-msg';
+    t.innerText = msg;
+    t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:' +
+        (type === 'error' ? 'rgba(220,38,38,0.97)' : 'rgba(13,148,136,0.97)') +
+        ';color:white;padding:12px 24px;border-radius:10px;font-family:var(--font-mono);' +
+        'font-size:11px;font-weight:700;z-index:9999;max-width:520px;text-align:center;' +
+        'box-shadow:0 4px 24px rgba(15,23,42,0.1);letter-spacing:0.03em;';
+    document.body.appendChild(t);
+    setTimeout(function(){ t.remove(); }, 4500);
+}
+
+window.onload = function() { init(); loadApiKey(); };
+</script>
+</body>
+</html>
