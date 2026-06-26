@@ -1146,6 +1146,13 @@ function serverValuesToValuesOrig(sv) {
 }
 
 // AI PDF / IMAGE GUTACHTEN PARSER (WITH SYSTEMATIC LOKALISIERUNG FOR SPECIFIED SECTIONS)
+// Online gehostet (z.B. GitHub Pages) = NICHT vom lokalen Server (127.0.0.1) ausgeliefert.
+// Dann ist der lokale OCR-Server nicht erreichbar und das Einlesen läuft über Google.
+function isOnlineHosted() {
+    const h = location.hostname;
+    return (location.protocol === 'http:' || location.protocol === 'https:') && h !== '127.0.0.1' && h !== 'localhost';
+}
+
 async function aiReadGutachten(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -1276,7 +1283,8 @@ async function aiReadGutachten(event) {
             // Stammdaten, Diagnosen, Anamnese, Befund und die Modul-Zusammenfassung.
             // Lokal vorbereiten: Text (inkl. OCR bei Scans) + präzise Kriterien (Text-PDFs).
             updateOverlay("Lokaler Server liest aus (Scans: OCR, ~30 Sek.)...", 25);
-            const local = await tryLocalExtract(base64Data, mimeType);
+            // Online (GitHub Pages) ist der lokale Server nicht erreichbar -> direkt über Google lesen.
+            const local = isOnlineHosted() ? null : await tryLocalExtract(base64Data, mimeType);
             const haveLocalText = !!(local && local.ok && local.text && local.text.trim().length > 40);
             const haveLocalValues = !!(local && local.values && Object.keys(local.values).length);
 
@@ -1327,11 +1335,20 @@ async function aiReadGutachten(event) {
                 if (haveLocalValues) { fb.values_orig = serverValuesToValuesOrig(local.values); }
                 fb._localValues = true;
                 openImportReview(file, fb, mimeType);
-                if (!lastServerReachable) {
-                    showToast("Lokaler Server nicht erreicht und Google nicht verfügbar. Bitte 'Pflege-Server starten.bat' starten und die App über http://127.0.0.1:8765 öffnen.", "error");
+                const online = isOnlineHosted();
+                const keyPresent = !!((document.getElementById('user-api-key')?.value || '').trim() || userApiKey.trim());
+                let msg;
+                if (!keyPresent) {
+                    msg = "Zum Einlesen bitte oben rechts einen kostenlosen Google-API-Schlüssel eintragen (aistudio.google.com)."
+                        + (online ? " Das Einlesen läuft online über Google." : " Alternativ den lokalen Server über 'Pflege-Server starten.bat' nutzen.");
+                } else if (online) {
+                    msg = "Google nicht verfügbar (evtl. Limit erreicht oder Schlüssel ungültig). Tipp: ein neuer, kostenloser API-Schlüssel löst ein Limit sofort. Felder bitte anhand der PDF prüfen/ergänzen.";
+                } else if (!lastServerReachable) {
+                    msg = "Lokaler Server nicht erreicht und Google nicht verfügbar. Bitte 'Pflege-Server starten.bat' starten und die App über http://127.0.0.1:8765 öffnen – oder oben rechts einen Google-API-Schlüssel eintragen.";
                 } else {
-                    showToast("Google-Limit erreicht – Felder wurden lokal vorab gefüllt (ggf. unvollständig). Bitte anhand der PDF prüfen/ergänzen. Tipp: ein neuer, kostenloser API-Schlüssel löst das Limit sofort.", "error");
+                    msg = "Google-Limit erreicht – Felder wurden lokal vorab gefüllt (ggf. unvollständig). Bitte anhand der PDF prüfen/ergänzen. Tipp: ein neuer, kostenloser API-Schlüssel löst das Limit sofort.";
                 }
+                showToast(msg, "error");
             }
 
         } catch (err) {
