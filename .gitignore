@@ -6,6 +6,9 @@ Zum Senden/
 # Lokale Backups / Master (die Git-Historie ersetzt sie)
 Backups/
 
+# Interne Arbeits-/Kontextnotizen (nicht ins oeffentliche Repo)
+Claude-Projekt-Kontext.md
+
 # Python-Build-/Cache-Reste
 __pycache__/
 *.pyc
