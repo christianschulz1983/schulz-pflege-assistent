@@ -1697,6 +1697,8 @@ function buildStellungnahme(notesOverride) {
     const g = id => (document.getElementById(id)?.value || '').trim();
     const esc = escapeHtml;
     const f2 = n => Number(n).toFixed(2).replace('.', ',');
+    // Datenfeld im Fließtext: wird beim erneuten Generieren gezielt aktualisiert (Text bleibt erhalten).
+    const df = (key, val) => `<span data-f="${key}">${esc(val == null ? '' : String(val))}</span>`;
 
     // Name immer als "Herr/Frau Vorname Nachname". Liegt noch "Nachname, Vorname" vor,
     // wird umgedreht (Anrede ergänzt die Auslese).
@@ -1782,7 +1784,7 @@ function buildStellungnahme(notesOverride) {
     <h1>Pflegefachliche Stellungnahme</h1>
     <p>auf Grundlage der Richtlinien des Medizinischen Dienstes Bund zur Feststellung der Pflegebedürftigkeit nach dem SGB XI vom 21. Dezember 2023</p>
 
-    <div class="data-block">
+    <div class="data-block" id="stmt-data">
       ${dataRow('Betreffend', name)}
       ${dataRow('geboren am', geb)}
       ${dataRow('Kasse', kasse)}
@@ -1796,13 +1798,13 @@ function buildStellungnahme(notesOverride) {
       ${dataRow('Gesamtpunkte', origPts)}
     </div>
 
-    <p>${esc(name)} erhebt Widerspruch gegen den Bescheid vom ${esc(bescheid || '—')} der ${esc(kasse || 'Kasse')}. Diese pflegefachliche Stellungnahme dient der Unterstützung des Rechtsbeistands von ${esc(name)} bei der Begründung des Widerspruchs. Dazu habe ich ${esc(name)} persönlich befragt und Befunde erhoben sowie das Gutachten des ${esc(org)} vom ${esc(begut || '—')} gewürdigt.</p>
+    <p>${df('name', name)} erhebt Widerspruch gegen den Bescheid vom ${df('bescheid', bescheid || '—')} der ${df('kasse', kasse || 'Kasse')}. Diese pflegefachliche Stellungnahme dient der Unterstützung des Rechtsbeistands von ${df('name', name)} bei der Begründung des Widerspruchs. Dazu habe ich ${df('name', name)} persönlich befragt und Befunde erhoben sowie das Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} gewürdigt.</p>
 
     <hr>
 
     <h2>Allgemeine Angaben</h2>
-    <p>Im Gutachten des ${esc(org)} vom ${esc(begut || '—')} erfolgte die Einstufung mit ${esc(origPts)} gewichteten Punkten, woraus sich ein Pflegegrad ${esc(origPG)} ergeben hat. Die Verteilung der gewichteten Punkte auf die einzelnen Module ist der nachfolgenden Übersicht zu entnehmen.</p>
-    ${notesBullets}
+    <p>Im Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} erfolgte die Einstufung mit ${df('opts', origPts)} gewichteten Punkten, woraus sich ein Pflegegrad ${df('opg', origPG)} ergeben hat. Die Verteilung der gewichteten Punkte auf die einzelnen Module ist der nachfolgenden Übersicht zu entnehmen.</p>
+    <div id="stmt-notes">${notesBullets}</div>
     <p>Ich bin in mehreren dieser Module zu abweichenden Einschätzungen gekommen. Dies ergibt eine höhere Punktzahl in den Modulen und in der Folge eine höhere Gesamtpunktzahl. Die nachfolgende Übersicht stellt die Ergebnisse des Vorgutachtens und meiner Beurteilung einander gegenüber:</p>
 
     <h2>Gegenüberstellung des Gutachtens und der abweichenden Bepunktung</h2>
@@ -1811,16 +1813,16 @@ function buildStellungnahme(notesOverride) {
         <tr><th rowspan="2">Modul</th><th>Vorgutachten</th><th>Beurteilung</th></tr>
         <tr><th>Gewichtete Punkte</th><th>Gewichtete Punkte</th></tr>
       </thead>
-      <tbody>${tableRows}</tbody>
+      <tbody id="stmt-cmp-body">${tableRows}</tbody>
     </table>
 
     <h2>Befund und Stellungnahme</h2>
-    ${critHtml}
+    <div id="stmt-crit">${critHtml}</div>
 
     <hr>
 
     <h2>Fazit</h2>
-    <p>Das vorliegende Gutachten des ${esc(org)} vom ${esc(begut || '—')} mit einem Pflegegrad ${esc(origPG)} und ${esc(origPts)} Punkten berücksichtigt die tatsächlichen Einschränkungen von ${esc(name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${f2(rE.total)} Gesamtpunkten, der gemäß den Richtlinien den Pflegegrad ${rE.pg} ab dem ${esc(antrag)} (Antragsdatum) rechtfertigt.</p>
+    <p>Das vorliegende Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} mit einem Pflegegrad ${df('opg', origPG)} und ${df('opts', origPts)} Punkten berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien den Pflegegrad ${df('epg', rE.pg)} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
   </div>`;
 }
 
@@ -1832,6 +1834,26 @@ async function correctText(text) {
     const out = result?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!out || !out.trim()) throw new Error("Keine Korrektur erhalten.");
     return out.trim();
+}
+
+// Beim erneuten Generieren: nur die datengetriebenen Teile (Kopfdaten, Vergleichstabelle,
+// abweichende Kriterien, Name/Daten/Kennzahlen im Fließtext) aktualisieren – der vom Nutzer
+// geschriebene bzw. bearbeitete Text bleibt vollständig erhalten.
+function mergeStellungnahme(existingHtml, freshHtml) {
+    const parse = h => { const d = document.createElement('div'); d.innerHTML = h; return d; };
+    const cur = parse(existingHtml);
+    const fresh = parse(freshHtml);
+    // Inline-Datenfelder (Name, Daten, Kennzahlen) anhand von data-f übernehmen
+    const vals = {};
+    fresh.querySelectorAll('[data-f]').forEach(el => { const k = el.getAttribute('data-f'); if (!(k in vals)) vals[k] = el.innerHTML; });
+    cur.querySelectorAll('[data-f]').forEach(el => { const k = el.getAttribute('data-f'); if (k in vals) el.innerHTML = vals[k]; });
+    // Ganze Datenblöcke ersetzen (Kopfdaten, Vergleichstabelle, abweichende Kriterien).
+    // Der Notizblock (#stmt-notes) wird bewusst NICHT ersetzt, damit dort eingefügter Text erhalten bleibt.
+    ['stmt-data', 'stmt-cmp-body', 'stmt-crit'].forEach(id => {
+        const f = fresh.querySelector('#' + id), c = cur.querySelector('#' + id);
+        if (f && c) c.innerHTML = f.innerHTML;
+    });
+    return cur.innerHTML;
 }
 
 // Erzeugt die Stellungnahme im Familiara-Format (gefüllt aus den App-Daten, mit Rechtschreibkorrektur der Notizen).
@@ -1862,13 +1884,25 @@ async function generateAppealText() {
             }
         }
 
-        const html = buildStellungnahme(notes);
-        appealDraft = html;
+        const fresh = buildStellungnahme(notes);
         const docEl = document.getElementById('appeal-document');
         const cont = document.getElementById('appeal-result-container');
-        if (docEl) docEl.innerHTML = html;
+        // Vorhandenen (ggf. vom Nutzer bearbeiteten) Stand ermitteln
+        const existing = (docEl && docEl.innerHTML.trim()) ? docEl.innerHTML : (appealDraft || '');
+        let finalHtml, merged = false;
+        // Nur mergen, wenn bereits eine Stellungnahme im neuen Format (mit Markern) vorliegt
+        if (existing.trim() && /data-f=|id="stmt-(data|crit|cmp-body)"/.test(existing)) {
+            finalHtml = mergeStellungnahme(existing, fresh); // Text erhalten, nur Daten aktualisieren
+            merged = true;
+        } else {
+            finalHtml = fresh;
+        }
+        appealDraft = finalHtml;
+        if (docEl) docEl.innerHTML = finalHtml;
         if (cont) cont.style.display = 'block';
-        showToast("Stellungnahme im Familiara-Format erstellt.", "success");
+        showToast(merged
+            ? "Aktualisiert – Ihre Ergänzungen wurden beibehalten, nur die Falldaten wurden erneuert."
+            : "Stellungnahme im Familiara-Format erstellt.", "success");
         if (docEl) docEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
         hideOverlay();
