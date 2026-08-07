@@ -1713,7 +1713,6 @@ function buildStellungnahme(notesOverride) {
         <div>Pflegeberater</div>
         <div>B.Sc. in Pflege- und Gesundheitsmanagement</div>
       </div>
-      <div class="right">${esc(todayDE())}</div>
     </div>
 
     <h1>Pflegefachliche Stellungnahme</h1>
@@ -2452,7 +2451,10 @@ function saveCase() {
     document.querySelectorAll('[id^="stam-"], [id^="diag-"]').forEach(el=>stammdaten[el.id]=el.value);
     const notesEl = document.getElementById('erstgespraech-notes');
     if (notesEl) erstgespraechNotes = notesEl.value;
-    const data={stateOrig,stateEigene,stammdaten,erstgespraechNotes};
+    // Aktuellen (ggf. editierten) Stand der generierten Stellungnahme mitspeichern
+    const appealEl = document.getElementById('appeal-document');
+    if (appealEl) appealDraft = appealEl.innerHTML;
+    const data={stateOrig,stateEigene,stammdaten,erstgespraechNotes,appealDraft};
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
     const name=(document.getElementById('stam-betreffend').value||'Fall').replace(/\s/g,'_');
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${name}_PflegeAssistent.json`; a.click();
@@ -2474,7 +2476,7 @@ function loadCase(e) {
             stateOrig = data.stateOrig;
             stateEigene = data.stateEigene;
             erstgespraechNotes = data.erstgespraechNotes || "";
-            appealDraft = "";
+            appealDraft = data.appealDraft || "";
             init();
             setTimeout(() => {
                 Object.keys(data.stammdaten || {}).forEach(k => {
