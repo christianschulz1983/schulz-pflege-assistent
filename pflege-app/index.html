@@ -1754,6 +1754,16 @@ function briLevel(nr, idx) {
     return { name: keys[idx], text: b.levels[keys[idx]] };
 }
 
+// Kennung für den Abschnitt „Allgemeine Angaben": ändert sich, sobald sich die Notizen oder
+// die Abweichungen ändern. Nur dann wird der Abschnitt neu verfasst – sonst bleibt der
+// vorhandene (ggf. von Hand überarbeitete) Text erhalten.
+function allgemeinSignature(notes, diffs) {
+    const basis = (notes || '').trim() + '||' + (diffs || []).map(d => `${d.nr}:${d.o}>${d.e}`).sort().join(',');
+    let h = 5381;
+    for (let i = 0; i < basis.length; i++) { h = ((h * 33) ^ basis.charCodeAt(i)) >>> 0; }
+    return 'a' + h.toString(36);
+}
+
 // Alle Abweichungen Vorgutachten <-> eigene Einschätzung ermitteln
 function computeDiffs() {
     const diffs = [];
@@ -1780,7 +1790,8 @@ function computeDiffs() {
 }
 
 // Baut die Aufgabenbeschreibung für die KI (BRi-Texte + Quervergleichs-Material + Stil).
-function buildBegruendungPrompt(diffs) {
+// mitAllgemein = zusätzlich den einleitenden Abschnitt "Allgemeine Angaben" verfassen.
+function buildBegruendungPrompt(diffs, mitAllgemein) {
     const cut = (s, n) => (s && s.length > n) ? s.slice(0, n) + ' …' : (s || '');
     let p = '';
     const vName = (document.getElementById('stam-betreffend')?.value || '').trim();
@@ -1822,12 +1833,48 @@ function buildBegruendungPrompt(diffs) {
     if (anam) p += 'ANAMNESE – ebenfalls eigener Text des Gutachters:\n' + cut(anam, 2500) + '\n\n';
     const notizen = (document.getElementById('erstgespraech-notes')?.value || '').trim();
     if (notizen) p += 'EIGENE FESTSTELLUNGEN AUS DEM ERSTGESPRÄCH:\n' + cut(notizen, 2500) + '\n\n';
+    if (mitAllgemein) {
+        // Modulweiser Überblick als Grundlage für den einleitenden Abschnitt
+        const rO = calculateInternal('orig'), rE = calculateInternal('own');
+        const mN = ['Mobilität', 'Kognitive und kommunikative Fähigkeiten', 'Verhaltensweisen und psychische Problemlagen',
+                    'Selbstversorgung', 'Krankheits- und therapiebedingte Anforderungen', 'Gestaltung des Alltagslebens'];
+        // Als abweichend gilt ein Modul, sobald darin ein Kriterium abweicht – die gewichteten
+        // Punkte allein genügen nicht, da sie trotz geänderter Kriterien gleich bleiben können.
+        const modMitDiff = new Set(diffs.map(d => d.m));
+        let mo = '';
+        for (let m = 1; m <= 6; m++) {
+            const a = rO.weights[m - 1], b = rE.weights[m - 1];
+            const anz = diffs.filter(d => d.m === m).length;
+            mo += `- Modul ${m} (${mN[m - 1]}): Gutachten ${a.toFixed(2)} / meine Einschätzung ${b.toFixed(2)}`
+                + (modMitDiff.has(m) ? `  <-- abweichend, ${anz} Kriterium/Kriterien\n` : '\n');
+        }
+        p += 'MODULÜBERSICHT (gewichtete Punkte):\n' + mo
+           + `Gesamt: Gutachten ${rO.total.toFixed(2)} (Pflegegrad ${rO.pg || 'keiner'}) / meine Einschätzung `
+           + `${rE.total.toFixed(2)} (Pflegegrad ${rE.pg || 'keiner'})\n\n`;
+        p += 'ZUSÄTZLICHE AUFGABE – Abschnitt „Allgemeine Angaben":\n'
+           + 'Verfasse außerdem den einleitenden Abschnitt „Allgemeine Angaben" als zusammenhängenden\n'
+           + 'Fließtext aus 3 bis 5 Absätzen (Absätze durch Leerzeile trennen, KEINE Aufzählungszeichen),\n'
+           + 'individuell auf diesen Fall bezogen:\n'
+           + '- Stelle die gutachterliche Gesamtwertung als unabhängiger Sachverständiger fachlich infrage.\n'
+           + '- Gehe auf die Begutachtungsdauer ein, wenn sie im Material genannt ist, und kritisiere eine zu\n'
+           + '  kurze Dauer als Verstoß gegen die Pflicht zu sorgfältiger, kriterienscharfer Exploration.\n'
+           + '- Benenne die wesentlichen übersehenen oder fehlbeurteilten Einschränkungen THEMATISCH gebündelt\n'
+           + '  (etwa Mobilität und Transfer, Selbstversorgung, psychische Situation, nächtlicher Hilfebedarf)\n'
+           + '  und beziehe dich dabei auf die oben als abweichend markierten Module. Zähle NICHT die einzelnen\n'
+           + '  Kriterien ab – das folgt im Abschnitt „Befund und Stellungnahme".\n'
+           + '- Arbeite heraus, wo der Gutachter Feststellungen im Text trifft, sie in der Bewertung aber nicht\n'
+           + '  berücksichtigt, und wo Angaben der versicherten Person oder der Pflegeperson übergangen wurden.\n'
+           + '- Nutze die eigenen Feststellungen aus dem Erstgespräch als inhaltliche Grundlage.\n'
+           + 'Beginne NICHT mit „Im Gutachten des … erfolgte die Einstufung …" und wiederhole keine\n'
+           + 'Punktzahlen-Zusammenfassung – beide Sätze stehen bereits im Dokument.\n\n';
+    }
     return p;
 }
 
-// Erzeugt je Abweichung eine Begründung im Stil des Nutzers (ein einziger KI-Aufruf).
-async function generateBegruendungen(diffs) {
-    if (!diffs.length) return {};
+// Erzeugt Begründungen je Abweichung und – auf Wunsch – den Abschnitt „Allgemeine Angaben"
+// im Stil des Nutzers. Ein einziger KI-Aufruf für alles.
+async function generateBegruendungen(diffs, mitAllgemein) {
+    if (!diffs.length && !mitAllgemein) return { map: {}, allgemein: '' };
     const systemPrompt = `Du bist ein erfahrener Pflegeberater und Pflegesachverständiger und verfasst Begründungen für einen Widerspruch gegen ein Pflegegutachten (NBA, SGB XI).
 
 Schreibe zu JEDEM abweichenden Kriterium eine Begründung, die im Aufbau, im Ton und in der Wortwahl exakt den folgenden Beispielen des Verfassers entspricht:
@@ -1866,6 +1913,7 @@ Beachte zwingend:
     const responseSchema = {
         type: "OBJECT",
         properties: {
+            allgemein: { type: "STRING" },
             begruendungen: {
                 type: "ARRAY",
                 items: {
@@ -1878,7 +1926,7 @@ Beachte zwingend:
         required: ["begruendungen"]
     };
     const payload = {
-        contents: [{ role: "user", parts: [{ text: buildBegruendungPrompt(diffs) }] }],
+        contents: [{ role: "user", parts: [{ text: buildBegruendungPrompt(diffs, mitAllgemein) }] }],
         generationConfig: { responseMimeType: "application/json", responseSchema: responseSchema }
     };
     const res = await callGeminiWithFallback(payload, systemPrompt);
@@ -1889,11 +1937,11 @@ Beachte zwingend:
     const data = JSON.parse(txt.trim());
     const map = {};
     (data.begruendungen || []).forEach(b => { if (b && b.nr && b.text) map[b.nr] = b.text.trim(); });
-    return map;
+    return { map: map, allgemein: (data.allgemein || '').trim() };
 }
 
 // Baut die Stellungnahme im Familiara-Format aus den App-Daten (Gutachten/Bescheide).
-function buildStellungnahme(notesOverride, begruendungen) {
+function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     const g = id => (document.getElementById(id)?.value || '').trim();
     const esc = escapeHtml;
     const f2 = n => Number(n).toFixed(2).replace('.', ',');
@@ -1952,9 +2000,13 @@ function buildStellungnahme(notesOverride, begruendungen) {
         }).join('')
         : `<p>Es wurden keine von der Begutachtung abweichenden Einzelkriterien erfasst.</p>`;
 
-    const notesBullets = notes
-        ? `<ul class="aa">${notes.split(/\r?\n/).filter(l => l.trim()).map(l => `<li>${esc(l.trim())}</li>`).join('')}</ul>`
-        : '';
+    // „Allgemeine Angaben": bevorzugt der ausformulierte, fallbezogene Text der KI (Absätze).
+    // Ohne KI-Text werden die Notizen wie bisher als Stichpunkte übernommen.
+    const notesBullets = (allgemeinText && allgemeinText.trim())
+        ? allgemeinText.trim().split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
+        : (notes
+            ? `<ul class="aa">${notes.split(/\r?\n/).filter(l => l.trim()).map(l => `<li>${esc(l.trim())}</li>`).join('')}</ul>`
+            : '');
 
     const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}</span><span>: ${esc(v || '')}</span></div>`;
 
@@ -1995,7 +2047,7 @@ function buildStellungnahme(notesOverride, begruendungen) {
 
     <h2>Allgemeine Angaben</h2>
     <p>Im Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} erfolgte die Einstufung mit ${df('opts', origPts)} gewichteten Punkten, woraus sich ein Pflegegrad ${df('opg', origPG)} ergeben hat. Die Verteilung der gewichteten Punkte auf die einzelnen Module ist der nachfolgenden Übersicht zu entnehmen.</p>
-    <div id="stmt-notes">${notesBullets}</div>
+    <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${notesBullets}</div>
     <p>Ich bin in mehreren dieser Module zu abweichenden Einschätzungen gekommen. Dies ergibt eine höhere Punktzahl in den Modulen und in der Folge eine höhere Gesamtpunktzahl. Die nachfolgende Übersicht stellt die Ergebnisse des Vorgutachtens und meiner Beurteilung einander gegenüber:</p>
 
     <h2>Gegenüberstellung des Gutachtens und der abweichenden Bepunktung</h2>
@@ -2039,11 +2091,24 @@ function mergeStellungnahme(existingHtml, freshHtml) {
     fresh.querySelectorAll('[data-f]').forEach(el => { const k = el.getAttribute('data-f'); if (!(k in vals)) vals[k] = el.innerHTML; });
     cur.querySelectorAll('[data-f]').forEach(el => { const k = el.getAttribute('data-f'); if (k in vals) el.innerHTML = vals[k]; });
     // Reine Datenblöcke komplett ersetzen (Kopfdaten, Vergleichstabelle).
-    // Der Notizblock (#stmt-notes) wird bewusst NICHT ersetzt.
     ['stmt-data', 'stmt-cmp-body'].forEach(id => {
         const f = fresh.querySelector('#' + id), c = cur.querySelector('#' + id);
         if (f && c) c.innerHTML = f.innerHTML;
     });
+    // „Allgemeine Angaben": nur ersetzen, wenn sich Notizen oder Abweichungen geändert haben.
+    // Sonst bleibt der vorhandene, ggf. überarbeitete Text unangetastet.
+    const fN = fresh.querySelector('#stmt-notes'), cN = cur.querySelector('#stmt-notes');
+    if (fN && cN) {
+        const alt = cN.getAttribute('data-sig'), neu = fN.getAttribute('data-sig');
+        const altLeer = !cN.innerHTML.trim();
+        // Ersetzen nur, wenn bisher nichts dasteht oder tatsächlich ein neu verfasster
+        // KI-Text vorliegt. Scheitert die KI, bleibt der vorhandene Text unangetastet.
+        if (altLeer || (fN.getAttribute('data-ai') === '1' && alt !== neu)) {
+            cN.innerHTML = fN.innerHTML;
+            cN.setAttribute('data-sig', neu);
+            cN.setAttribute('data-ai', fN.getAttribute('data-ai') || '0');
+        }
+    }
     // Begründungsblock kriteriengenau zusammenführen: bereits vorhandene (ggf. von Hand
     // überarbeitete) Begründungen bleiben erhalten, solange sich die Bewertung nicht geändert
     // hat. Neue Abweichungen kommen hinzu, weggefallene verschwinden.
@@ -2110,21 +2175,34 @@ async function generateAppealText() {
             tmp.querySelectorAll('.crit[data-nr]').forEach(el => { bereitsDa[el.getAttribute('data-nr')] = el.getAttribute('data-vals'); });
         }
         const zuErzeugen = diffs.filter(d => bereitsDa[d.nr] !== `${d.o}|${d.e}`);
-        if (zuErzeugen.length && keyPresent) {
-            showOverlay("Stellungnahme wird erstellt...", `Begründungen zu ${zuErzeugen.length} abweichenden Kriterien werden verfasst`);
+        // „Allgemeine Angaben" nur neu verfassen, wenn sie fehlen oder sich Notizen/Abweichungen änderten
+        let allgemeinText = '';
+        let brauchtAllgemein = true;
+        if (vorhandenHtml) {
+            const tmp2 = document.createElement('div'); tmp2.innerHTML = vorhandenHtml;
+            const n = tmp2.querySelector('#stmt-notes');
+            if (n && n.innerHTML.trim() && n.getAttribute('data-sig') === allgemeinSignature(notes, diffs)) brauchtAllgemein = false;
+        }
+        if ((zuErzeugen.length || brauchtAllgemein) && keyPresent) {
+            const was = [];
+            if (zuErzeugen.length) was.push(`${zuErzeugen.length} Begründung(en)`);
+            if (brauchtAllgemein) was.push('Allgemeine Angaben');
+            showOverlay("Stellungnahme wird erstellt...", was.join(' und ') + ' werden verfasst');
             try {
-                begruendungen = await generateBegruendungen(zuErzeugen);
+                const erg = await generateBegruendungen(zuErzeugen, brauchtAllgemein);
+                begruendungen = erg.map || {};
+                allgemeinText = erg.allgemein || '';
             } catch (e) {
-                console.warn("Begründungen übersprungen:", e);
-                showToast("Begründungen konnten nicht erzeugt werden (" + e.message + "). Es wird der Standardsatz verwendet.", "error");
+                console.warn("Texterstellung übersprungen:", e);
+                showToast("Texte konnten nicht erzeugt werden (" + e.message + "). Es werden die Standardtexte verwendet.", "error");
             } finally {
                 hideOverlay();
             }
-        } else if (zuErzeugen.length && !keyPresent) {
-            showToast("Ohne API-Schlüssel wird nur der Standardsatz je Kriterium eingesetzt. Für ausformulierte Begründungen bitte oben rechts einen Google-API-Schlüssel eintragen.", "error");
+        } else if ((zuErzeugen.length || brauchtAllgemein) && !keyPresent) {
+            showToast("Ohne API-Schlüssel werden nur die Standardtexte eingesetzt. Für ausformulierte Begründungen und Allgemeine Angaben bitte oben rechts einen Google-API-Schlüssel eintragen.", "error");
         }
 
-        const fresh = buildStellungnahme(notes, begruendungen);
+        const fresh = buildStellungnahme(notes, begruendungen, allgemeinText);
         const docEl = document.getElementById('appeal-document');
         const cont = document.getElementById('appeal-result-container');
         // Vorhandenen (ggf. vom Nutzer bearbeiteten) Stand ermitteln
