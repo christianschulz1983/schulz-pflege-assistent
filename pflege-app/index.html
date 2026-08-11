@@ -1428,7 +1428,7 @@ function normalizeImport(data) {
             pg: data.stam_pg_manual !== undefined && data.stam_pg_manual !== null ? String(data.stam_pg_manual) : '',
             pts: data.stam_pts_manual !== undefined && data.stam_pts_manual !== null ? String(data.stam_pts_manual) : ''
         },
-        diagnoses: (Array.isArray(data.diagnoses) ? data.diagnoses : []).slice(0, 6).map(d => ({ icd: d.icd || '', text: d.text || '' })),
+        diagnoses: (Array.isArray(data.diagnoses) ? data.diagnoses : []).map(d => ({ icd: d.icd || '', text: d.text || '' })),
         anamnese: data.anamnese || '',
         befund: data.befund || '',
         special: data.special_orig || 0,
@@ -1447,6 +1447,17 @@ function normalizeImport(data) {
 // Bearbeitungs-Handler (mutieren reviewData)
 function rvStam(k, v) { reviewData.stam[k] = v; }
 function rvDiag(idx, field, v) { if (!reviewData.diagnoses[idx]) reviewData.diagnoses[idx] = { icd: '', text: '' }; reviewData.diagnoses[idx][field] = v; }
+// Weitere Diagnosezeile in der Prüfansicht anhängen
+function rvAddDiagRow() {
+    const box = document.getElementById('rev-diag-rows');
+    if (!box) return;
+    const idx = box.querySelectorAll('.rev-diag').length;
+    const div = document.createElement('div');
+    div.className = 'rev-diag';
+    div.innerHTML = `<input placeholder="ICD 10" style="width:120px" oninput="rvDiag(${idx},'icd',this.value)">`
+                  + `<input placeholder="Diagnose" oninput="rvDiag(${idx},'text',this.value)">`;
+    box.appendChild(div);
+}
 function rvText(k, v) { reviewData[k] = v; }
 function rvExtract(kind, idx, v) {
     if (!reviewData || !reviewData.extracted) return;
@@ -1555,7 +1566,9 @@ function applyImportedData(rev) {
     setVal('stam-pts-manual', rev.stam.pts);
     setVal('stam-anamnese', rev.anamnese);
     setVal('stam-befund', rev.befund);
-    (rev.diagnoses || []).forEach((d, idx) => { if (idx < 6) { setVal(`diag-icd-${idx + 1}`, d.icd); setVal(`diag-txt-${idx + 1}`, d.text); } });
+    // Tabelle auf die Anzahl der eingelesenen Diagnosen erweitern und alle übernehmen
+    ensureDiagRows((rev.diagnoses || []).length);
+    (rev.diagnoses || []).forEach((d, idx) => { setVal(`diag-icd-${idx + 1}`, d.icd); setVal(`diag-txt-${idx + 1}`, d.text); });
 
     stateOrig = { special: rev.special || 0, values: {} };
     stateEigene = { special: rev.special || 0, values: {} };
@@ -1613,12 +1626,14 @@ function buildReviewForm(rev) {
 
     html += `<div class="rev-section"><label class="rev-field rev-inline"><input type="checkbox" ${rev.special == 1 ? 'checked' : ''} onchange="reviewData.special=this.checked?1:0"> <span>Besondere Bedarfskonstellation (§ 15 Abs. 4) – Gebrauchsunfähigkeit beider Arme und Beine</span></label></div>`;
 
-    html += `<div class="rev-section"><div class="rev-sec-title">Diagnosen</div>`;
-    for (let idx = 0; idx < 6; idx++) {
+    // So viele Zeilen wie Diagnosen gefunden wurden, mindestens sechs, plus eine Leerzeile
+    html += `<div class="rev-section"><div class="rev-sec-title">Diagnosen</div><div id="rev-diag-rows">`;
+    const diagAnzahl = Math.max(6, (rev.diagnoses || []).length + 1);
+    for (let idx = 0; idx < diagAnzahl; idx++) {
         const d = rev.diagnoses[idx] || { icd: '', text: '' };
         html += `<div class="rev-diag"><input placeholder="ICD 10" style="width:120px" value="${esc(d.icd || '')}" oninput="rvDiag(${idx},'icd',this.value)"><input placeholder="Diagnose" value="${esc(d.text || '')}" oninput="rvDiag(${idx},'text',this.value)"></div>`;
     }
-    html += `</div>`;
+    html += `</div><button type="button" class="btn btn-secondary" style="margin-top:8px" onclick="rvAddDiagRow()">+ Weitere Diagnose</button></div>`;
 
     // Modul-Zusammenfassung nur anzeigen, wenn sie von der KI kam. Bei lokal ausgelesenen
     // Kriterien wird das Vorgutachten automatisch aus den Einzelkriterien berechnet.
@@ -1821,7 +1836,21 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
     const vOrg = (document.getElementById('stam-organisation')?.value || '').trim();
     if (vName) p += `VERSICHERTE PERSON: ${vName}\n`;
     if (vOrg) p += `PRÜFORGANISATION: ${vOrg}\n`;
-    p += '\nABWEICHENDE KRITERIEN (hierzu je eine Begründung schreiben):\n\n';
+    // Die eigenen Notizen sind die Hauptquelle und stehen deshalb ganz am Anfang.
+    const notizen = (document.getElementById('erstgespraech-notes')?.value || '').trim();
+    if (notizen) {
+        p += '\n==================== HAUPTQUELLE ====================\n'
+           + 'MEINE EIGENEN FESTSTELLUNGEN AUS DEM ERSTGESPRÄCH\n'
+           + 'Dies ist die inhaltliche Grundlage des gesamten Widerspruchs. Alles Folgende dient nur\n'
+           + 'dazu, diese Feststellungen zu stützen. Die Aufzeichnungen sind häufig stichpunktartig –\n'
+           + 'forme sie zu vollständigem Fließtext aus, ohne den Inhalt zu verändern:\n\n'
+           + cut(notizen, 6000) + '\n'
+           + '=====================================================\n\n';
+    } else {
+        p += '\nHINWEIS: Es liegen keine eigenen Notizen aus dem Erstgespräch vor. Begründe daher\n'
+           + 'ausschließlich aus dem Befundtext des Gutachters und den BRi-Texten.\n\n';
+    }
+    p += 'ABWEICHENDE KRITERIEN (hierzu je eine Begründung schreiben):\n\n';
     diffs.forEach(d => {
         const b = briFor(d.nr);
         p += `--- Kriterium ${d.nr}: ${d.title} ---\n`;
@@ -1851,11 +1880,10 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
     }
     const befund = (document.getElementById('stam-befund')?.value || '').trim();
     const anam = (document.getElementById('stam-anamnese')?.value || '').trim();
-    if (befund) p += 'BEFUND – EIGENER TEXT DES GUTACHTERS (wichtigste Quelle: hier nach Feststellungen\n'
-                   + 'suchen, die seiner eigenen Bewertung widersprechen):\n' + cut(befund, 5000) + '\n\n';
+    if (befund) p += 'BEFUND – EIGENER TEXT DES GUTACHTERS (ergänzende Quelle: hier nach Feststellungen\n'
+                   + 'suchen, die meine Notizen bestätigen oder der Bewertung des Gutachters widersprechen):\n'
+                   + cut(befund, 5000) + '\n\n';
     if (anam) p += 'ANAMNESE – ebenfalls eigener Text des Gutachters:\n' + cut(anam, 2500) + '\n\n';
-    const notizen = (document.getElementById('erstgespraech-notes')?.value || '').trim();
-    if (notizen) p += 'EIGENE FESTSTELLUNGEN AUS DEM ERSTGESPRÄCH:\n' + cut(notizen, 2500) + '\n\n';
     if (mitAllgemein) {
         // Modulweiser Überblick als Grundlage für den einleitenden Abschnitt
         const rO = calculateInternal('orig'), rE = calculateInternal('own');
@@ -1878,6 +1906,10 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
            + 'Verfasse außerdem den einleitenden Abschnitt „Allgemeine Angaben" als zusammenhängenden\n'
            + 'Fließtext aus 3 bis 5 Absätzen (Absätze durch Leerzeile trennen, KEINE Aufzählungszeichen),\n'
            + 'individuell auf diesen Fall bezogen:\n'
+           + '- ZWINGEND: Dieser Abschnitt baut inhaltlich auf MEINEN NOTIZEN aus dem Erstgespräch auf.\n'
+           + '  Übernimm deren Feststellungen vollständig und forme die Stichpunkte zu Fließtext aus;\n'
+           + '  ordne sie sachlich, ohne Inhalte zu verändern oder hinzuzuerfinden. Erst darauf stützt\n'
+           + '  sich die Kritik an der gutachterlichen Wertung.\n'
            + '- Stelle die gutachterliche Gesamtwertung als unabhängiger Sachverständiger fachlich infrage.\n'
            + '- Gehe auf die Begutachtungsdauer ein, wenn sie im Material genannt ist, und kritisiere eine zu\n'
            + '  kurze Dauer als Verstoß gegen die Pflicht zu sorgfältiger, kriterienscharfer Exploration.\n'
@@ -1887,7 +1919,8 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
            + '  Kriterien ab – das folgt im Abschnitt „Befund und Stellungnahme".\n'
            + '- Arbeite heraus, wo der Gutachter Feststellungen im Text trifft, sie in der Bewertung aber nicht\n'
            + '  berücksichtigt, und wo Angaben der versicherten Person oder der Pflegeperson übergangen wurden.\n'
-           + '- Nutze die eigenen Feststellungen aus dem Erstgespräch als inhaltliche Grundlage.\n'
+           + '- Keine meiner Notizen darf unter den Tisch fallen: Was dort steht und nicht einem einzelnen\n'
+           + '  Kriterium zuzuordnen ist, gehört in diesen Abschnitt.\n'
            + 'Beginne NICHT mit „Im Gutachten des … erfolgte die Einstufung …" und wiederhole keine\n'
            + 'Punktzahlen-Zusammenfassung – beide Sätze stehen bereits im Dokument.\n\n';
     }
@@ -1906,24 +1939,39 @@ Schreibe zu JEDEM abweichenden Kriterium eine Begründung, die im Aufbau, im Ton
 ${getStilBeispiele()}
 === ENDE STILBEISPIELE ===
 
-DAS WICHTIGSTE ARGUMENT – der innere Widerspruch des Gutachtens:
-Prüfe zuerst den mitgelieferten Befund- und Anamnesetext daraufhin, ob der Gutachter dort selbst
-eine Einschränkung, eine Hilfeleistung, einen pathologischen Messwert oder einen Hilfsmittelbedarf
-beschreibt, den er anschließend in der Bewertung nicht berücksichtigt. Findest du eine solche
-Stelle, ist sie der Kern der Begründung: Benenne die Feststellung des Gutachters ausdrücklich
-(„Der Gutachter dokumentiert im eigenen Befund, dass …"), stelle den Widerspruch zur Bewertung
-heraus und leite daraus die zwingende Höherbewertung ab. Erfinde eine solche Stelle niemals.
+RANGFOLGE DER QUELLEN – dies ist die wichtigste Vorgabe überhaupt:
+1. MEINE EIGENEN NOTIZEN aus dem Erstgespräch (im Abschnitt HAUPTQUELLE) sind der eigentliche
+   Grund des Widerspruchs. JEDE Begründung MUSS inhaltlich auf ihnen aufbauen. Suche zu jedem
+   abweichenden Kriterium die Notizen heraus, die dazu inhaltlich passen, und mache sie zum Kern
+   der Argumentation. Eine Notiz kann für mehrere Kriterien einschlägig sein.
+   Die Notizen sind oft nur Stichpunkte oder unvollständige Sätze: Formuliere sie zu
+   zusammenhängendem, fachsprachlichem Fließtext aus. Ergänze dabei NUR Sprache, niemals Inhalt –
+   erfinde keine zusätzlichen Sachverhalte, Zahlen, Diagnosen oder Vorkommnisse.
+2. Erst danach stützt du die Begründung auf meine abweichende Bewertung des Kriteriums.
+3. Anschließend gleichst du beides mit dem BRi-Text ab (wörtliches Zitat) und suchst – wo
+   vorhanden – im Befundtext des Gutachters eine Stelle, die meine Feststellung bestätigt oder
+   seiner eigenen Bewertung widerspricht.
+Enthalten die Notizen zu einem Kriterium nichts Einschlägiges, begründe aus BRi-Text und
+Befundtext – aber erfinde niemals Feststellungen.
+
+STARKES ZUSATZARGUMENT – der innere Widerspruch des Gutachtens:
+Prüfe den Befund- und Anamnesetext daraufhin, ob der Gutachter dort selbst eine Einschränkung,
+eine Hilfeleistung, einen pathologischen Messwert oder einen Hilfsmittelbedarf beschreibt, den er
+anschließend in der Bewertung nicht berücksichtigt. Findest du eine solche Stelle, benenne die
+Feststellung des Gutachters ausdrücklich („Der Gutachter dokumentiert im eigenen Befund, dass …"),
+stelle den Widerspruch zur Bewertung heraus und verbinde ihn mit meiner Feststellung aus den
+Notizen. Erfinde eine solche Stelle niemals.
 
 AUFBAU jeder Begründung (ein zusammenhängender Fließtext, etwa 130–220 Wörter):
 1. Eröffnung: Stelle die gutachterliche Wertung fachlich infrage – zum Beispiel „Die gutachterliche Einstufung als … ignoriert …", „Die pauschale Bewertung dieses Kriteriums als … hält einer fachlichen Überprüfung anhand der geltenden Richtlinien nicht stand" oder „Laut gutachterlichen Richtlinien SGB XI ist eine Wertung mit „…" ableitbar".
-2. Konkreter Sachverhalt: Was ist der versicherten Person tatsächlich nicht möglich und welche personelle Unterstützung ist erforderlich? Nutze ausschließlich die Angaben aus Befund und Anamnese.
-3. Kritik am gutachterlichen Vorgehen, soweit das Material sie hergibt: innerer Widerspruch (siehe oben), unterlassene praktische Überprüfung oder Erprobung, ignorierte Hinweise der versicherten Person oder der Pflegeperson, zu kurze Begutachtungsdauer.
+2. Konkreter Sachverhalt – der Kern: Was ist der versicherten Person tatsächlich nicht möglich und welche personelle Unterstützung ist erforderlich? Baue dies auf MEINEN NOTIZEN auf und formuliere die dortigen Stichpunkte zu vollständigem Fließtext aus. Ergänzend, nicht ersetzend, kannst du Angaben aus Befund und Anamnese heranziehen.
+3. Kritik am gutachterlichen Vorgehen, soweit das Material sie hergibt: innerer Widerspruch (siehe oben), unterlassene praktische Überprüfung oder Erprobung, ignorierte Hinweise der versicherten Person oder der Pflegeperson, zu kurze Begutachtungsdauer. Halte ausdrücklich fest, wenn eine in meinen Notizen festgehaltene Feststellung im Gutachten übergangen wurde.
 4. Richtlinienmaßstab: Gib wieder, was die BRi für dieses Kriterium und die strittige Stufe verlangen, und zitiere dabei wörtlich aus den mitgelieferten BRi-Texten.
 5. Zwingender Schluss, in der Regel: „Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „…" ableitbar." (Varianten: „… ist … zwingend abzuleiten", „… muss die Bewertung zwingend auf „…" korrigiert werden".)
 
 Beachte zwingend:
 1. Zitiere die BRi ausschließlich wörtlich aus den mitgelieferten BRi-Texten. Erfinde NIEMALS Zitate und gib nur wieder, was dort tatsächlich steht.
-2. Erfinde keine Befunde, Diagnosen, Zeitangaben, Messwerte oder Vorkommnisse. Nutze nur, was in Befund, Anamnese und den mitgelieferten Bewertungen steht. Gibt das Material zu einem Punkt nichts her, lasse ihn weg.
+2. Erfinde keine Befunde, Diagnosen, Zeitangaben, Messwerte oder Vorkommnisse. Nutze nur, was in meinen Notizen, im Befund, in der Anamnese und den mitgelieferten Bewertungen steht. Gibt das Material zu einem Punkt nichts her, lasse ihn weg.
 3. Nutze – wo fachlich tragfähig – den Quervergleich zu einem Kriterium, in dem der Gutachter bereits eine Einschränkung anerkannt hat, und leite daraus den Widerspruch in der Bewertung ab. Findest du keinen tragfähigen Vergleich, begründe aus BRi-Text und Befund; konstruiere niemals einen unpassenden Vergleich.
 4. Module 1, 4 und 6 (Selbständigkeit): Begründe über die notwendige personelle Unterstützung bei wesentlichen Teilschritten sowie über Sicherheit und Schmerz – eine Aktivität gilt nur dann als selbständig, wenn sie ohne personelle Hilfe, adäquat und sicher durchführbar ist. Bei psychischer Grunderkrankung zählt auch der Bedarf an Aufforderung, Anleitung, Motivierung und Kontrolle: Ist die Handlung motorisch möglich, wird sie aber ohne personelle Anstöße nicht zuverlässig ausgeführt, liegt keine Selbständigkeit vor.
 5. Modul 3 (Verhaltensweisen und psychische Problemlagen): Begründe über die nachgewiesene Häufigkeit der Ereignisse, die eine personelle Intervention erfordern; eine aufwändige Motivierung durch andere Personen ist dabei zwingend zu werten. Nenne die Zielstufe (nie oder sehr selten / selten / häufig / täglich).
@@ -2384,15 +2432,53 @@ function syncSpecialUI() {
     });
 }
 
+// --- Diagnoseliste: wächst mit der Anzahl der Diagnosen -------------------------------------
+const DIAG_MIN_ROWS = 6;          // so viele Zeilen sind immer sichtbar
+
+function diagRowCount() {
+    return document.querySelectorAll('#diag-rows-container tr').length;
+}
+
+// Hängt eine einzelne Zeile an. Beim Tippen in der letzten Zeile entsteht automatisch eine neue.
+function appendDiagRow(i) {
+    const body = document.getElementById('diag-rows-container');
+    if (!body) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="border-right:1px solid var(--border)"><input type="text" id="diag-icd-${i}" class="field-input" style="border:none;background:transparent;border-radius:0" placeholder="..." oninput="onDiagInput()"></td>`
+                 + `<td><input type="text" id="diag-txt-${i}" class="field-input" style="border:none;background:transparent;border-radius:0" placeholder="Diagnose eingeben..." oninput="onDiagInput()"></td>`;
+    body.appendChild(tr);
+}
+
+// Stellt sicher, dass mindestens n Zeilen vorhanden sind (bestehende Eingaben bleiben erhalten).
+function ensureDiagRows(n) {
+    const body = document.getElementById('diag-rows-container');
+    if (!body) return;
+    const soll = Math.max(DIAG_MIN_ROWS, n || 0);
+    for (let i = diagRowCount() + 1; i <= soll; i++) appendDiagRow(i);
+}
+
+// Sobald in der letzten Zeile etwas steht, wird eine weitere Leerzeile angeboten.
+function onDiagInput() {
+    const n = diagRowCount();
+    const icd = document.getElementById('diag-icd-' + n);
+    const txt = document.getElementById('diag-txt-' + n);
+    if ((icd && icd.value.trim()) || (txt && txt.value.trim())) appendDiagRow(n + 1);
+}
+
+// Höchste belegte Diagnosenummer in einem gespeicherten Fall ermitteln.
+function maxDiagIndex(stammdaten) {
+    let max = 0;
+    Object.keys(stammdaten || {}).forEach(k => {
+        const m = /^diag-(?:icd|txt)-(\d+)$/.exec(k);
+        if (m && (stammdaten[k] || '').toString().trim()) max = Math.max(max, parseInt(m[1], 10));
+    });
+    return max;
+}
+
 function init() {
     const diagBody = document.getElementById('diag-rows-container');
     diagBody.innerHTML = '';
-    for(let i=1;i<=6;i++){
-        diagBody.innerHTML += `<tr>
-            <td style="border-right:1px solid var(--border)"><input type="text" id="diag-icd-${i}" class="field-input" style="border:none;background:transparent;border-radius:0" placeholder="..."></td>
-            <td><input type="text" id="diag-txt-${i}" class="field-input" style="border:none;background:transparent;border-radius:0" placeholder="Diagnose eingeben..."></td>
-        </tr>`;
-    }
+    ensureDiagRows(DIAG_MIN_ROWS);
 
     // Reiter "Laut Vorgutachten" entfällt – die Vorgutachten-Werte kommen aus dem Import
     // (Prüfansicht) und werden in Reiter "Einschätzung & Vergleich" je Kriterium angezeigt.
@@ -2932,6 +3018,8 @@ function loadCase(e) {
             appealDraft = data.appealDraft || "";
             init();
             setTimeout(() => {
+                // Erst genügend Diagnosezeilen anlegen, sonst gehen Einträge ab Zeile 7 verloren
+                ensureDiagRows(maxDiagIndex(data.stammdaten));
                 Object.keys(data.stammdaten || {}).forEach(k => {
                     const el = document.getElementById(k);
                     if (!el) return;
