@@ -1714,7 +1714,15 @@ Die gutachterliche Einstufung als vollständig selbstständig ignoriert die nach
 
 4.5.14: Besuche anderer medizinischer oder therapeutischer Einrichtungen
 Gutachterliche Bewertung: „entfällt oder selbständig"
-Laut gutachterlichen Richtlinien SGB XI ist eine Wertung mit „2 mal wöchentlich" ableitbar. Die pauschale Bewertung dieses Kriteriums als selbstständig hält einer fachlichen Überprüfung anhand der geltenden Richtlinien nicht stand. Nach den Begutachtungs-Richtlinien umfasst diese Aktivität die gesamte Kette vom Verlassen der Wohnung über das Erreichen des Transportmittels bis hin zur Rückkehr, wobei die reelle physische Fähigkeit zur sicheren Bewältigung des Weges maßgeblich ist. Aufgrund der ausgeprägten Funktionseinschränkungen und des fortlaufend hohen Sturzrisikos im Außenbereich ist das eigenständige Aufsuchen der Therapiepraxis nachweislich nicht möglich, sodass die Wege untrennbar an eine personelle Begleitung und Absicherung gebunden sind. Da die notwendigen Termine zyklisch und nachweisbar mindestens zweimal pro Woche stattfinden, erfordert dies einen regelmäßigen personellen Unterstützungsaufwand. Die Voraussetzungen für eine vollständige Selbstständigkeit liegen folglich nicht vor, weshalb die Frequenz zwingend mit „2 mal wöchentlich" in Ansatz gebracht werden muss.`;
+Laut gutachterlichen Richtlinien SGB XI ist eine Wertung mit „2 mal wöchentlich" ableitbar. Die pauschale Bewertung dieses Kriteriums als selbstständig hält einer fachlichen Überprüfung anhand der geltenden Richtlinien nicht stand. Nach den Begutachtungs-Richtlinien umfasst diese Aktivität die gesamte Kette vom Verlassen der Wohnung über das Erreichen des Transportmittels bis hin zur Rückkehr, wobei die reelle physische Fähigkeit zur sicheren Bewältigung des Weges maßgeblich ist. Aufgrund der ausgeprägten Funktionseinschränkungen und des fortlaufend hohen Sturzrisikos im Außenbereich ist das eigenständige Aufsuchen der Therapiepraxis nachweislich nicht möglich, sodass die Wege untrennbar an eine personelle Begleitung und Absicherung gebunden sind. Da die notwendigen Termine zyklisch und nachweisbar mindestens zweimal pro Woche stattfinden, erfordert dies einen regelmäßigen personellen Unterstützungsaufwand. Die Voraussetzungen für eine vollständige Selbstständigkeit liegen folglich nicht vor, weshalb die Frequenz zwingend mit „2 mal wöchentlich" in Ansatz gebracht werden muss.
+
+4.3.10: Ängste
+Gutachterliche Bewertung: „nie oder sehr selten"
+In diesem Kriterium kumuliert die fachliche Inkonsistenz des Gutachtens. Der Gutachter notiert im Rahmen der eigenen Befunderhebung, dass die versicherte Person unter wiederkehrenden, primär nächtlichen Angstzuständen leidet, die eine personelle Intervention erfordern, und dass die Pflegeperson in diesen Phasen beruhigende Gespräche führen und stabilisierend einwirken muss. Trotz dieser eindeutigen Dokumentation eines aktiven pflegerischen Betreuungsaufwandes verweigert der Gutachter in der tabellarischen Erfassung jegliche Punkte und wählt die Stufe „nie oder sehr selten". Die Rechtfertigung, das bloße Herstellen einer angstfreien Atmosphäre durch Anwesenheit werde nicht bepunktet, verkehrt die eigenen Beobachtungen ins Gegenteil: Beruhigende Gespräche und gezielte Deeskalation bei massiven Angstzuständen stellen eine handfeste psychische Hilfestellung im Sinne des SGB XI dar. Da diese Zustände nachweislich mehrfach wöchentlich auftreten und jedes Mal eine aktive personelle Intervention erfordern, ist eine Null-Punkte-Wertung fachlich unhaltbar. Laut gutachterlichen Richtlinien SGB XI ist somit die Einstufung auf „häufig" zur korrekten Abbildung des Pflegeaufwandes unumgänglich.
+
+4.6.1: Gestaltung des Tagesablaufs und Anpassung an Veränderungen
+Gutachterliche Bewertung: „selbständig"
+Infolge der ausgeprägten Antriebsstörung ist die versicherte Person nicht in der Lage, den Tag autonom zu strukturieren; ohne äußere Impulse verharrt sie in Passivität, was die wiederholte Intervention der Pflegeperson zur Vorgabe einer Tagesstruktur erforderlich macht. Der Gutachter dokumentiert in der eigenen Anamnese, dass der Großteil des Tages passiv verbracht wird und an grundlegende Verrichtungen wie Essen und Trinken erinnert werden muss. Es ist ein fachlicher Widerspruch, diese Antriebs- und Strukturlosigkeit im Textteil zu bestätigen, in der Modulbewertung jedoch vollständige Selbständigkeit zu attestieren. Die formelhafte Begründung, ein personeller Hilfebedarf sei nicht ableitbar, ignoriert den eigenen Befund zur notwendigen Motivationsarbeit vollständig und ersetzt die gebotene kriterienscharfe Einzelfallprüfung durch einen Standard-Textbaustein. Die Begutachtungs-Richtlinien beschreiben für dieses Kriterium, dass Routineabläufe weitgehend selbständig gestaltet werden können und bei ungewohnten Veränderungen Unterstützung notwendig ist. Da hier bereits die alltägliche Grundstruktur ohne personelle Anstöße nicht aufrechterhalten werden kann, ist dieser Maßstab deutlich unterschritten. Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „überwiegend unselbständig" zwingend abzuleiten.`;
 
 const STIL_STORAGE = 'pflege_stilbeispiele';
 function getStilBeispiele() {
@@ -1809,8 +1817,11 @@ function buildBegruendungPrompt(diffs) {
     }
     const befund = (document.getElementById('stam-befund')?.value || '').trim();
     const anam = (document.getElementById('stam-anamnese')?.value || '').trim();
-    if (befund) p += 'BEFUND AUS DEM GUTACHTEN:\n' + cut(befund, 3000) + '\n\n';
-    if (anam) p += 'ANAMNESE:\n' + cut(anam, 1500) + '\n\n';
+    if (befund) p += 'BEFUND – EIGENER TEXT DES GUTACHTERS (wichtigste Quelle: hier nach Feststellungen\n'
+                   + 'suchen, die seiner eigenen Bewertung widersprechen):\n' + cut(befund, 5000) + '\n\n';
+    if (anam) p += 'ANAMNESE – ebenfalls eigener Text des Gutachters:\n' + cut(anam, 2500) + '\n\n';
+    const notizen = (document.getElementById('erstgespraech-notes')?.value || '').trim();
+    if (notizen) p += 'EIGENE FESTSTELLUNGEN AUS DEM ERSTGESPRÄCH:\n' + cut(notizen, 2500) + '\n\n';
     return p;
 }
 
@@ -1825,20 +1836,32 @@ Schreibe zu JEDEM abweichenden Kriterium eine Begründung, die im Aufbau, im Ton
 ${getStilBeispiele()}
 === ENDE STILBEISPIELE ===
 
-AUFBAU jeder Begründung (ein zusammenhängender Fließtext, etwa 120–200 Wörter):
+DAS WICHTIGSTE ARGUMENT – der innere Widerspruch des Gutachtens:
+Prüfe zuerst den mitgelieferten Befund- und Anamnesetext daraufhin, ob der Gutachter dort selbst
+eine Einschränkung, eine Hilfeleistung, einen pathologischen Messwert oder einen Hilfsmittelbedarf
+beschreibt, den er anschließend in der Bewertung nicht berücksichtigt. Findest du eine solche
+Stelle, ist sie der Kern der Begründung: Benenne die Feststellung des Gutachters ausdrücklich
+(„Der Gutachter dokumentiert im eigenen Befund, dass …"), stelle den Widerspruch zur Bewertung
+heraus und leite daraus die zwingende Höherbewertung ab. Erfinde eine solche Stelle niemals.
+
+AUFBAU jeder Begründung (ein zusammenhängender Fließtext, etwa 130–220 Wörter):
 1. Eröffnung: Stelle die gutachterliche Wertung fachlich infrage – zum Beispiel „Die gutachterliche Einstufung als … ignoriert …", „Die pauschale Bewertung dieses Kriteriums als … hält einer fachlichen Überprüfung anhand der geltenden Richtlinien nicht stand" oder „Laut gutachterlichen Richtlinien SGB XI ist eine Wertung mit „…" ableitbar".
-2. Konkreter Sachverhalt: Was ist der versicherten Person tatsächlich nicht möglich? Nutze dafür ausschließlich die Angaben aus Befund und Anamnese – nenne konkrete Funktionseinschränkungen, keine erfundenen Details.
-3. Kritik am gutachterlichen Vorgehen, sofern das Material sie hergibt: unterlassene praktische Überprüfung, ignorierte Hinweise der Versicherten oder der Pflegeperson, zu kurze Begutachtungsdauer, sowie – besonders wirksam – innere Widersprüche des Gutachtens (der Gutachter erkennt an einer Stelle eine Einschränkung an, verneint sie aber an anderer).
-4. Richtlinienmaßstab: Gib wieder, was die BRi für dieses Kriterium verlangen, und zitiere dabei wörtlich aus den mitgelieferten BRi-Texten.
-5. Zwingender Schluss auf die eigene Wertung, zum Beispiel „… muss die Bewertung zwingend auf „…" korrigiert werden", „… ist … als „…" zu klassifizieren" oder „Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „…" ableitbar".
+2. Konkreter Sachverhalt: Was ist der versicherten Person tatsächlich nicht möglich und welche personelle Unterstützung ist erforderlich? Nutze ausschließlich die Angaben aus Befund und Anamnese.
+3. Kritik am gutachterlichen Vorgehen, soweit das Material sie hergibt: innerer Widerspruch (siehe oben), unterlassene praktische Überprüfung oder Funktionsprüfung, ignorierte Hinweise der versicherten Person oder der Pflegeperson, zu kurze Begutachtungsdauer, formelhafte Standard-Textbausteine statt kriterienscharfer Einzelfallprüfung.
+4. Richtlinienmaßstab: Gib wieder, was die BRi für dieses Kriterium und die strittige Stufe verlangen, und zitiere dabei wörtlich aus den mitgelieferten BRi-Texten.
+5. Zwingender Schluss, in der Regel: „Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „…" ableitbar." (Varianten: „… ist … zwingend abzuleiten", „… muss die Bewertung zwingend auf „…" korrigiert werden".)
 
 Beachte zwingend:
 1. Zitiere die BRi ausschließlich wörtlich aus den mitgelieferten BRi-Texten. Erfinde NIEMALS Zitate und gib nur wieder, was dort tatsächlich steht.
-2. Erfinde keine Befunde, Diagnosen, Zeitangaben oder Vorkommnisse. Nutze nur, was in Befund, Anamnese und den mitgelieferten Bewertungen steht. Gibt das Material zu einem Punkt nichts her, lasse ihn weg.
+2. Erfinde keine Befunde, Diagnosen, Zeitangaben, Messwerte oder Vorkommnisse. Nutze nur, was in Befund, Anamnese und den mitgelieferten Bewertungen steht. Gibt das Material zu einem Punkt nichts her, lasse ihn weg.
 3. Nutze – wo fachlich tragfähig – den Quervergleich zu einem Kriterium, in dem der Gutachter bereits eine Einschränkung anerkannt hat, und leite daraus den Widerspruch in der Bewertung ab. Findest du keinen tragfähigen Vergleich, begründe aus BRi-Text und Befund; konstruiere niemals einen unpassenden Vergleich.
-4. Bei Kriterien der Module 2 und 3 nenne im Schlusssatz die Einzelpunkte in Klammern, zum Beispiel „größtenteils vorhanden" (1 Einzelpunkt).
-5. Schreibe sachlich-fachlichen Gutachterstil in der dritten Person („die versicherte Person", „Herr/Frau …"), ohne Aufzählungszeichen und ohne Überschriften.
-6. Gib NUR den Begründungstext zurück – ohne die Zeilen "Kriterium ..." und "Gutachterliche Bewertung ...", diese ergänzt die Software selbst.`;
+4. Differenziere fachlich sauber: Weise darauf hin, wenn der Gutachter aus einer beobachteten Teilfähigkeit unzulässig auf eine ganz andere Anforderung schließt (etwa vom sicheren Gang auf ebener Strecke auf das Treppensteigen, oder vom Führen eines Trinkglases auf das Öffnen von Flaschen). Solche Bewegungsabläufe sind anatomisch und physiologisch nicht gleichzusetzen.
+5. Module 1, 4 und 6 (Selbständigkeit): Begründe über die notwendige personelle Unterstützung bei wesentlichen Teilschritten sowie über Sicherheit und Schmerz – eine Aktivität gilt nur dann als selbständig, wenn sie ohne personelle Hilfe, adäquat und sicher durchführbar ist.
+6. Modul 3 (Verhaltensweisen und psychische Problemlagen): Begründe über die nachgewiesene Häufigkeit der Ereignisse, die eine personelle Intervention erfordern. Beruhigende Gespräche, Deeskalation und Motivationsarbeit sind zu berücksichtigende personelle Hilfestellungen. Nenne die Zielstufe (nie oder sehr selten / selten / häufig / täglich).
+7. Modul 5: Begründe über die dauerhafte, regelmäßige Häufigkeit der Maßnahmen und nenne die Zielfrequenz ausdrücklich, etwa „2 mal wöchentlich" oder „2 mal monatlich".
+8. Bei Kriterien der Module 2 und 3 nenne im Schlusssatz die Einzelpunkte in Klammern, zum Beispiel „größtenteils vorhanden" (1 Einzelpunkt).
+9. Schreibe sachlich-fachlichen Gutachterstil in der dritten Person („die versicherte Person", „Herr/Frau …"), ohne Aufzählungszeichen und ohne Überschriften. Der Ton ist bestimmt und fachlich zugespitzt, aber sachlich begründet – keine pauschalen Unterstellungen ohne Beleg im Material.
+10. Gib NUR den Begründungstext zurück – ohne die Zeilen "Kriterium ..." und "Gutachterliche Bewertung ...", diese ergänzt die Software selbst.`;
 
     const responseSchema = {
         type: "OBJECT",
