@@ -737,6 +737,8 @@
 
 <!-- BRi-Referenztexte (MD Bund, 21.08.2024) – Zitatgrundlage für die Begründungen -->
 <script src="bri_texte.js"></script>
+<!-- Praxishinweise je Kriterium (Hilfsmittel-Regeln, Fallstricke, Abstufungen) -->
+<script src="laien_hinweise.js"></script>
 <!-- PDF.js (lokal) – zeichnet die hochgeladene PDF zuverlässig in der Prüfansicht -->
 <script src="pdf.min.js"></script>
 <script>
@@ -1861,6 +1863,17 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
             if (lo) p += `BRi-Text zur Bewertung des Gutachters ("${lo.name}"): ${cut(lo.text, 700)}\n`;
             if (le) p += `BRi-Text zu meiner Bewertung ("${le.name}"): ${cut(le.text, 700)}\n`;
         }
+        // Praxishinweise: verhindern typische Bewertungsfehler (Hilfsmittel, Abgrenzung)
+        const lh = (typeof LAIEN_HINWEISE !== 'undefined') ? LAIEN_HINWEISE[d.nr] : null;
+        if (lh) {
+            if (lh.check) p += `Prüffrage zu diesem Kriterium: ${lh.check}\n`;
+            if (lh.hilfsmittel) p += `HILFSMITTEL-REGEL (zwingend beachten): ${lh.hilfsmittel}\n`;
+            if (lh.wichtig) p += `WICHTIG / FEHLERQUELLE (zwingend beachten): ${lh.wichtig}\n`;
+            if (Array.isArray(lh.stufen)) {
+                if (d.oIdx != null && lh.stufen[d.oIdx]) p += `Praxisbeschreibung der Bewertung des Gutachters: ${lh.stufen[d.oIdx]}\n`;
+                if (d.eIdx != null && lh.stufen[d.eIdx]) p += `Praxisbeschreibung meiner Bewertung: ${lh.stufen[d.eIdx]}\n`;
+            }
+        }
         p += '\n';
     });
     // Quervergleich: Kriterien, in denen der Gutachter selbst schon eine Einschränkung sah
@@ -1968,6 +1981,24 @@ AUFBAU jeder Begründung (ein zusammenhängender Fließtext, etwa 130–220 Wör
 3. Kritik am gutachterlichen Vorgehen, soweit das Material sie hergibt: innerer Widerspruch (siehe oben), unterlassene praktische Überprüfung oder Erprobung, ignorierte Hinweise der versicherten Person oder der Pflegeperson, zu kurze Begutachtungsdauer. Halte ausdrücklich fest, wenn eine in meinen Notizen festgehaltene Feststellung im Gutachten übergangen wurde.
 4. Richtlinienmaßstab: Gib wieder, was die BRi für dieses Kriterium und die strittige Stufe verlangen, und zitiere dabei wörtlich aus den mitgelieferten BRi-Texten.
 5. Zwingender Schluss, in der Regel: „Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „…" ableitbar." (Varianten: „… ist … zwingend abzuleiten", „… muss die Bewertung zwingend auf „…" korrigiert werden".)
+
+FACHLICHE FEHLER VERMEIDEN – prüfe vor jeder Begründung die mitgelieferte HILFSMITTEL-REGEL und
+den Hinweis WICHTIG / FEHLERQUELLE des jeweiligen Kriteriums:
+- Führt ein Hilfsmittel laut Regel zu „selbständig", darf seine bloße Nutzung NIEMALS als
+  Begründung für eine Einschränkung dienen (etwa Rollator oder Gehstock bei 4.1.4, Treppengeländer
+  bei 4.1.5, Haltegriffe bei 4.1.3). Argumentiere dann ausschließlich über die darüber hinaus
+  erforderliche personelle Hilfe, über Sicherheit oder über Schmerz.
+- Halte die Abgrenzung zwischen den Kriterien ein: Bei 4.2.7 und 4.2.8 ist Schwerhörigkeit oder
+  eine Seheinschränkung ausdrücklich NICHT zu bewerten, bei 4.2.10 dagegen schon. Kognitiv
+  bedingter Anleitungsbedarf bei Alltagshandlungen gehört zu 4.2.5. Reines Bereitlegen von
+  Kleidung oder Decken des Tisches ist hauswirtschaftlich und begründet KEINE Einschränkung.
+- Modul 3 setzt eine fachärztlich diagnostizierte psychiatrische Erkrankung oder Demenz voraus,
+  die seit mindestens sechs Monaten behandelt wird. Bei 4.3.10 zählen allgemeine Zukunftsängste,
+  Sturzangst und Angst vor dem Alleinsein NICHT. Bei 4.3.11 genügt gedrückte Stimmung NICHT.
+- Modul 5 setzt in der Regel ärztliche Verordnung und Dauerhaftigkeit von mindestens sechs Monaten
+  voraus; frei verkäufliche Mittel und Akuttermine zählen nicht.
+Steht eine Argumentation im Widerspruch zu diesen Regeln, verwende sie NICHT – auch dann nicht,
+wenn sie sich aus meinen Notizen nahelegen würde. Suche stattdessen die tragfähige Begründung.
 
 Beachte zwingend:
 1. Zitiere die BRi ausschließlich wörtlich aus den mitgelieferten BRi-Texten. Erfinde NIEMALS Zitate und gib nur wieder, was dort tatsächlich steht.
