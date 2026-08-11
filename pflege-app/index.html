@@ -735,6 +735,8 @@
     </div>
 </div>
 
+<!-- BRi-Referenztexte (MD Bund, 21.08.2024) – Zitatgrundlage für die Begründungen -->
+<script src="bri_texte.js"></script>
 <!-- PDF.js (lokal) – zeichnet die hochgeladene PDF zuverlässig in der Prüfansicht -->
 <script src="pdf.min.js"></script>
 <script>
@@ -1692,8 +1694,159 @@ function expandLabel(s) {
         .replace(/vorh\./g, 'vorhanden');
 }
 
+/* ===================== BRi-gestützte Begründung abweichender Bewertungen =====================
+   Grundlage: bri_texte.js (Originaltexte der Richtlinien des MD Bund, Stand 21.08.2024).
+   Die KI erhält je Abweichung den BRi-Text des Kriteriums, beide strittigen Ausprägungen und
+   – für den Quervergleich – jene Kriterien, in denen der Gutachter bereits eine Einschränkung
+   anerkannt hat. Der Stil richtet sich nach den hinterlegten Beispielen des Nutzers.          */
+
+const STIL_BEISPIEL_DEFAULT = `4.2.6: Treffen von Entscheidungen im Alltagsleben
+Gutachterliche Bewertung: „unbeeinträchtigt"
+Hier ist ein systematischer Fehler aufgetreten, der gegen die gutachterlichen Richtlinien nach SGB XI eindeutig widerspricht. Zu diesem Modul heißt es in den BRi: "Dazu gehört zum Beispiel die dem Wetter angepasste Auswahl von Kleidung, die Entscheidung über die Durchführung von Aktivitäten wie Einkaufen, Familienangehörige oder Freunde anrufen und einer Freizeitbeschäftigung nachgehen." und weiter heißt es, "Im Rahmen der Alltagsroutinen oder in zuvor besprochenen Situationen können Entscheidungen getroffen werden, die Person hat aber Schwierigkeiten in unbekannten Situationen.". Vergleicht man den Text aus dem Modul 4.6.1, bei der laut des Gutachters eine Einschränkung mit größtenteils vorhanden besteht: "Die Routineabläufe können weitgehend selbständig gestaltet werden, bei ungewohnten Veränderungen ist Unterstützung notwendig. Es reichen zum Beispiel Erinnerungshilfen an einzelne für den Tag vereinbarte Termine." stellt man eine ähnliche Formulierung und Darstellung der Einschränkungen dar. Hieraus ergibt sich zwangsläufig, dass wenn eine Wertung im Modul 4.6.1 erfolgt, auch im Modul 4.2.6 erfolgen muss, da das Treffen von Entscheidungen in Bezug auf den Tagesablauf ja zweifelsfrei festgestellt worden ist und somit unzweifelhaft besteht. Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „größtenteils vorhanden" ableitbar.`;
+
+const STIL_STORAGE = 'pflege_stilbeispiele';
+function getStilBeispiele() {
+    const el = document.getElementById('stil-beispiele');
+    if (el && el.value.trim()) return el.value.trim();
+    try { const s = localStorage.getItem(STIL_STORAGE); if (s && s.trim()) return s.trim(); } catch (e) {}
+    return STIL_BEISPIEL_DEFAULT;
+}
+function saveStilBeispiele() {
+    const el = document.getElementById('stil-beispiele');
+    if (!el) return;
+    try { localStorage.setItem(STIL_STORAGE, el.value); } catch (e) {}
+}
+function resetStilBeispiele() {
+    const el = document.getElementById('stil-beispiele');
+    if (!el) return;
+    el.value = STIL_BEISPIEL_DEFAULT;
+    saveStilBeispiele();
+    showToast('Stilvorlage auf das Ausgangsbeispiel zurückgesetzt.', 'success');
+}
+
+function briFor(nr) { return (typeof BRI_KRITERIEN !== 'undefined') ? BRI_KRITERIEN[nr] : null; }
+// BRi-Ausprägung zum Options-Index (Reihenfolge im BRi = Reihenfolge der Skala)
+function briLevel(nr, idx) {
+    const b = briFor(nr);
+    if (!b || !b.levels) return null;
+    const keys = Object.keys(b.levels);
+    if (idx == null || idx < 0 || idx >= keys.length) return null;
+    return { name: keys[idx], text: b.levels[keys[idx]] };
+}
+
+// Alle Abweichungen Vorgutachten <-> eigene Einschätzung ermitteln
+function computeDiffs() {
+    const diffs = [];
+    ITEMS.forEach(i => {
+        if (!i.m) return;                       // Sonderbedarf (id 0) auslassen
+        const vO = stateOrig.values[i.id];
+        const vE = stateEigene.values[i.id];
+        if (i.m === 5 && i.group !== 'D') {
+            const oO = (vO && typeof vO === 'object') ? vO : { count: 0, period: 'W' };
+            const oE = (vE && typeof vE === 'object') ? vE : { count: 0, period: 'W' };
+            if (oO.count !== oE.count || oO.period !== oE.period) {
+                const fp = o => `${o.count}x pro ${o.period === 'D' ? 'Tag' : o.period === 'W' ? 'Woche' : 'Monat'}`;
+                diffs.push({ id: i.id, m: i.m, nr: i.nr, title: i.title, o: fp(oO), e: fp(oE), oIdx: null, eIdx: null });
+            }
+        } else if (i.opts) {
+            if (vO !== vE) {
+                diffs.push({ id: i.id, m: i.m, nr: i.nr, title: i.title,
+                             o: expandLabel(i.opts[vO] || '—'), e: expandLabel(i.opts[vE] || '—'),
+                             oIdx: (typeof vO === 'number' ? vO : null), eIdx: (typeof vE === 'number' ? vE : null) });
+            }
+        }
+    });
+    return diffs;
+}
+
+// Baut die Aufgabenbeschreibung für die KI (BRi-Texte + Quervergleichs-Material + Stil).
+function buildBegruendungPrompt(diffs) {
+    const cut = (s, n) => (s && s.length > n) ? s.slice(0, n) + ' …' : (s || '');
+    let p = 'ABWEICHENDE KRITERIEN (hierzu je eine Begründung schreiben):\n\n';
+    diffs.forEach(d => {
+        const b = briFor(d.nr);
+        p += `--- Kriterium ${d.nr}: ${d.title} ---\n`;
+        p += `Bewertung des Gutachters: „${d.o}"\nMeine Bewertung: „${d.e}"\n`;
+        if (b) {
+            p += `BRi-Definition: ${cut(b.definition, 1400)}\n`;
+            const lo = briLevel(d.nr, d.oIdx), le = briLevel(d.nr, d.eIdx);
+            if (lo) p += `BRi-Text zur Bewertung des Gutachters ("${lo.name}"): ${cut(lo.text, 700)}\n`;
+            if (le) p += `BRi-Text zu meiner Bewertung ("${le.name}"): ${cut(le.text, 700)}\n`;
+        }
+        p += '\n';
+    });
+    // Quervergleich: Kriterien, in denen der Gutachter selbst schon eine Einschränkung sah
+    const diffNrs = new Set(diffs.map(d => d.nr));
+    let quer = '';
+    ITEMS.forEach(i => {
+        if (!i.m || !i.opts || diffNrs.has(i.nr)) return;
+        const vO = stateOrig.values[i.id];
+        if (typeof vO !== 'number' || vO <= 0) return;   // nur anerkannte Einschränkungen
+        const lv = briLevel(i.nr, vO);
+        quer += `- ${i.nr} ${i.title}: Gutachter wertet „${expandLabel(i.opts[vO])}"`
+             + (lv ? `. BRi-Text dazu: ${cut(lv.text, 450)}` : '') + '\n';
+    });
+    if (quer) {
+        p += 'VOM GUTACHTER BEREITS ANERKANNTE EINSCHRÄNKUNGEN (Material für Quervergleiche –\n'
+           + 'nutze diese, um Widersprüche in der Bewertung aufzuzeigen):\n' + quer + '\n';
+    }
+    const befund = (document.getElementById('stam-befund')?.value || '').trim();
+    const anam = (document.getElementById('stam-anamnese')?.value || '').trim();
+    if (befund) p += 'BEFUND AUS DEM GUTACHTEN:\n' + cut(befund, 3000) + '\n\n';
+    if (anam) p += 'ANAMNESE:\n' + cut(anam, 1500) + '\n\n';
+    return p;
+}
+
+// Erzeugt je Abweichung eine Begründung im Stil des Nutzers (ein einziger KI-Aufruf).
+async function generateBegruendungen(diffs) {
+    if (!diffs.length) return {};
+    const systemPrompt = `Du bist ein erfahrener Pflegeberater und Pflegesachverständiger und verfasst Begründungen für einen Widerspruch gegen ein Pflegegutachten (NBA, SGB XI).
+
+Schreibe zu JEDEM abweichenden Kriterium eine Begründung, die im Aufbau, im Ton und in der Wortwahl exakt den folgenden Beispielen des Verfassers entspricht:
+
+=== STILBEISPIELE DES VERFASSERS ===
+${getStilBeispiele()}
+=== ENDE STILBEISPIELE ===
+
+Beachte zwingend:
+1. Zitiere die BRi wörtlich aus den mitgelieferten BRi-Texten. Erfinde NIEMALS Zitate und gib nur wieder, was dort tatsächlich steht.
+2. Suche – wo fachlich tragfähig – einen Quervergleich zu einem anderen Kriterium, in dem der Gutachter bereits eine Einschränkung anerkannt hat, und leite daraus den Widerspruch in der Bewertung ab (wie im Beispiel).
+3. Findest du keinen tragfähigen Quervergleich, begründe ausschließlich aus dem BRi-Text des Kriteriums und dem Befund. Konstruiere keinen unpassenden Vergleich.
+4. Schließe jede Begründung mit dem Satz: Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „<meine Bewertung>" ableitbar.
+5. Schreibe Fließtext in der Ich-Form, sachlich-fachlich, ohne Aufzählungszeichen und ohne Überschriften.
+6. Gib NUR den Begründungstext zurück – ohne die Zeilen "Kriterium ..." und "Gutachterliche Bewertung ...", diese ergänzt die Software selbst.`;
+
+    const responseSchema = {
+        type: "OBJECT",
+        properties: {
+            begruendungen: {
+                type: "ARRAY",
+                items: {
+                    type: "OBJECT",
+                    properties: { nr: { type: "STRING" }, text: { type: "STRING" } },
+                    required: ["nr", "text"]
+                }
+            }
+        },
+        required: ["begruendungen"]
+    };
+    const payload = {
+        contents: [{ role: "user", parts: [{ text: buildBegruendungPrompt(diffs) }] }],
+        generationConfig: { responseMimeType: "application/json", responseSchema: responseSchema }
+    };
+    const res = await callGeminiWithFallback(payload, systemPrompt);
+    let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!txt) throw new Error("Keine Antwort der KI erhalten.");
+    const fence = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fence) txt = fence[1];
+    const data = JSON.parse(txt.trim());
+    const map = {};
+    (data.begruendungen || []).forEach(b => { if (b && b.nr && b.text) map[b.nr] = b.text.trim(); });
+    return map;
+}
+
 // Baut die Stellungnahme im Familiara-Format aus den App-Daten (Gutachten/Bescheide).
-function buildStellungnahme(notesOverride) {
+function buildStellungnahme(notesOverride, begruendungen) {
     const g = id => (document.getElementById(id)?.value || '').trim();
     const esc = escapeHtml;
     const f2 = n => Number(n).toFixed(2).replace('.', ',');
@@ -1725,24 +1878,7 @@ function buildStellungnahme(notesOverride) {
     const origPts = g('stam-pts-manual') || f2(rO.total);
 
     // Abweichende Einzelkriterien ermitteln
-    const diffs = [];
-    ITEMS.forEach(i => {
-        if (!i.m) return; // Sonderbedarf (id 0) auslassen
-        const vO = stateOrig.values[i.id];
-        const vE = stateEigene.values[i.id];
-        if (i.m === 5 && i.group !== 'D') {
-            const oO = (vO && typeof vO === 'object') ? vO : { count: 0, period: 'W' };
-            const oE = (vE && typeof vE === 'object') ? vE : { count: 0, period: 'W' };
-            if (oO.count !== oE.count || oO.period !== oE.period) {
-                const fp = o => `${o.count}x pro ${o.period === 'D' ? 'Tag' : o.period === 'W' ? 'Woche' : 'Monat'}`;
-                diffs.push({ nr: i.nr, title: i.title, o: fp(oO), e: fp(oE) });
-            }
-        } else if (i.opts) {
-            if (vO !== vE) {
-                diffs.push({ nr: i.nr, title: i.title, o: expandLabel(i.opts[vO] || '—'), e: expandLabel(i.opts[vE] || '—') });
-            }
-        }
-    });
+    const diffs = computeDiffs();
 
     const row = (label, o, e, bold) => `<tr><td${bold ? ' style="font-weight:bold"' : ''}>${esc(label)}</td><td class="num">${o}</td><td class="num">${e}</td></tr>`;
     const tableRows = [
@@ -1757,8 +1893,16 @@ function buildStellungnahme(notesOverride) {
         row('Pflegegrad', esc(origPG), String(rE.pg), true)
     ].join('');
 
+    // Je Abweichung: KI-Begründung (BRi-gestützt) verwenden, sonst der bisherige Standardsatz.
+    const bg = begruendungen || {};
     const critHtml = diffs.length
-        ? diffs.map(d => `<div class="crit"><div class="ct">${esc(d.nr)}: ${esc(d.title)}</div><div>Gutachterliche Bewertung: „${esc(d.o)}“</div><div>Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „${esc(d.e)}“ ableitbar.</div></div>`).join('')
+        ? diffs.map(d => {
+            const txt = (bg[d.nr] || '').trim();
+            const body = txt
+                ? txt.split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
+                : `<div>Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „${esc(d.e)}“ ableitbar.</div>`;
+            return `<div class="crit" data-nr="${esc(d.nr)}" data-vals="${esc(d.o)}|${esc(d.e)}"><div class="ct">${esc(d.nr)}: ${esc(d.title)}</div><div>Gutachterliche Bewertung: „${esc(d.o)}“</div>${body}</div>`;
+        }).join('')
         : `<p>Es wurden keine von der Begutachtung abweichenden Einzelkriterien erfasst.</p>`;
 
     const notesBullets = notes
@@ -1847,12 +1991,34 @@ function mergeStellungnahme(existingHtml, freshHtml) {
     const vals = {};
     fresh.querySelectorAll('[data-f]').forEach(el => { const k = el.getAttribute('data-f'); if (!(k in vals)) vals[k] = el.innerHTML; });
     cur.querySelectorAll('[data-f]').forEach(el => { const k = el.getAttribute('data-f'); if (k in vals) el.innerHTML = vals[k]; });
-    // Ganze Datenblöcke ersetzen (Kopfdaten, Vergleichstabelle, abweichende Kriterien).
-    // Der Notizblock (#stmt-notes) wird bewusst NICHT ersetzt, damit dort eingefügter Text erhalten bleibt.
-    ['stmt-data', 'stmt-cmp-body', 'stmt-crit'].forEach(id => {
+    // Reine Datenblöcke komplett ersetzen (Kopfdaten, Vergleichstabelle).
+    // Der Notizblock (#stmt-notes) wird bewusst NICHT ersetzt.
+    ['stmt-data', 'stmt-cmp-body'].forEach(id => {
         const f = fresh.querySelector('#' + id), c = cur.querySelector('#' + id);
         if (f && c) c.innerHTML = f.innerHTML;
     });
+    // Begründungsblock kriteriengenau zusammenführen: bereits vorhandene (ggf. von Hand
+    // überarbeitete) Begründungen bleiben erhalten, solange sich die Bewertung nicht geändert
+    // hat. Neue Abweichungen kommen hinzu, weggefallene verschwinden.
+    const fCrit = fresh.querySelector('#stmt-crit'), cCrit = cur.querySelector('#stmt-crit');
+    if (fCrit && cCrit) {
+        const alt = {};
+        cCrit.querySelectorAll('.crit[data-nr]').forEach(el => { alt[el.getAttribute('data-nr')] = el; });
+        const neu = document.createElement('div');
+        const frischeBloecke = fCrit.querySelectorAll('.crit[data-nr]');
+        if (!frischeBloecke.length) {
+            cCrit.innerHTML = fCrit.innerHTML;      // keine Abweichungen mehr -> Hinweistext
+        } else {
+            frischeBloecke.forEach(f => {
+                const nr = f.getAttribute('data-nr');
+                const a = alt[nr];
+                // Unverändert bewertet -> bestehenden Text behalten, sonst neuen übernehmen
+                neu.appendChild((a && a.getAttribute('data-vals') === f.getAttribute('data-vals'))
+                    ? a.cloneNode(true) : f.cloneNode(true));
+            });
+            cCrit.innerHTML = neu.innerHTML;
+        }
+    }
     return cur.innerHTML;
 }
 
@@ -1884,7 +2050,34 @@ async function generateAppealText() {
             }
         }
 
-        const fresh = buildStellungnahme(notes);
+        // BRi-gestützte Begründungen zu den abweichenden Kriterien (ein KI-Aufruf für alle).
+        // Bereits vorhandene, unverändert bewertete Kriterien werden nicht erneut formuliert –
+        // ihr (ggf. überarbeiteter) Text bleibt beim Zusammenführen ohnehin erhalten.
+        let begruendungen = {};
+        const diffs = computeDiffs();
+        const vorhandenEl = document.getElementById('appeal-document');
+        const vorhandenHtml = (vorhandenEl && vorhandenEl.innerHTML.trim()) ? vorhandenEl.innerHTML : (appealDraft || '');
+        const bereitsDa = {};
+        if (vorhandenHtml) {
+            const tmp = document.createElement('div'); tmp.innerHTML = vorhandenHtml;
+            tmp.querySelectorAll('.crit[data-nr]').forEach(el => { bereitsDa[el.getAttribute('data-nr')] = el.getAttribute('data-vals'); });
+        }
+        const zuErzeugen = diffs.filter(d => bereitsDa[d.nr] !== `${d.o}|${d.e}`);
+        if (zuErzeugen.length && keyPresent) {
+            showOverlay("Stellungnahme wird erstellt...", `Begründungen zu ${zuErzeugen.length} abweichenden Kriterien werden verfasst`);
+            try {
+                begruendungen = await generateBegruendungen(zuErzeugen);
+            } catch (e) {
+                console.warn("Begründungen übersprungen:", e);
+                showToast("Begründungen konnten nicht erzeugt werden (" + e.message + "). Es wird der Standardsatz verwendet.", "error");
+            } finally {
+                hideOverlay();
+            }
+        } else if (zuErzeugen.length && !keyPresent) {
+            showToast("Ohne API-Schlüssel wird nur der Standardsatz je Kriterium eingesetzt. Für ausformulierte Begründungen bitte oben rechts einen Google-API-Schlüssel eintragen.", "error");
+        }
+
+        const fresh = buildStellungnahme(notes, begruendungen);
         const docEl = document.getElementById('appeal-document');
         const cont = document.getElementById('appeal-result-container');
         // Vorhandenen (ggf. vom Nutzer bearbeiteten) Stand ermitteln
@@ -2517,6 +2710,15 @@ function renderAuswertung() {
                 </p>
                 <button class="btn btn-yellow" onclick="generateAppealText()">⚡ Stellungnahme / Widerspruch erstellen</button>
 
+                <details style="margin-top:16px; border:1px solid var(--border); border-radius:8px; padding:10px 14px;">
+                    <summary style="cursor:pointer; font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-secondary);">Stilvorlage für die Begründungen (BRi-gestützt)</summary>
+                    <p style="font-size:12px; color:var(--text-secondary); margin:10px 0; line-height:1.6">
+                        Zu jedem abweichenden Kriterium wird eine Begründung im Stil der folgenden Beispiele verfasst – mit wörtlichen Zitaten aus den BRi und, wo fachlich tragfähig, einem Quervergleich zu Kriterien, in denen der Gutachter bereits eine Einschränkung anerkannt hat. Ergänzen Sie hier gern weitere eigene Begründungen (durch Leerzeile getrennt); je mehr Beispiele, desto genauer der Stil.
+                    </p>
+                    <textarea id="stil-beispiele" class="field-input" style="min-height:150px; font-size:12px; line-height:1.6; padding:12px;" oninput="saveStilBeispiele(); autoResize(this)"></textarea>
+                    <button class="btn btn-secondary" style="margin-top:10px" onclick="resetStilBeispiele()">Auf Ausgangsbeispiel zurücksetzen</button>
+                </details>
+
                 <div id="appeal-result-container" style="display:none; margin-top:20px;">
                     <label class="field-label">Generierte Stellungnahme (Vorschau – frei editierbar)</label>
                     <div id="appeal-document" contenteditable="true" spellcheck="false" oninput="appealDraft = this.innerHTML"></div>
@@ -2534,6 +2736,12 @@ function renderAuswertung() {
     injectStellungnahmeCss();
     const notesEl = document.getElementById('erstgespraech-notes');
     if (notesEl) { notesEl.value = erstgespraechNotes; autoResize(notesEl); }
+    const stilEl = document.getElementById('stil-beispiele');
+    if (stilEl) {
+        let s = null;
+        try { s = localStorage.getItem(STIL_STORAGE); } catch (e) {}
+        stilEl.value = (s && s.trim()) ? s : STIL_BEISPIEL_DEFAULT;
+    }
     if (appealDraft) {
         const appealEl = document.getElementById('appeal-document');
         const cont = document.getElementById('appeal-result-container');
