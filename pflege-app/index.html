@@ -2200,8 +2200,8 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
                 + (modMitDiff.has(m) ? `  <-- abweichend, ${anz} Kriterium/Kriterien\n` : '\n');
         }
         p += 'MODULÜBERSICHT (gewichtete Punkte):\n' + mo
-           + `Gesamt: Gutachten ${rO.total.toFixed(2)} (Pflegegrad ${rO.pg || 'keiner'}) / meine Einschätzung `
-           + `${rE.total.toFixed(2)} (Pflegegrad ${rE.pg || 'keiner'})\n\n`;
+           + `Gesamt: Gutachten ${rO.total.toFixed(2)} (${rO.pg ? 'Pflegegrad ' + rO.pg : 'kein Pflegegrad'}) / meine Einschätzung `
+           + `${rE.total.toFixed(2)} (${rE.pg ? 'Pflegegrad ' + rE.pg : 'kein Pflegegrad'})\n\n`;
         p += 'ZUSÄTZLICHE AUFGABE – Abschnitt „Allgemeine Angaben":\n'
            + 'Verfasse außerdem den einleitenden Abschnitt „Allgemeine Angaben" als zusammenhängenden\n'
            + 'Fließtext aus 3 bis 5 Absätzen (Absätze durch Leerzeile trennen, KEINE Aufzählungszeichen),\n'
@@ -2379,6 +2379,12 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     const rE = calculateInternal('own');
     const origPG = g('stam-pg-manual') || String(rO.pg);
     const origPts = g('stam-pts-manual') || f2(rO.total);
+    // Ein Pflegegrad 0 existiert nicht – dort heißt es immer „kein Pflegegrad".
+    const istKeinPG = v => { const s = String(v == null ? '' : v).trim(); return s === '' || s === '0' || /^kein/i.test(s); };
+    const pgWert = v => istKeinPG(v) ? 'kein Pflegegrad' : String(v).trim();          // für Datenzeile und Tabelle
+    const pgSatz = v => istKeinPG(v) ? 'kein Pflegegrad' : 'Pflegegrad ' + String(v).trim();  // im Fließtext
+    const origPGTxt = pgWert(origPG);
+    const eigPGTxt = pgWert(rE.pg);
 
     // Abweichende Einzelkriterien ermitteln
     const diffs = computeDiffs();
@@ -2393,7 +2399,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
         row('4.5 Krankheits- und therapiebedingten Anforderungen', f2(rO.weights[4]), f2(rE.weights[4])),
         row('4.6 Gestaltung des Alltagslebens und sozialer Kontakte', f2(rO.weights[5]), f2(rE.weights[5])),
         row('Summe der gewichteten Punkte', f2(rO.total), f2(rE.total), true),
-        row('Pflegegrad', esc(origPG), String(rE.pg), true)
+        row('Pflegegrad', esc(origPGTxt), esc(eigPGTxt), true)
     ].join('');
 
     // Je Abweichung: KI-Begründung (BRi-gestützt) verwenden, sonst der bisherige Standardsatz.
@@ -2453,7 +2459,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
       ${dataRow('Gutachtenorganisation', org)}
       ${dataRow('Begutachtungsdatum', begut)}
       ${dataRow('Durchführungsart', art)}
-      ${dataRow('Pflegegrad', origPG)}
+      ${dataRow('Pflegegrad', origPGTxt)}
       ${dataRow('Gesamtpunkte', origPts)}
     </div>
 
@@ -2462,7 +2468,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     <hr>
 
     <h2>Allgemeine Angaben</h2>
-    <p>Im Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} erfolgte die Einstufung mit ${df('opts', origPts)} gewichteten Punkten, woraus sich ein Pflegegrad ${df('opg', origPG)} ergeben hat. Die Verteilung der gewichteten Punkte auf die einzelnen Module ist der nachfolgenden Übersicht zu entnehmen.</p>
+    <p>Im Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} erfolgte die Einstufung mit ${df('opts', origPts)} gewichteten Punkten, woraus sich ${istKeinPG(origPG) ? df('opgsatz', 'kein Pflegegrad') : 'ein ' + df('opgsatz', pgSatz(origPG))} ergeben hat. Die Verteilung der gewichteten Punkte auf die einzelnen Module ist der nachfolgenden Übersicht zu entnehmen.</p>
     <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${notesBullets}</div>
     <p>Ich bin in mehreren dieser Module zu abweichenden Einschätzungen gekommen. Dies ergibt eine höhere Punktzahl in den Modulen und in der Folge eine höhere Gesamtpunktzahl. Die nachfolgende Übersicht stellt die Ergebnisse des Vorgutachtens und meiner Beurteilung einander gegenüber:</p>
 
@@ -2481,7 +2487,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     <hr>
 
     <h2>Fazit</h2>
-    <p>Das vorliegende Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} mit einem Pflegegrad ${df('opg', origPG)} und ${df('opts', origPts)} Punkten berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien den Pflegegrad ${df('epg', rE.pg)} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
+    <p>Das vorliegende Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} ${istKeinPG(origPG) ? 'mit der Feststellung ' + df('opgfazit', 'keines Pflegegrades') : 'mit einem ' + df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
   </div>`;
 }
 
@@ -3212,7 +3218,7 @@ function calculate(pref) {
     setEl('mod-w-'+pref+'-5',w5.toFixed(2)); setEl('mod-r-'+pref+'-5',ptsM5);
     setEl('mod-w-'+pref+'-6',w6.toFixed(2)); setEl('mod-r-'+pref+'-6',s6);
     setEl('total-w-'+pref, total.toFixed(2).replace('.',','));
-    setEl('pg-title-'+pref, pg>0?'PFLEGEGRAD '+pg:'KEIN PG');
+    setEl('pg-title-'+pref, pg>0?'PFLEGEGRAD '+pg:'KEIN PFLEGEGRAD');
 
     const tiers={1:[2,4,7,10],2:[2,6,11,17],3:[2,6,11,17],4:[3,8,19,37],5:[1,2,4,6],6:[1,4,7,12]};
     const getGap=(mod,sum)=>{
@@ -3244,7 +3250,7 @@ function calculate(pref) {
                 </tr>`;
             }).join('');
             setEl('total-w-orig-ref', rO.total.toFixed(2).replace('.',','));
-            setEl('pg-title-orig-ref', rO.pg>0?'VORGUTACHTEN: PG '+rO.pg:'VORGUTACHTEN: KEIN PG');
+            setEl('pg-title-orig-ref', rO.pg>0?'VORGUTACHTEN: PFLEGEGRAD '+rO.pg:'VORGUTACHTEN: KEIN PFLEGEGRAD');
             updateLiveCompRows();
         } else {
             grid.innerHTML=[1,2,3,4,5,6].map(m=>{
@@ -3332,8 +3338,8 @@ function renderAuswertung() {
             <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Vergleichsbericht: Vorgutachten vs. Eigene Einschätzung</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)">
                 ${[
-                    ['PG laut Vorgutachten', rO.pg>0?'PG '+rO.pg:'Kein PG', 'var(--accent)'],
-                    ['PG Eigene Einschätzung', rE.pg>0?'PG '+rE.pg:'Kein PG', 'var(--accent2)'],
+                    ['PG laut Vorgutachten', rO.pg>0?'Pflegegrad '+rO.pg:'Kein Pflegegrad', 'var(--accent)'],
+                    ['PG Eigene Einschätzung', rE.pg>0?'Pflegegrad '+rE.pg:'Kein Pflegegrad', 'var(--accent2)'],
                     ['Differenz Pflegegrad', pgDiffTxt, pgDiffClr]
                 ].map(([l,v,c])=>`<div style="background:var(--bg-card2);padding:20px;text-align:center">
                     <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-secondary);margin-bottom:8px">${l}</div>
