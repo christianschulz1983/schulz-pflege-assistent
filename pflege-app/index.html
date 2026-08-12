@@ -453,6 +453,26 @@
         .own-box .m5-disp { color: var(--c) !important; }
         .own-box .m5-period-btn.active { background: var(--c); }
 
+        /* VORSCHLAGSLISTE (weitere Widerspruchspunkte) */
+        .vs-item {
+            display: flex; gap: 12px; align-items: flex-start;
+            border: 1px solid var(--border); border-left: 4px solid var(--accent);
+            border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; background: var(--bg-card);
+        }
+        .vs-item input[type="checkbox"] { margin-top: 3px; width: 16px; height: 16px; flex-shrink: 0; }
+        .vs-nr { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--accent); }
+        .vs-titel { font-weight: 700; font-size: 13px; color: var(--text-primary); margin: 2px 0 6px; }
+        .vs-wert {
+            font-family: var(--font-mono); font-size: 11px; margin-bottom: 6px; color: var(--text-secondary);
+        }
+        .vs-wert b { color: #15803d; }
+        .vs-grund { font-size: 12px; line-height: 1.55; color: var(--text-secondary); }
+        .vs-fund {
+            font-size: 11px; line-height: 1.5; margin-top: 6px; padding: 6px 9px;
+            background: var(--bg-card2); border-radius: 6px; color: var(--text-secondary); font-style: italic;
+        }
+        .vs-leer { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+
         /* DIAGNOSES TABLE */
         .diag-table { width: 100%; border-collapse: collapse; }
         .diag-table thead th {
@@ -732,6 +752,19 @@
             <div id="review-pdf" class="review-pdf"></div>
             <div id="review-form" class="review-form"></div>
         </div>
+    </div>
+</div>
+
+<div id="vorschlag-overlay" class="review-overlay">
+    <div class="review-box">
+        <div class="review-header">
+            <div class="rh-title">Vorgeschlagene Widerspruchspunkte</div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-secondary" onclick="closeVorschlaege()">Schließen</button>
+                <button class="btn btn-primary" onclick="uebernehmeVorschlaege()">✓ Ausgewählte übernehmen</button>
+            </div>
+        </div>
+        <div id="vorschlag-body" class="review-form" style="padding:18px 22px"></div>
     </div>
 </div>
 
@@ -1798,6 +1831,174 @@ function briLevel(nr, idx) {
     return { name: keys[idx], text: b.levels[keys[idx]] };
 }
 
+/* ============ Weitere Widerspruchspunkte aus Notizen und Befund vorschlagen ============
+   Die Anzahl der Widerspruchspunkte hängt daran, wie viele Kriterien abweichend bewertet sind.
+   Diese Funktion prüft alle noch NICHT abweichenden Kriterien gegen Notizen, Befund und Anamnese
+   und schlägt vor, wo das Material eine höhere Bewertung trägt. Übernommen wird nur, was der
+   Nutzer bestätigt.                                                                          */
+let vorschlagListe = [];
+
+// Alle Kriterien, die aktuell genauso wie im Vorgutachten bewertet sind und noch Luft nach oben haben.
+function sammleKandidaten() {
+    const out = [];
+    ITEMS.forEach(i => {
+        if (!i.m || !i.opts) return;
+        const vO = stateOrig.values[i.id];
+        const vE = stateEigene.values[i.id];
+        if (i.m === 5 && i.group !== 'D') return;          // Häufigkeitskriterien hier auslassen
+        if (typeof vO !== 'number' || typeof vE !== 'number') return;
+        if (vO !== vE) return;                              // weicht bereits ab
+        if (vO >= i.opts.length - 1) return;                // schon höchste Stufe
+        out.push(i);
+    });
+    return out;
+}
+
+function buildVorschlagPrompt(kand) {
+    const cut = (s, n) => (s && s.length > n) ? s.slice(0, n) + ' …' : (s || '');
+    const notizen = (erstgespraechNotes || '').trim();
+    const befund = (document.getElementById('stam-befund')?.value || '').trim();
+    const anam = (document.getElementById('stam-anamnese')?.value || '').trim();
+    let p = 'MEINE NOTIZEN AUS DEM ERSTGESPRÄCH (wichtigste Quelle):\n' + (notizen ? cut(notizen, 6000) : '(keine)') + '\n\n';
+    if (befund) p += 'BEFUND – EIGENER TEXT DES GUTACHTERS:\n' + cut(befund, 5000) + '\n\n';
+    if (anam) p += 'ANAMNESE – EIGENER TEXT DES GUTACHTERS:\n' + cut(anam, 3000) + '\n\n';
+    p += 'ZU PRÜFENDE KRITERIEN (aktuell genauso bewertet wie im Gutachten):\n\n';
+    kand.forEach(i => {
+        const vO = stateOrig.values[i.id];
+        const lh = (typeof LAIEN_HINWEISE !== 'undefined') ? LAIEN_HINWEISE[i.nr] : null;
+        p += `${i.nr} ${i.title} | derzeit: „${expandLabel(i.opts[vO])}" | mögliche höhere Stufen: `
+           + i.opts.slice(vO + 1).map((o, k) => `${vO + 1 + k}=„${expandLabel(o)}"`).join(', ') + '\n';
+        if (lh) {
+            if (lh.check) p += `   Prüffrage: ${cut(lh.check, 240)}\n`;
+            if (lh.hilfsmittel) p += `   Hilfsmittel-Regel: ${cut(lh.hilfsmittel, 240)}\n`;
+            if (lh.wichtig) p += `   Achtung: ${cut(lh.wichtig, 300)}\n`;
+        }
+        p += '\n';
+    });
+    return p;
+}
+
+async function schlageWiderspruchspunkteVor() {
+    const keyPresent = ((document.getElementById('user-api-key')?.value || '').trim() || userApiKey.trim() || apiKey.trim());
+    if (!keyPresent) { showToast('Dafür wird ein Google-API-Schlüssel benötigt – bitte oben rechts eintragen.', 'error'); return; }
+    const notizen = (erstgespraechNotes || '').trim();
+    const befund = (document.getElementById('stam-befund')?.value || '').trim();
+    if (!notizen && !befund) {
+        showToast('Bitte zuerst Notizen aus dem Erstgespräch oder den Befund erfassen – darauf stützt sich die Prüfung.', 'error');
+        return;
+    }
+    const kand = sammleKandidaten();
+    if (!kand.length) { showToast('Alle Kriterien weichen bereits ab oder stehen auf der höchsten Stufe.', 'success'); return; }
+
+    const systemPrompt = `Du bist ein erfahrener Pflegeberater und prüfst ein Pflegegutachten (NBA, SGB XI) auf übersehene Einschränkungen.
+
+Dir werden die Notizen des Pflegeberaters aus dem Erstgespräch sowie Befund und Anamnese des Gutachters vorgelegt, dazu eine Liste von Kriterien, die derzeit genauso bewertet sind wie im Gutachten.
+
+Aufgabe: Nenne ausschließlich jene Kriterien, für die das vorgelegte Material eine HÖHERE Bewertung tatsächlich trägt.
+
+Zwingende Regeln:
+1. Stütze jeden Vorschlag auf eine konkrete Stelle im Material. Gib diese Stelle im Feld "fundstelle" wörtlich wieder (kurzes Zitat aus Notizen, Befund oder Anamnese). Ohne belegbare Stelle KEIN Vorschlag.
+2. Erfinde nichts. Schlussfolgere nur, was das Material hergibt. Lieber wenige belastbare Vorschläge als viele schwache.
+3. Beachte die mitgelieferte Hilfsmittel-Regel: Führt ein Hilfsmittel laut Regel zu „selbständig", ist seine bloße Nutzung KEIN Grund für eine höhere Stufe.
+4. Beachte die Hinweise unter „Achtung" – sie benennen Abgrenzungen und Ausschlüsse. Ein Vorschlag, der ihnen widerspricht, ist unzulässig.
+5. Denke in Zusammenhängen: Belegt das Material eine Einschränkung, wirkt sie sich oft auf mehrere Kriterien aus (etwa Erinnerungsbedarf auf Termine, Tagesstruktur und Medikation). Prüfe solche Ketten, aber nur, wenn sie fachlich tragen.
+6. "stufe" ist der Zahlenindex der vorgeschlagenen Stufe aus der Liste der möglichen höheren Stufen. Er muss höher sein als die derzeitige Bewertung.
+7. "begruendung" ist ein bis zwei Sätze: warum diese Stufe fachlich zutrifft.`;
+
+    const responseSchema = {
+        type: "OBJECT",
+        properties: {
+            vorschlaege: {
+                type: "ARRAY",
+                items: {
+                    type: "OBJECT",
+                    properties: {
+                        nr: { type: "STRING" },
+                        stufe: { type: "INTEGER" },
+                        begruendung: { type: "STRING" },
+                        fundstelle: { type: "STRING" }
+                    },
+                    required: ["nr", "stufe", "begruendung", "fundstelle"]
+                }
+            }
+        },
+        required: ["vorschlaege"]
+    };
+
+    showOverlay('Widerspruchspunkte werden gesucht...', `${kand.length} Kriterien werden gegen Ihre Notizen und den Befund geprüft`);
+    try {
+        const payload = {
+            contents: [{ role: "user", parts: [{ text: buildVorschlagPrompt(kand) }] }],
+            generationConfig: { responseMimeType: "application/json", responseSchema: responseSchema }
+        };
+        const res = await callGeminiWithFallback(payload, systemPrompt);
+        let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!txt) throw new Error('Keine Antwort der KI erhalten.');
+        const fence = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
+        if (fence) txt = fence[1];
+        const data = JSON.parse(txt.trim());
+        // Nur plausible Vorschläge behalten: bekanntes Kriterium, echte Höherstufung
+        vorschlagListe = (data.vorschlaege || []).map(v => {
+            const item = ITEMS.find(i => i.nr === v.nr);
+            if (!item || !item.opts) return null;
+            const vO = stateOrig.values[item.id];
+            const stufe = parseInt(v.stufe, 10);
+            if (!(stufe > vO) || stufe > item.opts.length - 1) return null;
+            return { item, stufe, alt: vO, begruendung: (v.begruendung || '').trim(), fundstelle: (v.fundstelle || '').trim() };
+        }).filter(Boolean);
+        hideOverlay();
+        renderVorschlaege();
+    } catch (e) {
+        hideOverlay();
+        console.warn('Vorschläge fehlgeschlagen:', e);
+        showToast('Die Prüfung ist fehlgeschlagen: ' + e.message, 'error');
+    }
+}
+
+function renderVorschlaege() {
+    const box = document.getElementById('vorschlag-body');
+    if (!vorschlagListe.length) {
+        box.innerHTML = '<div class="vs-leer">Aus den Notizen, dem Befund und der Anamnese lässt sich derzeit keine weitere Höherbewertung belastbar begründen. '
+                      + 'Ergänzen Sie gegebenenfalls Ihre Notizen und starten Sie die Prüfung erneut.</div>';
+    } else {
+        box.innerHTML = `<p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px">`
+            + `${vorschlagListe.length} Vorschlag${vorschlagListe.length > 1 ? 'e' : ''} – bitte fachlich prüfen. Nur Angehaktes wird übernommen; Ihre bisherigen Bewertungen bleiben sonst unverändert.</p>`
+            + vorschlagListe.map((v, idx) => `
+            <label class="vs-item">
+                <input type="checkbox" checked data-idx="${idx}">
+                <div style="flex:1">
+                    <div class="vs-nr">${escapeHtml(v.item.nr)}</div>
+                    <div class="vs-titel">${escapeHtml(v.item.title)}</div>
+                    <div class="vs-wert">Gutachten: „${escapeHtml(expandLabel(v.item.opts[v.alt]))}" &nbsp;→&nbsp; Vorschlag: <b>„${escapeHtml(expandLabel(v.item.opts[v.stufe]))}"</b></div>
+                    <div class="vs-grund">${escapeHtml(v.begruendung)}</div>
+                    ${v.fundstelle ? `<div class="vs-fund">Fundstelle: „${escapeHtml(v.fundstelle)}“</div>` : ''}
+                </div>
+            </label>`).join('');
+    }
+    document.getElementById('vorschlag-overlay').classList.add('active');
+}
+
+function closeVorschlaege() {
+    document.getElementById('vorschlag-overlay').classList.remove('active');
+}
+
+function uebernehmeVorschlaege() {
+    const boxen = document.querySelectorAll('#vorschlag-body input[type="checkbox"]');
+    let n = 0;
+    boxen.forEach(cb => {
+        if (!cb.checked) return;
+        const v = vorschlagListe[parseInt(cb.getAttribute('data-idx'), 10)];
+        if (!v) return;
+        stateEigene.values[v.item.id] = v.stufe;
+        n++;
+    });
+    closeVorschlaege();
+    if (!n) { showToast('Es wurde nichts ausgewählt – die Bewertungen bleiben unverändert.', 'error'); return; }
+    fillTable('own');
+    calculate('own');
+    showToast(`${n} Bewertung${n > 1 ? 'en' : ''} übernommen. Bitte in der Liste prüfen und anschließend die Stellungnahme neu erstellen.`, 'success');
+}
+
 // Kennung für den Abschnitt „Allgemeine Angaben": ändert sich, sobald sich die Notizen oder
 // die Abweichungen ändern. Nur dann wird der Abschnitt neu verfasst – sonst bleibt der
 // vorhandene (ggf. von Hand überarbeitete) Text erhalten.
@@ -2477,6 +2678,16 @@ function renderNBASection(prefix) {
                     </div>
                 </div>
             </div>
+
+            ${isEig ? `<div class="card" style="border:1px solid rgba(37,99,235,0.2)">
+                <div class="card-header"><div class="dot" style="background:var(--accent)"></div>Widerspruchspunkte finden (KI)</div>
+                <div style="padding:16px 20px">
+                    <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+                        Prüft alle Kriterien, die Sie bisher wie der Gutachter bewertet haben, gegen Ihre Notizen aus dem Erstgespräch, den Befund und die Anamnese – und schlägt vor, wo sich aus dem Material eine höhere Bewertung begründen ließe. Sie entscheiden, was übernommen wird.
+                    </p>
+                    <button class="btn btn-primary" onclick="schlageWiderspruchspunkteVor()">🔎 Weitere Widerspruchspunkte vorschlagen</button>
+                </div>
+            </div>` : ''}
 
             <div class="card">
                 <table class="nba-table">
