@@ -1699,6 +1699,10 @@ const STELLUNGNAHME_CSS = `
 .stmt table.cmp td.num{text-align:center;width:130px;}
 .stmt .crit{margin:11px 0;}
 .stmt .crit .ct{font-weight:bold;}
+/* Arbeitshinweis zu nicht belegten Zitaten – nur am Bildschirm, nicht im Ausdruck */
+.stmt .zitat-warnung{margin:6px 0 0;padding:7px 10px;border-left:4px solid #dc2626;
+ background:rgba(220,38,38,0.08);color:#b91c1c;font-size:11px;line-height:1.5;}
+@media print{.stmt .zitat-warnung{display:none;}}
 .stmt ul.aa{margin:8px 0 8px 24px;}
 .stmt ul.aa li{margin:3px 0;}
 .stmt .stmt-footer{margin-top:34px;border-top:1px solid #ccc;padding-top:8px;display:flex;justify-content:space-between;font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#333;}
@@ -1855,8 +1859,9 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
     p += 'ABWEICHENDE KRITERIEN (hierzu je eine Begründung schreiben):\n\n';
     diffs.forEach(d => {
         const b = briFor(d.nr);
-        p += `--- Kriterium ${d.nr}: ${d.title} ---\n`;
+        p += `--- Kriterium ${d.nr}: ${d.title} (Modul ${d.m}) ---\n`;
         p += `Bewertung des Gutachters: „${d.o}"\nMeine Bewertung: „${d.e}"\n`;
+        p += `Stufenbezeichnungen: verwende ausschließlich „${d.o}" und „${d.e}" – keine anderen Wörter für diese Stufen.\n`;
         if (b) {
             p += `BRi-Definition: ${cut(b.definition, 1400)}\n`;
             const lo = briLevel(d.nr, d.oIdx), le = briLevel(d.nr, d.eIdx);
@@ -2000,7 +2005,26 @@ den Hinweis WICHTIG / FEHLERQUELLE des jeweiligen Kriteriums:
 Steht eine Argumentation im Widerspruch zu diesen Regeln, verwende sie NICHT – auch dann nicht,
 wenn sie sich aus meinen Notizen nahelegen würde. Suche stattdessen die tragfähige Begründung.
 
+ZITIERREGEL – wird technisch überprüft:
+Alles, was du in Anführungszeichen setzt, MUSS zeichengenau in den mitgelieferten BRi-Texten
+dieses Kriteriums stehen. Setze niemals Halbsätze in Anführungszeichen, die du sinngemäß
+zusammengefasst, aus einem anderen Kriterium entnommen oder ergänzt hast. Passt keine Stelle
+wörtlich zu deiner Argumentation, dann zitiere GAR NICHT, sondern gib den Inhalt ohne
+Anführungszeichen sinngemäß wieder – oder wähle eine andere, tragfähige Begründung. Kürze ein
+Zitat nur so, dass sein Sinn erhalten bleibt; lasse einschränkende Nachsätze nicht weg, um die
+Stelle passender erscheinen zu lassen.
+
+STUFENBEZEICHNUNGEN:
+Verwende ausschließlich die je Kriterium angegebenen Bezeichnungen. In den Modulen 2 und 3 gibt
+es KEINE Stufe „selbständig" – dort heißt es „unbeeinträchtigt" beziehungsweise „größtenteils
+vorhanden", „in geringem Maße vorhanden", „nicht vorhanden" bzw. bei Modul 3 „nie oder sehr
+selten", „selten", „häufig", „täglich". Formulierungen wie „Einstufung als vollständig
+selbstständig" sind dort ein fachlicher Fehler.
+
 Beachte zwingend:
+0. Der Ableitungssatz („Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „…" ableitbar.") steht genau EINMAL, am Ende der Begründung. Beginne eine Begründung nicht mit ihm.
+0a. Variiere über alle Begründungen hinweg die Eröffnungen und Satzmuster. Verwende keine Wendung in zwei Begründungen wörtlich – sonst wirkt der Text wie ein Textbaustein, was du gerade dem Gutachter vorwirfst.
+0b. Führe KEINE Tatsache an, die die Position des Gutachters stützt (etwa eine noch ausgeübte Tätigkeit oder eine erhaltene Fähigkeit), es sei denn, du entkräftest sie im selben Zug schlüssig. Lenke keine Aufmerksamkeit auf Umstände, die gegen die eigene Bewertung sprechen.
 1. Zitiere die BRi ausschließlich wörtlich aus den mitgelieferten BRi-Texten. Erfinde NIEMALS Zitate und gib nur wieder, was dort tatsächlich steht.
 2. Erfinde keine Befunde, Diagnosen, Zeitangaben, Messwerte oder Vorkommnisse. Nutze nur, was in meinen Notizen, im Befund, in der Anamnese und den mitgelieferten Bewertungen steht. Gibt das Material zu einem Punkt nichts her, lasse ihn weg.
 3. Nutze – wo fachlich tragfähig – den Quervergleich zu einem Kriterium, in dem der Gutachter bereits eine Einschränkung anerkannt hat, und leite daraus den Widerspruch in der Bewertung ab. Findest du keinen tragfähigen Vergleich, begründe aus BRi-Text und Befund; konstruiere niemals einen unpassenden Vergleich.
@@ -2094,9 +2118,18 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     const critHtml = diffs.length
         ? diffs.map(d => {
             const txt = (bg[d.nr] || '').trim();
-            const body = txt
+            let body = txt
                 ? txt.split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
                 : `<div>Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „${esc(d.e)}“ ableitbar.</div>`;
+            // Nicht im BRi belegte Zitate sichtbar machen – sie müssen geprüft oder gestrichen werden.
+            if (txt) {
+                const offen = unbelegteZitate(d.nr, txt);
+                if (offen.length) {
+                    body += `<div class="zitat-warnung" data-warn="1">⚠ Bitte prüfen: Folgende Passage${offen.length > 1 ? 'n sind' : ' ist'} `
+                          + `nicht wörtlich im BRi-Text zu ${esc(d.nr)} belegt – vor dem Versand streichen oder korrigieren: `
+                          + offen.map(z => `„${esc(z)}“`).join(' · ') + `</div>`;
+                }
+            }
             return `<div class="crit" data-nr="${esc(d.nr)}" data-vals="${esc(d.o)}|${esc(d.e)}"><div class="ct">${esc(d.nr)}: ${esc(d.title)}</div><div>Gutachterliche Bewertung: „${esc(d.o)}“</div>${body}</div>`;
         }).join('')
         : `<p>Es wurden keine von der Begutachtung abweichenden Einzelkriterien erfasst.</p>`;
@@ -2178,6 +2211,61 @@ async function correctText(text) {
     const out = result?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!out || !out.trim()) throw new Error("Keine Korrektur erhalten.");
     return out.trim();
+}
+
+/* Zitatprüfung: Jedes wörtliche Zitat in einer Begründung muss tatsächlich im BRi-Text des
+   jeweiligen Kriteriums stehen. Anweisungen allein genügen nicht – erfundene oder aus anderen
+   Kriterien zusammengesetzte Zitate werden hier technisch aufgedeckt und im Dokument markiert. */
+function normZitat(s) {
+    return (s || '')
+        .replace(/[„“”‚‘’"']/g, ' ')
+        .replace(/\[[^\]]*\]/g, ' ')     // Einschübe wie [kommt] ignorieren
+        .replace(/[\s ]+/g, ' ')
+        .replace(/\s*…\s*/g, ' ')
+        .toLowerCase().trim();
+}
+
+// Wortabgleich mit Toleranz: kleine grammatische Anpassungen eines Zitats (eingeschobenes
+// „zwar", umgestellte Verbform, Einschub in eckigen Klammern) gelten weiterhin als belegt.
+// Erst wenn ein nennenswerter Teil der Wörter im BRi-Text fehlt, liegt eine eigene Zutat vor.
+function zitatGedeckt(zitat, quelle) {
+    const woerter = zitat.split(' ')
+        .map(w => w.replace(/[^\wäöüß]/gi, ''))
+        .filter(w => w.length >= 4);
+    if (woerter.length < 3) return true;              // zu kurz für eine belastbare Aussage
+    let treffer = 0;
+    woerter.forEach(w => {
+        // Wortstamm-Toleranz: „Durchführung" gilt auch bei „durchführen" als belegt
+        const stamm = w.length >= 7 ? w.slice(0, w.length - 2) : w;
+        if (quelle.includes(w) || quelle.includes(stamm)) treffer++;
+    });
+    return (treffer / woerter.length) >= 0.85;
+}
+
+// Liefert alle Zitate einer Begründung, die sich NICHT im BRi-Text des Kriteriums finden.
+function unbelegteZitate(nr, text) {
+    const b = briFor(nr);
+    if (!b || !text) return [];
+    let quelle = normZitat(b.definition + ' ' + Object.values(b.levels || {}).join(' '));
+    const modul = (typeof BRI_MODULE !== 'undefined') ? BRI_MODULE[nr.split('.').slice(0, 2).join('.')] : null;
+    if (modul) quelle += ' ' + normZitat(modul.text);   // Modul-Einleitung zählt als Beleg
+    const offen = [];
+    const re = /[„"]([^„“”"]{25,})[“”"]/g;              // nur längere Passagen prüfen
+    let m;
+    while ((m = re.exec(text)) !== null) {
+        const roh = m[1].trim();
+        const z = normZitat(roh);
+        if (!z) continue;
+        // Stufenbezeichnungen sind Etiketten, keine Zitate
+        if (/^(selbständig|überwiegend (un)?selbständig|unselbständig|unbeeinträchtigt|(fähigkeit )?(größtenteils|in geringem maße|nicht) vorhanden|fähigkeit vorhanden|häufig|selten|täglich|nie oder sehr selten)/.test(z)) continue;
+        if (quelle.includes(z)) continue;
+        // Teilstücke prüfen: lange Zitate dürfen an Satzgrenzen zusammengesetzt sein
+        const teile = z.split(/,| und | oder /).map(t => t.trim()).filter(t => t.length > 30);
+        if (teile.length && teile.every(t => quelle.includes(t))) continue;
+        if (zitatGedeckt(z, quelle)) continue;      // nur grammatisch angepasst -> in Ordnung
+        offen.push(roh.length > 160 ? roh.slice(0, 160) + ' …' : roh);
+    }
+    return offen;
 }
 
 // Beim erneuten Generieren: nur die datengetriebenen Teile (Kopfdaten, Vergleichstabelle,
@@ -2319,9 +2407,15 @@ async function generateAppealText() {
         appealDraft = finalHtml;
         if (docEl) docEl.innerHTML = finalHtml;
         if (cont) cont.style.display = 'block';
-        showToast(merged
-            ? "Aktualisiert – Ihre Ergänzungen wurden beibehalten, nur die Falldaten wurden erneuert."
-            : "Stellungnahme im Familiara-Format erstellt.", "success");
+        // Auf nicht belegte BRi-Zitate hinweisen – die müssen vor dem Versand geprüft werden.
+        const warnAnzahl = (docEl ? docEl.querySelectorAll('.zitat-warnung[data-warn]').length : 0);
+        if (warnAnzahl) {
+            showToast(`Achtung: In ${warnAnzahl} Begründung${warnAnzahl > 1 ? 'en' : ''} steht ein Zitat, das sich nicht wörtlich in den BRi belegen lässt. Die Stellen sind rot markiert – bitte streichen oder korrigieren.`, "error");
+        } else {
+            showToast(merged
+                ? "Aktualisiert – Ihre Ergänzungen wurden beibehalten, nur die Falldaten wurden erneuert."
+                : "Stellungnahme im Familiara-Format erstellt. Alle BRi-Zitate sind belegt.", "success");
+        }
         if (docEl) docEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
         hideOverlay();
