@@ -625,6 +625,36 @@
 
     <section id="tab-1" class="tab-content active space-y-6">
         <div class="card">
+            <div class="card-header"><div class="dot"></div>Verfasser der Stellungnahme</div>
+            <div style="padding:20px">
+                <div class="grid-4" style="gap:16px">
+                    <div>
+                        <label class="field-label">Name des Pflegeberaters</label>
+                        <select id="verf-name-sel" class="field-input" onchange="onVerfasserChange()">
+                            <option>Christian Schulz</option>
+                            <option>Katja Tittel</option>
+                            <option value="__frei">anderer Name</option>
+                        </select>
+                        <input type="text" id="verf-name-frei" class="field-input" style="display:none;margin-top:8px"
+                               placeholder="Namen eingeben" oninput="saveVerfasser()">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="field-label">Qualifikation</label>
+                        <select id="verf-qual-sel" class="field-input" onchange="onVerfasserChange()">
+                            <option>Pflegeberater / B.Sc. in Pflege- und Gesundheitsmanagement</option>
+                            <option value="__frei">Qualifikation</option>
+                        </select>
+                        <textarea id="verf-qual-frei" class="field-input" style="display:none;margin-top:8px;min-height:52px"
+                                  placeholder="Qualifikation eingeben (eine Zeile je Angabe)" oninput="saveVerfasser()"></textarea>
+                    </div>
+                </div>
+                <p style="font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.5">
+                    Diese Angaben erscheinen im Kopf der erstellten Stellungnahme und werden für den nächsten Fall gemerkt.
+                </p>
+            </div>
+        </div>
+
+        <div class="card">
             <div class="card-header"><div class="dot"></div>Begutachtungs-Informationen</div>
             <div style="padding:20px">
                 <div class="grid-4" style="gap:16px">
@@ -1712,15 +1742,15 @@ const FAMILIARA_LOGO = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDA
 
 const STELLUNGNAHME_CSS = `
 #appeal-document{background:#fff;color:#000;border:1px solid #cbd5e1;border-radius:8px;padding:46px 54px;max-width:900px;margin:0 auto;overflow-x:auto;}
-.stmt{font-family:Cambria,'Times New Roman',Georgia,serif;color:#000;font-size:12pt;line-height:1.45;text-align:justify;}
+.stmt{font-family:Calibri,'Segoe UI',Candara,Arial,sans-serif;color:#000;font-size:11pt;line-height:1.45;text-align:justify;}
 .stmt .stmt-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:34px;}
 .stmt .stmt-logo{height:46px;width:auto;display:block;}
-.stmt .stmt-address{font-family:Arial,Helvetica,sans-serif;font-size:9pt;line-height:1.4;color:#333;text-align:left;white-space:nowrap;}
+.stmt .stmt-address{font-family:Calibri,'Segoe UI',Candara,Arial,sans-serif;font-size:9pt;line-height:1.4;color:#333;text-align:left;white-space:nowrap;}
 .stmt .stmt-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;}
 .stmt .stmt-top .left div{line-height:1.3;}
 .stmt .stmt-top .right{white-space:nowrap;}
-.stmt h1{color:#366091;font-size:13pt;font-weight:bold;margin:16px 0 6px;text-align:left;}
-.stmt h2{color:#366091;font-size:13pt;font-weight:bold;margin:22px 0 8px;text-align:left;}
+.stmt h1{color:#366091;font-size:14pt;font-weight:bold;margin:16px 0 6px;text-align:left;}
+.stmt h2{color:#366091;font-size:14pt;font-weight:bold;margin:22px 0 8px;text-align:left;}
 .stmt p{margin:9px 0;}
 .stmt .data-block{margin:10px 0;}
 .stmt .data-row{display:flex;}
@@ -1749,6 +1779,57 @@ function injectStellungnahmeCss() {
     s.id = 'stmt-style';
     s.textContent = STELLUNGNAHME_CSS;
     document.head.appendChild(s);
+}
+
+/* ---- Verfasser (Name und Qualifikation) für den Kopf der Stellungnahme ---- */
+const VERFASSER_STORAGE = 'pflege_verfasser';
+
+function onVerfasserChange() {
+    const nSel = document.getElementById('verf-name-sel');
+    const nFrei = document.getElementById('verf-name-frei');
+    const qSel = document.getElementById('verf-qual-sel');
+    const qFrei = document.getElementById('verf-qual-frei');
+    if (nSel && nFrei) nFrei.style.display = (nSel.value === '__frei') ? 'block' : 'none';
+    if (qSel && qFrei) qFrei.style.display = (qSel.value === '__frei') ? 'block' : 'none';
+    saveVerfasser();
+}
+
+function saveVerfasser() {
+    try {
+        localStorage.setItem(VERFASSER_STORAGE, JSON.stringify({
+            nameSel: document.getElementById('verf-name-sel')?.value || '',
+            nameFrei: document.getElementById('verf-name-frei')?.value || '',
+            qualSel: document.getElementById('verf-qual-sel')?.value || '',
+            qualFrei: document.getElementById('verf-qual-frei')?.value || ''
+        }));
+    } catch (e) {}
+}
+
+function loadVerfasser() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(VERFASSER_STORAGE) || 'null'); } catch (e) {}
+    if (s) {
+        const set = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+        set('verf-name-sel', s.nameSel); set('verf-name-frei', s.nameFrei);
+        set('verf-qual-sel', s.qualSel); set('verf-qual-frei', s.qualFrei);
+    }
+    onVerfasserChange();
+}
+
+// Liefert Name und Qualifikationszeilen für den Briefkopf.
+function getVerfasser() {
+    const nSel = document.getElementById('verf-name-sel')?.value || 'Christian Schulz';
+    const nFrei = (document.getElementById('verf-name-frei')?.value || '').trim();
+    const qSel = document.getElementById('verf-qual-sel')?.value || '';
+    const qFrei = (document.getElementById('verf-qual-frei')?.value || '').trim();
+    const name = (nSel === '__frei') ? (nFrei || 'Name') : nSel;
+    let zeilen;
+    if (qSel === '__frei') {
+        zeilen = qFrei ? qFrei.split(/\r?\n/).map(z => z.trim()).filter(Boolean) : [];
+    } else {
+        zeilen = ['Pflegeberater', 'B.Sc. in Pflege- und Gesundheitsmanagement'];
+    }
+    return { name: name, zeilen: zeilen };
 }
 
 function formatDE(ymd) {
@@ -2292,6 +2373,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     const notesEl = document.getElementById('erstgespraech-notes');
     if (notesEl) erstgespraechNotes = notesEl.value;
     const notes = (typeof notesOverride === 'string' ? notesOverride : (erstgespraechNotes || '')).trim();
+    const verf = getVerfasser();
 
     const rO = calculateInternal('orig');
     const rE = calculateInternal('own');
@@ -2353,9 +2435,8 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
 
     <div class="stmt-top">
       <div class="left">
-        <div>Christian Schulz</div>
-        <div>Pflegeberater</div>
-        <div>B.Sc. in Pflege- und Gesundheitsmanagement</div>
+        <div>${esc(verf.name)}</div>
+        ${verf.zeilen.map(z => `<div>${esc(z)}</div>`).join('')}
       </div>
     </div>
 
@@ -2644,6 +2725,51 @@ function copyAppealText() {
     } else { fallback(); }
 }
 
+/* Word-Dokument erzeugen: bearbeitbar in Word und in Google Docs (dort hochladen und öffnen).
+   Enthält Seitenzahlen in der Fußzeile und weder Erstellungsdatum noch Adresszeile des Browsers. */
+function exportAppealWord() {
+    const docEl = document.getElementById('appeal-document');
+    if (!docEl || !docEl.innerHTML.trim()) { showToast("Bitte zuerst die Stellungnahme erstellen.", "error"); return; }
+    // Arbeitshinweise zu ungeprüften Zitaten gehören nicht ins fertige Dokument
+    const kopie = docEl.cloneNode(true);
+    kopie.querySelectorAll('.zitat-warnung').forEach(el => el.remove());
+
+    const name = (document.getElementById('stam-betreffend')?.value || 'Stellungnahme').trim();
+    const dateiname = 'Pflegefachliche Stellungnahme - ' + name.replace(/[\\/:*?"<>|]/g, '') + '.doc';
+
+    // Word-eigene Formatvorlagen: Seitenränder, Fußzeile mit Seitenzahl, Calibri als Standard
+    const wordCss = `
+@page Section1 { size:21cm 29.7cm; margin:2cm 2cm 2cm 2cm; mso-page-numbers:1;
+                 mso-footer:f1; mso-footer-margin:1.2cm; }
+div.Section1 { page:Section1; }
+p.MsoFooter, li.MsoFooter, div.MsoFooter { margin:0cm; font-family:Calibri,sans-serif; font-size:9.0pt; text-align:center; color:#555; }
+body { font-family:Calibri,'Segoe UI',sans-serif; font-size:11.0pt; }
+${STELLUNGNAHME_CSS.replace(/\.stmt \.zitat-warnung\{[^}]*\}/g, '').replace(/@media print\{\.stmt \.zitat-warnung\{[^}]*\}\}/g, '')}
+#appeal-document, .stmt { max-width:none; border:none; border-radius:0; padding:0; margin:0; }
+`;
+    const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
+        + 'xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+        + '<head><meta charset="utf-8">'
+        + '<title>Pflegefachliche Stellungnahme</title>'
+        + '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom>'
+        + '<w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'
+        + '<style>' + wordCss + '</style></head><body>'
+        + '<div class="Section1"><div id="appeal-document">' + kopie.innerHTML + '</div></div>'
+        // Fußzeile mit fortlaufender Seitenzahl (Word-Feldfunktion)
+        + '<div style="mso-element:footer" id="f1"><p class="MsoFooter">'
+        + 'Seite <span style="mso-field-code: PAGE "></span> von <span style="mso-field-code: NUMPAGES "></span>'
+        + '</p></div>'
+        + '</body></html>';
+
+    const blob = new Blob(['﻿', html], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = dateiname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    showToast('Word-Dokument gespeichert. Es lässt sich in Word bearbeiten oder in Google Drive hochladen und dort als Google-Dokument öffnen.', 'success');
+}
+
 function printAppealText() {
     const docEl = document.getElementById('appeal-document');
     if (!docEl || !docEl.innerHTML.trim()) { showToast("Bitte zuerst die Stellungnahme erstellen.", "error"); return; }
@@ -2653,13 +2779,15 @@ function printAppealText() {
         return;
     }
     const title = escapeHtml(document.getElementById('stam-betreffend').value || 'Stellungnahme');
+    const kopie = docEl.cloneNode(true);
+    kopie.querySelectorAll('.zitat-warnung').forEach(el => el.remove());
     printWindow.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Pflegefachliche Stellungnahme - ${title}</title><style>${STELLUNGNAHME_CSS}
         body{margin:0;}
         #appeal-document, .stmt{max-width:none;border:none;border-radius:0;}
         #appeal-document{padding:0;}
         body{padding:16mm 15mm;}
         @page{margin:14mm;}
-    </style></head><body><div id="appeal-document">${docEl.innerHTML}</div><script>window.onload=function(){window.print();}<\/script></body></html>`);
+    </style></head><body><div id="appeal-document">${kopie.innerHTML}</div><script>window.onload=function(){window.print();}<\/script></body></html>`);
     printWindow.document.close();
 }
 
@@ -2812,6 +2940,7 @@ function maxDiagIndex(stammdaten) {
 }
 
 function init() {
+    loadVerfasser();
     const diagBody = document.getElementById('diag-rows-container');
     diagBody.innerHTML = '';
     ensureDiagRows(DIAG_MIN_ROWS);
@@ -3293,6 +3422,7 @@ function renderAuswertung() {
                     <div id="appeal-document" contenteditable="true" spellcheck="false" oninput="appealDraft = this.innerHTML"></div>
 
                     <div style="display:flex; gap:12px; margin-top:16px;">
+                        <button class="btn btn-yellow" onclick="exportAppealWord()">📄 Als Word-Dokument speichern</button>
                         <button class="btn btn-primary" onclick="copyAppealText()">Kopieren</button>
                         <button class="btn btn-secondary" onclick="printAppealText()">Drucken / PDF speichern</button>
                     </div>
