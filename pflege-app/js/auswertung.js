@@ -1,0 +1,237 @@
+// Teil des Schulz Pflege-Assistenten. Diese Datei wurde aus der frueheren
+// Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
+let activeSidebarBtn = {};
+function selectItem(id, pref, btn) {
+    const item=ITEMS.find(i=>i.id===id);
+    if(!item || !item.info) return;
+    if(activeSidebarBtn[pref] && activeSidebarBtn[pref] !== btn) activeSidebarBtn[pref].classList.remove('active');
+    if(btn){ btn.classList.toggle('active'); if(!btn.classList.contains('active')){ document.getElementById('sidebar-empty-'+pref).style.display='flex'; document.getElementById('sidebar-content-'+pref).style.display='none'; activeSidebarBtn[pref]=null; return; } }
+    activeSidebarBtn[pref]=btn;
+    document.getElementById('sidebar-empty-'+pref).style.display='none';
+    document.getElementById('sidebar-content-'+pref).style.display='block';
+    document.getElementById('side-title-'+pref).innerText=(item.nr?item.nr+' ':'')+item.title;
+    document.getElementById('side-check-'+pref).innerHTML=item.info?.check||'—';
+    const steps=item.info?.steps;
+    const stepsEl=document.getElementById('side-steps-'+pref);
+    if(steps && steps.length){
+        stepsEl.innerHTML=steps.map(s=>`<div class="side-step"><div class="side-step-label">${s.l}</div><div class="side-step-text">${s.d}</div></div>`).join('');
+    } else if(item.info?.rule){
+        stepsEl.innerHTML=`<div class="side-step"><div class="side-step-label">Hinweis</div><div class="side-step-text">${item.info.rule}</div></div>`;
+    } else { stepsEl.innerHTML='<div style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono)">Keine weiteren Details.</div>'; }
+}
+
+function renderAuswertung() {
+    const rO=calculateInternal('orig');
+    const rE=calculateInternal('own');
+    const mNames=['Mobilität','Kognition','Verhalten','Selbstversorgung','Med. Anf.','Alltagsgest.'];
+    const diff=(rE.total-rO.total).toFixed(2).replace('.',',');
+    const diffSign=rE.total>=rO.total?'+':'';
+    const pgDiff=rE.pg-rO.pg;
+    const pgDiffTxt=pgDiff>0?`+${pgDiff}`:pgDiff===0?'±0':pgDiff;
+    const pgDiffClr=pgDiff>0?'var(--green)':pgDiff===0?'var(--text-muted)':'var(--red)';
+
+    document.getElementById('auswertung-content').innerHTML=`
+    <div class="space-y-6">
+        <div class="card" style="border: 1px solid rgba(13,148,136,0.25);">
+            <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Allgemeine Angaben / Anamnese (Mitschrift Erstgespräch)</div>
+            <div style="padding:20px;">
+                <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px; line-height:1.6">
+                    Notieren Sie hier alle Anmerkungen aus dem Erstgespräch. Diese Mitschrift wird beim Erzeugen der Widerspruchsbegründung berücksichtigt – sie fließt in die modulbezogene Argumentation ein und erscheint zusätzlich als zusammenfassender Fließtext in der Begründung.
+                </p>
+                <textarea id="erstgespraech-notes" class="field-input" style="min-height:160px; font-size:13px; line-height:1.6; padding:14px;" placeholder="Mitschrift des Erstgesprächs / allgemeine Angaben / Anamnese ..." oninput="erstgespraechNotes = this.value; autoResize(this)"></textarea>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Vergleichsbericht: Vorgutachten vs. Eigene Einschätzung</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)">
+                ${[
+                    ['PG laut Vorgutachten', rO.pg>0?'Pflegegrad '+rO.pg:'Kein Pflegegrad', 'var(--accent)'],
+                    ['PG Eigene Einschätzung', rE.pg>0?'Pflegegrad '+rE.pg:'Kein Pflegegrad', 'var(--accent2)'],
+                    ['Differenz Pflegegrad', pgDiffTxt, pgDiffClr]
+                ].map(([l,v,c])=>`<div style="background:var(--bg-card2);padding:20px;text-align:center">
+                    <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-secondary);margin-bottom:8px">${l}</div>
+                    <div style="font-size:28px;font-weight:800;color:${c}">${v}</div>
+                </div>`).join('')}
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)">
+                ${[
+                    ['Punkte Vorgutachten', rO.total.toFixed(2).replace('.',','), 'var(--text-primary)'],
+                    ['Punkte Eigene Einschätzung', rE.total.toFixed(2).replace('.',','), 'var(--text-primary)'],
+                    ['Differenz Punkte', diffSign+diff, rE.total>=rO.total?'var(--green)':'var(--red)']
+                ].map(([l,v,c])=>`<div style="background:var(--bg-card);padding:16px;text-align:center">
+                    <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-secondary);margin-bottom:6px">${l}</div>
+                    <div style="font-size:22px;font-weight:800;color:${c};font-family:var(--font-mono)">${v}</div>
+                </div>`).join('')}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="dot"></div>Modul-Vergleich</div>
+            <table class="result-table">
+                <thead><tr>
+                    <th>Modul</th>
+                    <th class="center">Gew. Pkt (Vorg.)</th><th class="center">Einzel (Vorg.)</th>
+                    <th class="center">Gew. Pkt (Eigen)</th><th class="center">Einzel (Eigen)</th>
+                    <th class="center">Differenz</th>
+                </tr></thead>
+                <tbody>${[1,2,3,4,5,6].map(m=>{
+                    const dw=rE.weights[m-1]-rO.weights[m-1];
+                    const dr=rE.raws[m-1]-rO.raws[m-1];
+                    const dwStr=(dw>=0?'+':'')+dw.toFixed(2);
+                    const drStr=(dr>=0?'+':'')+dr;
+                    const clr=dw>0?'var(--green)':dw<0?'var(--red)':'var(--text-muted)';
+                    return `<tr>
+                        <td>${m}. ${mNames[m-1]}</td>
+                        <td class="center mono">${rO.weights[m-1].toFixed(2)}</td>
+                        <td class="center mono">${rO.raws[m-1]}</td>
+                        <td class="center" style="color:var(--accent2);font-family:var(--font-mono);font-weight:700">${rE.weights[m-1].toFixed(2)}</td>
+                        <td class="center" style="color:var(--accent2);font-family:var(--font-mono)">${rE.raws[m-1]}</td>
+                        <td class="center"><span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:${clr}">${dwStr} (${drStr})</span></td>
+                    </tr>`;
+                }).join('')}</tbody>
+            </table>
+        </div>
+
+        <div class="card" style="border-color:var(--border);">
+            <div class="card-header"><div class="dot" style="background:var(--accent)"></div>Mathematische Berechnungsgrundlage (SGB XI)</div>
+            <div style="padding:20px; font-family:var(--font-mono); font-size:11px; line-height:1.6; color:var(--text-secondary);">
+                <p style="margin-bottom:12px;">Die SGB XI Gesamtpunktzahl wird anhand der gewichteten Modulergebnisse berechnet. Modul 2 und 3 werden als Verbund gewertet, wobei nur das Modul mit der höheren Punktzahl in die Summe einfließt:</p>
+                <div style="background:var(--bg-base); padding:16px; border-radius:8px; text-align:center; color:var(--accent); font-size:14px; margin-bottom:12px; border:1px solid var(--border)">
+                    T = W_1 + max(W_2, W_3) + W_4 + W_5 + W_6
+                </div>
+                <p>Wobei:</p>
+                <ul style="list-style-type:none; padding-left:14px; margin-top:8px;">
+                    <li>- W_1: Gewichtete Punkte Mobilität (max 10 Pkt)</li>
+                    <li>- W_2: Kognitive Fähigkeiten (max 15 Pkt)</li>
+                    <li>- W_3: Verhaltensweisen (max 15 Pkt)</li>
+                    <li>- W_4: Selbstversorgung (max 40 Pkt)</li>
+                    <li>- W_5: Krankheitsbed. Anforderungen (max 20 Pkt)</li>
+                    <li>- W_6: Gestaltung Alltagsleben (max 15 Pkt)</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card" style="border: 1px solid rgba(37,99,235,0.2);">
+            <div class="card-header">
+                <div class="header-title-left"><div class="dot" style="background:var(--accent)"></div>Widerspruchs- &amp; Begründungs-Assistent (KI)</div>
+            </div>
+            <div style="padding:24px;">
+                <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px; line-height:1.6">
+                    Erstellt auf Knopfdruck eine formatgetreue „Pflegefachliche Stellungnahme" im Familiara-Layout. Alle Daten werden automatisch aus den eingegebenen bzw. eingelesenen Gutachten- und Bescheiddaten, dem Modulvergleich und Ihrer Mitschrift übernommen. Die Vorschau ist frei editierbar und kann als PDF gedruckt werden.
+                </p>
+                <button class="btn btn-yellow" onclick="generateAppealText()">⚡ Stellungnahme / Widerspruch erstellen</button>
+
+                <details style="margin-top:16px; border:1px solid var(--border); border-radius:8px; padding:10px 14px;">
+                    <summary style="cursor:pointer; font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-secondary);">Stilvorlage für die Begründungen (BRi-gestützt)</summary>
+                    <p style="font-size:12px; color:var(--text-secondary); margin:10px 0; line-height:1.6">
+                        Zu jedem abweichenden Kriterium wird eine Begründung im Stil der folgenden Beispiele verfasst – mit wörtlichen Zitaten aus den BRi und, wo fachlich tragfähig, einem Quervergleich zu Kriterien, in denen der Gutachter bereits eine Einschränkung anerkannt hat. Ergänzen Sie hier gern weitere eigene Begründungen (durch Leerzeile getrennt); je mehr Beispiele, desto genauer der Stil.
+                    </p>
+                    <textarea id="stil-beispiele" class="field-input" style="min-height:150px; font-size:12px; line-height:1.6; padding:12px;" oninput="saveStilBeispiele(); autoResize(this)"></textarea>
+                    <button class="btn btn-secondary" style="margin-top:10px" onclick="resetStilBeispiele()">Auf Ausgangsbeispiel zurücksetzen</button>
+                </details>
+
+                <div id="appeal-result-container" style="display:none; margin-top:20px;">
+                    <label class="field-label">Generierte Stellungnahme (Vorschau – frei editierbar)</label>
+                    <div id="appeal-document" contenteditable="true" spellcheck="false" oninput="appealDraft = this.innerHTML"></div>
+
+                    <div style="display:flex; gap:12px; margin-top:16px;">
+                        <button class="btn btn-yellow" onclick="exportAppealWord()">📄 Als Word-Dokument speichern</button>
+                        <button class="btn btn-primary" onclick="copyAppealText()">Kopieren</button>
+                        <button class="btn btn-secondary" onclick="printAppealText()">Drucken / PDF speichern</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    // Eingaben nach dem Neu-Rendern wiederherstellen (Tab-Wechsel baut den Inhalt neu auf)
+    injectStellungnahmeCss();
+    const notesEl = document.getElementById('erstgespraech-notes');
+    if (notesEl) { notesEl.value = erstgespraechNotes; autoResize(notesEl); }
+    const stilEl = document.getElementById('stil-beispiele');
+    if (stilEl) {
+        let s = null;
+        try { s = localStorage.getItem(STIL_STORAGE); } catch (e) {}
+        stilEl.value = (s && s.trim()) ? s : STIL_BEISPIEL_DEFAULT;
+    }
+    if (appealDraft) {
+        const appealEl = document.getElementById('appeal-document');
+        const cont = document.getElementById('appeal-result-container');
+        if (appealEl && cont) {
+            appealEl.innerHTML = appealDraft;
+            cont.style.display = 'block';
+        }
+    }
+}
+
+function saveCase() {
+    const stammdaten={};
+    document.querySelectorAll('[id^="stam-"], [id^="diag-"]').forEach(el=>stammdaten[el.id]=el.value);
+    const notesEl = document.getElementById('erstgespraech-notes');
+    if (notesEl) erstgespraechNotes = notesEl.value;
+    // Aktuellen (ggf. editierten) Stand der generierten Stellungnahme mitspeichern
+    const appealEl = document.getElementById('appeal-document');
+    if (appealEl) appealDraft = appealEl.innerHTML;
+    const data={stateOrig,stateEigene,stammdaten,erstgespraechNotes,appealDraft};
+    const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+    const name=(document.getElementById('stam-betreffend').value||'Fall').replace(/\s/g,'_');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${name}_PflegeAssistent.json`; a.click();
+}
+
+function loadCase(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.name.endsWith('.json') && file.type !== 'application/json') {
+        showToast('Bitte eine gültige .json-Datei laden (zuvor mit "Speichern" erstellt).', 'error');
+        e.target.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        try {
+            const data = JSON.parse(ev.target.result);
+            if (!data.stateOrig || !data.stateEigene) throw new Error('Ungueltiges Format');
+            stateOrig = data.stateOrig;
+            stateEigene = data.stateEigene;
+            erstgespraechNotes = data.erstgespraechNotes || "";
+            appealDraft = data.appealDraft || "";
+            init();
+            setTimeout(() => {
+                // Erst genügend Diagnosezeilen anlegen, sonst gehen Einträge ab Zeile 7 verloren
+                ensureDiagRows(maxDiagIndex(data.stammdaten));
+                Object.keys(data.stammdaten || {}).forEach(k => {
+                    const el = document.getElementById(k);
+                    if (!el) return;
+                    // Ältere Fälle enthalten noch die früheren Kurzformen der Durchführungsart
+                    el.value = (k === 'stam-art') ? normalizeArt(data.stammdaten[k]) : data.stammdaten[k];
+                });
+                autoResize(document.getElementById('stam-anamnese'));
+                autoResize(document.getElementById('stam-befund'));
+            }, 100);
+            showToast('Fall erfolgreich geladen!', 'success');
+        } catch(err) {
+            showToast('Fehler: Keine gültige Pflege-Assistent-Datei.', 'error');
+        }
+        e.target.value = '';
+    };
+    reader.readAsText(file);
+}
+
+function showToast(msg, type) {
+    type = type || 'success';
+    const existing = document.getElementById('toast-msg');
+    if (existing) existing.remove();
+    const t = document.createElement('div');
+    t.id = 'toast-msg';
+    t.innerText = msg;
+    t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:' +
+        (type === 'error' ? 'rgba(220,38,38,0.97)' : 'rgba(13,148,136,0.97)') +
+        ';color:white;padding:12px 24px;border-radius:10px;font-family:var(--font-mono);' +
+        'font-size:11px;font-weight:700;z-index:9999;max-width:520px;text-align:center;' +
+        'box-shadow:0 4px 24px rgba(15,23,42,0.1);letter-spacing:0.03em;';
+    document.body.appendChild(t);
+    setTimeout(function(){ t.remove(); }, 4500);
+}
+
+window.onload = function() { init(); loadApiKey(); };
