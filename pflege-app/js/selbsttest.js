@@ -337,6 +337,63 @@ function selbsttest() {
             erfassungExtra = extraVor; setzeModus(modusVor2);
         }
 
+        // ---------- 16. Ernährungszustand aus dem BMI ----------
+        if (typeof leiteErnaehrungszustandAb === 'function') {
+            const bwVor2 = befundWerte, btVor2 = befundTexte;
+            befundWerte = {}; befundTexte = {};
+            const ez = () => befundWerte['ernaehrungszustand'];
+            const setzeMasse = (gr, gw) => { befundTexte['groesse'] = gr; befundTexte['gewicht'] = gw; berechneBmi(); };
+
+            setzeMasse('175', '80');
+            pruefe('BMI 26,1 ergibt Übergewicht', ez(), 2);
+            setzeMasse('175', '70');
+            pruefe('BMI 22,9 ergibt Normalgewicht', ez(), 0);
+            setzeMasse('175', '55');
+            pruefe('BMI 18,0 ergibt Untergewicht', ez(), 1);
+            setzeMasse('175', '95');
+            pruefe('BMI 31,0 ergibt Adipositas', ez(), 3);
+
+            // Eigene Angabe hat Vorrang und bleibt erhalten
+            setzeBefund('ernaehrung', 'ernaehrungszustand', null, '1');
+            pruefe('Eigene Angabe wird gemerkt', befundTexte['ernaehrungszustand_manuell'], '1');
+            setzeMasse('175', '95');
+            pruefe('Eigene Angabe überlebt eine Gewichtsänderung', ez(), 1);
+            ernaehrungszustandAutomatisch();
+            pruefe('Zurück auf automatische Ableitung', ez(), 3);
+
+            befundWerte = bwVor2; befundTexte = btVor2;
+        }
+
+        // ---------- 17. Speichern und Laden über alle Bereiche ----------
+        if (typeof erfassungSichern === 'function' && typeof befundSichern === 'function') {
+            const sichBef = befundSichern(), sichErf = erfassungSichern(), modusVor3 = appModus;
+            setzeModus('hoeherstufung');
+            befundWerte = { 'schuerzengriff|rechts': 2 };
+            befundTexte = { groesse: '170', gewicht: '60' };
+            befundExtra = { sonstiges: [{ titel: 'Tremor', text: 'beidseits' }] };
+            erfassung = { hilfsmittel: [{ bezeichnung: 'Rollator' }] };
+            erfassungExtra = { pg: '3', verschlechterung: 'nach Sturz', deckblatt: true };
+
+            const gespeichert = JSON.parse(JSON.stringify({
+                appModus: appModus, befund: befundSichern(), erfassung: erfassungSichern()
+            }));
+            // alles leeren und aus der Sicherung wiederherstellen
+            befundLaden({}); erfassungLaden({}); setzeModus('widerspruch');
+            setzeModus(gespeichert.appModus);
+            befundLaden(gespeichert.befund);
+            erfassungLaden(gespeichert.erfassung);
+
+            pruefe('Speichern und Laden: Vorgangsart', appModus, 'hoeherstufung');
+            pruefe('Speichern und Laden: Befundwert', befundWerte['schuerzengriff|rechts'], 2);
+            pruefe('Speichern und Laden: Befundtext', befundTexte['groesse'], '170');
+            pruefe('Speichern und Laden: eigener Befundeintrag', (befundExtra.sonstiges || [])[0] && befundExtra.sonstiges[0].titel, 'Tremor');
+            pruefe('Speichern und Laden: Erfassungstabelle', (erfassung.hilfsmittel || [])[0] && erfassung.hilfsmittel[0].bezeichnung, 'Rollator');
+            pruefe('Speichern und Laden: Verschlechterung', erfassungExtra.verschlechterung, 'nach Sturz');
+            pruefe('Speichern und Laden: Deckblattschalter', erfassungExtra.deckblatt, true);
+
+            befundLaden(sichBef); erfassungLaden(sichErf); setzeModus(modusVor3);
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {
