@@ -446,6 +446,58 @@
         .own-box .m5-disp { color: var(--c) !important; }
         .own-box .m5-period-btn.active { background: var(--c); }
 
+        /* STARTAUSWAHL: Verfasser und Vorgangsart */
+        .start-overlay {
+            display: none; position: fixed; inset: 0; z-index: 9600;
+            background: rgba(15,23,42,0.55); backdrop-filter: blur(6px);
+            align-items: center; justify-content: center; padding: 24px;
+        }
+        .start-overlay.active { display: flex; }
+        .start-box {
+            background: var(--bg-card); border: 1px solid var(--border-bright); border-radius: 16px;
+            width: 100%; max-width: 900px; max-height: 92vh; overflow-y: auto;
+            box-shadow: 0 18px 50px rgba(15,23,42,0.18);
+        }
+        .start-kopf { padding: 26px 30px 18px; border-bottom: 1px solid var(--border); }
+        .start-titel {
+            font-family: var(--font-display); font-size: 22px; font-weight: 800; color: var(--text-primary);
+        }
+        .start-sub { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+        .start-abschnitt { padding: 20px 30px; border-bottom: 1px solid var(--border); }
+        .start-abschnitt:last-of-type { border-bottom: none; }
+        .start-abschnitt-titel {
+            font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+            text-transform: uppercase; color: var(--text-secondary); margin-bottom: 12px;
+        }
+        .start-verfasser { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; }
+        .start-modi { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        .start-kachel {
+            text-align: left; cursor: pointer; background: var(--bg-card);
+            border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+            display: flex; flex-direction: column; gap: 8px; transition: all 0.15s; font: inherit;
+        }
+        .start-kachel:hover { border-color: var(--accent); box-shadow: 0 4px 16px var(--accent-glow); }
+        .start-kachel.aktiv { border-color: var(--accent); background: var(--accent-dim); }
+        .start-kachel.vorbereitung { opacity: 0.72; }
+        .sk-kopf { display: flex; align-items: center; gap: 9px; }
+        .sk-zeichen { font-size: 20px; line-height: 1; }
+        .sk-titel { font-size: 14px; font-weight: 800; color: var(--text-primary); }
+        .sk-text { font-size: 12px; line-height: 1.55; color: var(--text-secondary); flex: 1; }
+        .sk-status {
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+            text-transform: uppercase; padding: 3px 8px; border-radius: 5px; align-self: flex-start;
+        }
+        .sk-status.bereit { background: rgba(22,163,74,0.12); color: #15803d; }
+        .sk-status.offen { background: rgba(245,158,11,0.14); color: #b45309; }
+        .start-fuss {
+            padding: 16px 30px; background: var(--bg-card2); border-top: 1px solid var(--border);
+            display: flex; justify-content: flex-end;
+        }
+        @media (max-width: 820px) {
+            .start-modi { grid-template-columns: 1fr; }
+            .start-verfasser { grid-template-columns: 1fr; }
+        }
+
         /* VORSCHLAGSLISTE (weitere Widerspruchspunkte) */
         .vs-item {
             display: flex; gap: 12px; align-items: flex-start;

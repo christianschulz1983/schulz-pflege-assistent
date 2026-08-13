@@ -55,9 +55,11 @@ function onVerfasserChange() {
     if (nSel && nFrei) nFrei.style.display = (nSel.value === '__frei') ? 'block' : 'none';
     if (qSel && qFrei) qFrei.style.display = (qSel.value === '__frei') ? 'block' : 'none';
     saveVerfasser();
+    if (typeof aktualisiereVerfasserAnzeige === 'function') aktualisiereVerfasserAnzeige();
 }
 
 function saveVerfasser() {
+    if (typeof aktualisiereVerfasserAnzeige === 'function') aktualisiereVerfasserAnzeige();
     try {
         localStorage.setItem(VERFASSER_STORAGE, JSON.stringify({
             nameSel: document.getElementById('verf-name-sel')?.value || '',

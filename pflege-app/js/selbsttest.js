@@ -152,6 +152,25 @@ function selbsttest() {
             pruefeWahr('Word-Datei ohne Arbeitshinweise', !wordProbe.includes('zitat-warnung'));
         }
 
+        // ---------- 11. Startauswahl und Vorgangsart ----------
+        const modusVorher = appModus;
+        pruefe('Drei Vorgangsarten vorhanden', Object.keys(MODI).length, 3);
+        pruefeWahr('Widerspruch ist einsatzbereit', MODI.widerspruch.fertig === true);
+        pruefeWahr('Erstantrag als in Vorbereitung gekennzeichnet', MODI.erstantrag.fertig === false);
+        pruefeWahr('Höherstufung als in Vorbereitung gekennzeichnet', MODI.hoeherstufung.fertig === false);
+        setzeModus('hoeherstufung');
+        pruefe('Vorgangsart lässt sich setzen', appModus, 'hoeherstufung');
+        setzeModus('unbekannt');
+        pruefe('Unbekannte Vorgangsart fällt auf Widerspruch zurück', appModus, 'widerspruch');
+        // Noch nicht fertige Vorgänge dürfen den Modus nicht umschalten
+        waehleModus('erstantrag');
+        pruefe('Unfertiger Vorgang ändert die Vorgangsart nicht', appModus, 'widerspruch');
+        document.getElementById('vorbereitung-box')?.remove();
+        setzeModus(modusVorher);
+        pruefeWahr('Verfasserfelder existieren genau einmal',
+            document.querySelectorAll('#verf-name-sel').length === 1 &&
+            document.querySelectorAll('#verf-qual-sel').length === 1);
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

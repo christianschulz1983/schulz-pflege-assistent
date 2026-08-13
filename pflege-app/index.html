@@ -25,6 +25,9 @@
                 <span id="system-status-text">Bereit</span>
             </div>
 
+            <button class="btn btn-ghost" id="modus-anzeige" title="Verfasser oder Vorgang wechseln"
+                    onclick="zeigeStart(true)">⚖ Widerspruch</button>
+
             <!-- API-Schlüssel Input für die lokale PC-Ausführung -->
             <div style="display:flex; align-items:center; gap:4px;">
                 <input type="password" id="user-api-key" class="field-input" style="width: 150px; font-family: var(--font-mono); font-size: 10px; height: 34px; border-color: var(--border-bright);" placeholder="🔑 API-Schlüssel" oninput="userApiKey = this.value; saveApiKey()" onpaste="setTimeout(function(){ var e=document.getElementById('user-api-key'); userApiKey=e.value; saveApiKey(); }, 0)">
@@ -55,31 +58,14 @@
     <section id="tab-1" class="tab-content active space-y-6">
         <div class="card">
             <div class="card-header"><div class="dot"></div>Verfasser der Stellungnahme</div>
-            <div style="padding:20px">
-                <div class="grid-4" style="gap:16px">
-                    <div>
-                        <label class="field-label">Name des Pflegeberaters</label>
-                        <select id="verf-name-sel" class="field-input" onchange="onVerfasserChange()">
-                            <option>Christian Schulz</option>
-                            <option>Katja Tittel</option>
-                            <option value="__frei">anderer Name</option>
-                        </select>
-                        <input type="text" id="verf-name-frei" class="field-input" style="display:none;margin-top:8px"
-                               placeholder="Namen eingeben" oninput="saveVerfasser()">
-                    </div>
-                    <div class="col-span-2">
-                        <label class="field-label">Qualifikation</label>
-                        <select id="verf-qual-sel" class="field-input" onchange="onVerfasserChange()">
-                            <option>Pflegeberater / B.Sc. in Pflege- und Gesundheitsmanagement</option>
-                            <option value="__frei">Qualifikation</option>
-                        </select>
-                        <textarea id="verf-qual-frei" class="field-input" style="display:none;margin-top:8px;min-height:52px"
-                                  placeholder="Qualifikation eingeben (eine Zeile je Angabe)" oninput="saveVerfasser()"></textarea>
+            <div style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+                <div>
+                    <div id="verfasser-anzeige" style="font-size:13px;font-weight:700;color:var(--text-primary)">–</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:3px">
+                        Erscheint im Kopf der erstellten Stellungnahme.
                     </div>
                 </div>
-                <p style="font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.5">
-                    Diese Angaben erscheinen im Kopf der erstellten Stellungnahme und werden für den nächsten Fall gemerkt.
-                </p>
+                <button class="btn btn-secondary" onclick="zeigeStart(true)">Verfasser oder Vorgang ändern</button>
             </div>
         </div>
 
@@ -214,6 +200,49 @@
     </div>
 </div>
 
+<div id="start-overlay" class="start-overlay">
+    <div class="start-box">
+        <div class="start-kopf">
+            <div class="start-titel">Schulz Pflege-Assistent</div>
+            <div class="start-sub">Bitte Verfasser und Vorgang wählen</div>
+        </div>
+
+        <div class="start-abschnitt">
+            <div class="start-abschnitt-titel">Verfasser der Stellungnahme</div>
+            <div class="start-verfasser">
+                <div>
+                    <label class="field-label">Name des Pflegeberaters</label>
+                    <select id="verf-name-sel" class="field-input" onchange="onVerfasserChange()">
+                        <option>Christian Schulz</option>
+                        <option>Katja Tittel</option>
+                        <option value="__frei">anderer Name</option>
+                    </select>
+                    <input type="text" id="verf-name-frei" class="field-input" style="display:none;margin-top:8px"
+                           placeholder="Namen eingeben" oninput="saveVerfasser()">
+                </div>
+                <div>
+                    <label class="field-label">Qualifikation</label>
+                    <select id="verf-qual-sel" class="field-input" onchange="onVerfasserChange()">
+                        <option>Pflegeberater / B.Sc. in Pflege- und Gesundheitsmanagement</option>
+                        <option value="__frei">Qualifikation</option>
+                    </select>
+                    <textarea id="verf-qual-frei" class="field-input" style="display:none;margin-top:8px;min-height:52px"
+                              placeholder="Qualifikation eingeben (eine Zeile je Angabe)" oninput="saveVerfasser()"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="start-abschnitt">
+            <div class="start-abschnitt-titel">Welcher Vorgang?</div>
+            <div class="start-modi" id="start-modi"></div>
+        </div>
+
+        <div class="start-fuss" id="start-fuss">
+            <button class="btn btn-secondary" onclick="schliesseStart()">Abbrechen</button>
+        </div>
+    </div>
+</div>
+
 <div id="vorschlag-overlay" class="review-overlay">
     <div class="review-box">
         <div class="review-header">
@@ -246,6 +275,7 @@ if (typeof pdfjsLib !== 'undefined') { try { pdfjsLib.GlobalWorkerOptions.worker
 <script src="js/dokument.js"></script>
 <script src="js/oberflaeche.js"></script>
 <script src="js/berechnung.js"></script>
+<script src="js/modus.js"></script>
 <script src="js/auswertung.js"></script>
 <script src="js/selbsttest.js"></script>
 </body>
