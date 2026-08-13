@@ -68,7 +68,20 @@ function setzeModus(key) {
     appModus = key;
     const anz = document.getElementById('modus-anzeige');
     if (anz) anz.innerText = MODI[key].zeichen + ' ' + MODI[key].titel;
-    // Die Reiter bleiben unverändert – der Widerspruch verhält sich wie bisher.
+    // Die Befunderhebung gehört zu Erstantrag und Höherstufungsantrag.
+    // Im Widerspruch bleibt die Reiterleiste unverändert.
+    const btn = document.getElementById('btn-tab-befund');
+    const mitBefund = (key === 'erstantrag' || key === 'hoeherstufung');
+    if (btn) {
+        btn.style.display = mitBefund ? '' : 'none';
+        btn.innerText = (key === 'erstantrag') ? '2. Befunderhebung' : '2. Befunderhebung';
+    }
+    // Nummerierung der übrigen Reiter anpassen
+    const b3 = document.getElementById('btn-tab-3'), b4 = document.getElementById('btn-tab-4');
+    if (b3) b3.innerText = (mitBefund ? '3.' : '2.') + ' Einschätzung & Vergleich';
+    if (b4) b4.innerText = (mitBefund ? '4.' : '3.') + ' Auswertung';
+    // Steht die Befunderhebung nicht zur Verfügung, nicht darauf stehen bleiben
+    if (!mitBefund && document.getElementById('tab-befund')?.classList.contains('active')) switchTab(1);
 }
 
 // Hinweis für noch nicht gebaute Vorgänge

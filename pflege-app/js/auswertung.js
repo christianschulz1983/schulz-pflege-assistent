@@ -173,7 +173,8 @@ function saveCase() {
     // Aktuellen (ggf. editierten) Stand der generierten Stellungnahme mitspeichern
     const appealEl = document.getElementById('appeal-document');
     if (appealEl) appealDraft = appealEl.innerHTML;
-    const data={stateOrig,stateEigene,stammdaten,erstgespraechNotes,appealDraft,appModus};
+    const data={stateOrig,stateEigene,stammdaten,erstgespraechNotes,appealDraft,appModus,
+                befund: (typeof befundSichern === 'function') ? befundSichern() : null};
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
     const name=(document.getElementById('stam-betreffend').value||'Fall').replace(/\s/g,'_');
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${name}_PflegeAssistent.json`; a.click();
@@ -197,6 +198,7 @@ function loadCase(e) {
             erstgespraechNotes = data.erstgespraechNotes || "";
             appealDraft = data.appealDraft || "";
             setzeModus(data.appModus || 'widerspruch');   // ältere Fälle sind immer Widersprüche
+            if (typeof befundLaden === 'function') befundLaden(data.befund);
             init();
             setTimeout(() => {
                 // Erst genügend Diagnosezeilen anlegen, sonst gehen Einträge ab Zeile 7 verloren
