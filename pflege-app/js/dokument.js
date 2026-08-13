@@ -429,12 +429,46 @@ ${STELLUNGNAHME_CSS.replace(/\.stmt \.zitat-warnung\{[^}]*\}/g, '').replace(/@me
         + '</body></html>';
 
     const blob = new Blob(['﻿', html], { type: 'application/msword' });
+    return speichereDatei(blob, dateiname, 'pflege-stellungnahme',
+        'Word-Dokument gespeichert. Es lässt sich in Word bearbeiten oder in Google Drive hochladen und dort als Google-Dokument öffnen.');
+}
+
+/* Speichern unter: öffnet den Dateidialog des Betriebssystems, sodass Ordner und
+   Dateiname frei gewählt werden können. Der zuletzt genutzte Ordner wird je Kennung
+   gemerkt. Kennt der Browser den Dialog nicht, wird wie bisher heruntergeladen. */
+async function speichereDatei(blob, dateiname, kennung, erfolgstext) {
+    const endung = '.' + (dateiname.split('.').pop() || 'doc').toLowerCase();
+    const typen = {
+        '.doc': { beschreibung: 'Word-Dokument', mime: 'application/msword' },
+        '.json': { beschreibung: 'Fall-Datei', mime: 'application/json' }
+    }[endung] || { beschreibung: 'Datei', mime: blob.type || 'application/octet-stream' };
+
+    if (typeof window.showSaveFilePicker === 'function') {
+        try {
+            const griff = await window.showSaveFilePicker({
+                suggestedName: dateiname,
+                id: kennung,                 // Chrome merkt sich den Ordner je Kennung
+                startIn: 'documents',
+                types: [{ description: typen.beschreibung, accept: { [typen.mime]: [endung] } }]
+            });
+            const schreiber = await griff.createWritable();
+            await schreiber.write(blob);
+            await schreiber.close();
+            showToast('Gespeichert als „' + griff.name + '". ' + (erfolgstext || ''), 'success');
+            return true;
+        } catch (e) {
+            if (e && e.name === 'AbortError') return false;    // Nutzer hat abgebrochen
+            console.warn('Speichern-unter nicht möglich, nutze Download:', e);
+        }
+    }
+    // Rückfall: Herunterladen in den Standardordner des Browsers
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = dateiname;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    showToast('Word-Dokument gespeichert. Es lässt sich in Word bearbeiten oder in Google Drive hochladen und dort als Google-Dokument öffnen.', 'success');
+    showToast((erfolgstext || 'Datei gespeichert.') + ' Der Speicherort ist der Download-Ordner des Browsers.', 'success');
+    return true;
 }
 
 function printAppealText() {

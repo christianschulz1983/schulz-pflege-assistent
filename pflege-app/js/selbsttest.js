@@ -137,12 +137,16 @@ function selbsttest() {
             el.innerHTML = buildStellungnahme('', {}, '');
             let inhalt = null;
             const oc = URL.createObjectURL, ok = HTMLAnchorElement.prototype.click;
+            // Den Dateidialog während des Tests unterbinden – er würde ein Fenster öffnen
+            const echterDialog = window.showSaveFilePicker;
+            window.showSaveFilePicker = undefined;
             URL.createObjectURL = () => 'blob:selbsttest';
             HTMLAnchorElement.prototype.click = function () {};
             const origBlob = window.Blob;
             window.Blob = function (teile, opt) { inhalt = teile.join(''); return new origBlob(teile, opt); };
             try { exportAppealWord(); } catch (e) { inhalt = 'FEHLER: ' + e.message; }
             window.Blob = origBlob; URL.createObjectURL = oc; HTMLAnchorElement.prototype.click = ok;
+            if (echterDialog) window.showSaveFilePicker = echterDialog; else delete window.showSaveFilePicker;
             el.innerHTML = alt;
             return inhalt;
         })();
@@ -392,6 +396,39 @@ function selbsttest() {
             pruefe('Speichern und Laden: Deckblattschalter', erfassungExtra.deckblatt, true);
 
             befundLaden(sichBef); erfassungLaden(sichErf); setzeModus(modusVor3);
+        }
+
+        // ---------- 18. Speichern unter ----------
+        if (typeof speichereDatei === 'function') {
+            const echterDialog2 = window.showSaveFilePicker;
+            const ok2 = HTMLAnchorElement.prototype.click, oc2 = URL.createObjectURL;
+            let geschrieben = null, dialogOptionen = null, heruntergeladen = null;
+            URL.createObjectURL = () => 'blob:test';
+            HTMLAnchorElement.prototype.click = function () { heruntergeladen = this.download; };
+
+            // Weg 1: Browser kennt den Dateidialog
+            window.showSaveFilePicker = async (opt) => {
+                dialogOptionen = opt;
+                return { name: 'Mein Dokument.doc',
+                         createWritable: async () => ({ write: async b => { geschrieben = b; }, close: async () => {} }) };
+            };
+            const p = speichereDatei(new Blob(['x'], { type: 'application/msword' }), 'Test.doc', 'pruefung', 'Hinweis');
+            pruefeWahr('Speichern unter: liefert ein Versprechen', p && typeof p.then === 'function');
+
+            // Weg 2: Browser kennt ihn nicht -> Rückfall auf Herunterladen
+            window.showSaveFilePicker = undefined;
+            speichereDatei(new Blob(['x'], { type: 'application/msword' }), 'Rueckfall.doc', 'pruefung', 'Hinweis');
+            pruefe('Ohne Dateidialog wird heruntergeladen', heruntergeladen, 'Rueckfall.doc');
+
+            HTMLAnchorElement.prototype.click = ok2; URL.createObjectURL = oc2;
+            if (echterDialog2) window.showSaveFilePicker = echterDialog2; else delete window.showSaveFilePicker;
+
+            pruefeWahr('Word-Ausgabe nutzt die Speichern-unter-Funktion',
+                exportAppealWord.toString().includes('speichereDatei'));
+            pruefeWahr('Dateidialog merkt sich den Ordner (Kennung gesetzt)',
+                speichereDatei.toString().includes('id: kennung'));
+            pruefeWahr('Abbruch durch den Nutzer erzeugt keinen Fehler',
+                speichereDatei.toString().includes('AbortError'));
         }
 
     } catch (e) {
