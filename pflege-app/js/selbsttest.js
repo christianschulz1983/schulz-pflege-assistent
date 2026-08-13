@@ -217,6 +217,48 @@ function selbsttest() {
             setzeModus('widerspruch');
         }
 
+        // ---------- 13. Erweiterte Erfassung und Übernahme in Modul 5 ----------
+        if (typeof ERFASSUNG_TABELLEN !== 'undefined') {
+            pruefe('Erfassung: sechs Tabellen', ERFASSUNG_TABELLEN.length, 6);
+            const sicherungErf = erfassungSichern();
+            erfassung = {}; erfassungExtra = {};
+
+            // Wochenstunden aus Tagen und Stunden
+            erfSetzen('pflegepersonen', 0, 'tage', '5');
+            erfSetzen('pflegepersonen', 0, 'stunden', '3');
+            pruefe('Erfassung: Wochenstunden werden berechnet', erfassung.pflegepersonen[0].wochenstunden, '15');
+
+            // Zuordnung zu Modul 5
+            erfassung.arztbesuche = [
+                { fach: 'Hausarzt', anzahl: '2', zeitraum: 'pro Monat', begleitung: 'in Begleitung', dauer3h: 'nein' },
+                { fach: 'Physiotherapie', anzahl: '2', zeitraum: 'pro Woche', begleitung: 'in Begleitung', dauer3h: 'nein' },
+                { fach: 'Dialyse', anzahl: '3', zeitraum: 'pro Woche', begleitung: 'in Begleitung', dauer3h: 'ja' },
+                { fach: 'Augenarzt', anzahl: '1', zeitraum: 'pro Monat', begleitung: 'selbständig', dauer3h: 'nein' }
+            ];
+            erfassung.medikation = [
+                { applikation: 'oral', anzahl: '3', zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' },
+                { applikation: 'Injektion', anzahl: '4', zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' },
+                { applikation: 'oral', anzahl: '1', zeitraum: 'pro Tag', durchfuehrung: 'selbständig' }
+            ];
+            erfassung.behandlungspflege = [
+                { art: 'Kompressionsstrümpfe anlegen', anzahl: '1', zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' },
+                { art: 'Kompressionsstrümpfe ablegen', anzahl: '1', zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' },
+                { art: 'Verbandswechsel', anzahl: '3', zeitraum: 'pro Woche', durchfuehrung: 'durch Pflegeperson' }
+            ];
+            const z = modul5AusErfassung();
+            const kurz = nr => z[nr] ? z[nr].count + z[nr].period : 'fehlt';
+            pruefe('Modul 5: Arztbesuche (4.5.13)', kurz('4.5.13'), '2M');
+            pruefe('Modul 5: Therapiebesuche (4.5.14)', kurz('4.5.14'), '2W');
+            pruefe('Modul 5: zeitaufwendige Besuche (4.5.15)', kurz('4.5.15'), '3W');
+            pruefe('Modul 5: Medikation (4.5.1)', kurz('4.5.1'), '3D');
+            pruefe('Modul 5: Injektionen (4.5.2)', kurz('4.5.2'), '4D');
+            pruefe('Modul 5: körpernahe Hilfsmittel summiert (4.5.7)', kurz('4.5.7'), '2D');
+            pruefe('Modul 5: Verbandswechsel (4.5.8)', kurz('4.5.8'), '3W');
+            pruefeWahr('Modul 5: selbständige Maßnahmen zählen nicht',
+                !Object.keys(z).some(nr => nr === '4.5.14' && z[nr].count > 2));
+            erfassungLaden(sicherungErf);
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

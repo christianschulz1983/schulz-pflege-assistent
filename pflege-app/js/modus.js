@@ -82,6 +82,12 @@ function setzeModus(key) {
     if (b4) b4.innerText = (mitBefund ? '4.' : '3.') + ' Auswertung';
     // Steht die Befunderhebung nicht zur Verfügung, nicht darauf stehen bleiben
     if (!mitBefund && document.getElementById('tab-befund')?.classList.contains('active')) switchTab(1);
+    // Erweiterte Erfassung (Pflegepersonen, Aufenthalte, Versorgung) ebenfalls nur dort
+    const erf = document.getElementById('erfassung-bereich');
+    if (erf) {
+        erf.style.display = mitBefund ? '' : 'none';
+        if (mitBefund && typeof renderErfassung === 'function') renderErfassung();
+    }
 }
 
 // Hinweis für noch nicht gebaute Vorgänge
