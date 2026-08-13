@@ -455,10 +455,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         rel = urllib.parse.unquote(path)
         if rel in ("", "/"):
             rel = "/index.html"
-        name = os.path.basename(rel)  # nur Dateiname -> kein Verzeichniswechsel
-        full = os.path.join(BASE_DIR, name)
-        if not name or not os.path.isfile(full):
-            self._json({"ok": False, "error": "nicht gefunden"}, 404)
+        # Unterordner sind zugelassen (z.B. js/basis.js). Ein Ausbrechen aus dem
+        # App-Ordner wird verhindert: der aufgeloeste Pfad muss darin liegen.
+        rel = rel.lstrip("/").replace("\\", "/")
+        full = os.path.normpath(os.path.join(BASE_DIR, *rel.split("/")))
+        wurzel = os.path.abspath(BASE_DIR)
+        if not os.path.abspath(full).startswith(wurzel + os.sep):
+            self._json({"ok": False, "error": "unzulaessiger Pfad"}, 403)
+            return
+        if not os.path.isfile(full):
+            self._json({"ok": False, "error": "nicht gefunden: " + rel}, 404)
             return
         ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype == "application/javascript":
