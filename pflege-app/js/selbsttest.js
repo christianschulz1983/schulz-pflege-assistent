@@ -304,6 +304,39 @@ function selbsttest() {
             befundWerte = bwVor; befundTexte = btVor; setzeModus(modusVor);
         }
 
+        // ---------- 15. Arztberichte und Deckblatt ----------
+        if (typeof entdoppeln === 'function') {
+            const roh = [
+                { icd: 'I50.9', text: 'Herzinsuffizienz', ed: '', _quelle: 'A.pdf' },
+                { icd: 'I50.9', text: 'Herzinsuffizienz', ed: '12.03.2020', _quelle: 'B.pdf' },
+                { icd: 'E11.9', text: 'Diabetes mellitus Typ 2', ed: '', _quelle: 'B.pdf' },
+                { icd: 'I50.9', text: 'Herzinsuffizienz', ed: '', _quelle: 'C.pdf' }
+            ];
+            const ent = entdoppeln(roh, x => ((x.icd || '') + '|' + (x.text || '')).toLowerCase().replace(/\s+/g, ' '));
+            pruefe('Arztberichte: Diagnosen werden entdoppelt', ent.length, 2);
+            pruefe('Arztberichte: vollständigerer Eintrag gewinnt',
+                (ent.find(x => x.icd === 'I50.9') || {}).ed, '12.03.2020');
+            pruefe('Arztberichte: alle Quellen werden gesammelt',
+                (ent.find(x => x.icd === 'I50.9') || {})._quellen, ['A.pdf', 'B.pdf', 'C.pdf']);
+
+            // Deckblatt
+            const extraVor = erfassungExtra, modusVor2 = appModus;
+            setzeModus('hoeherstufung');
+            erfassungExtra = { pg: '2', verschlechterung: 'seit dem Sturz', deckblatt: true };
+            const mitDeck = buildHoeherstufung('', {}, '');
+            pruefeWahr('Deckblatt: wird vorangestellt', mitDeck.indexOf('deckblatt') >= 0
+                && mitDeck.indexOf('Antrag auf Höherstufung des Pflegegrades') < mitDeck.indexOf('Pflegefachliche Stellungnahme'));
+            pruefeWahr('Deckblatt: Unterschriftszeile vorhanden', mitDeck.includes('Unterschrift'));
+            pruefeWahr('Deckblatt: Anlage benannt', mitDeck.includes('Anlage: Pflegefachliche Stellungnahme'));
+            erfassungExtra = { pg: '2', deckblatt: false };
+            pruefeWahr('Ohne Schalter kein Deckblatt', !buildHoeherstufung('', {}, '').includes('Antrag auf Höherstufung des Pflegegrades'));
+            setzeModus('erstantrag');
+            erfassungExtra = { deckblatt: true };
+            pruefeWahr('Deckblatt: Erstantrag mit eigener Überschrift',
+                buildHoeherstufung('', {}, '').includes('Antrag auf Feststellung der Pflegebedürftigkeit'));
+            erfassungExtra = extraVor; setzeModus(modusVor2);
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

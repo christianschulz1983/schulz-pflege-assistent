@@ -97,7 +97,35 @@ function renderErfassung() {
     if (!ziel) return;
     const hoeher = (appModus === 'hoeherstufung');
     ziel.innerHTML =
-        (hoeher ? `<div class="card">
+        `<div class="card" style="border:1px solid rgba(13,148,136,0.25)">
+            <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Ärztliche Unterlagen einlesen</div>
+            <div style="padding:16px 20px">
+                <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+                    Mehrere Arztbriefe, Entlassungsberichte oder Verordnungen auf einmal auswählen. Diagnosen,
+                    Krankenhausaufenthalte, Hilfsmittel, Medikation und Therapien werden zusammengeführt und
+                    entdoppelt. Sie entscheiden anschließend, was übernommen wird.
+                </p>
+                <button class="btn btn-ai" onclick="berichteWaehlen()">📎 Arztberichte auswählen</button>
+                <input type="file" id="berichtFiles" accept=".pdf,image/*" multiple style="display:none"
+                       onchange="leseArztberichte(event)">
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="dot"></div>Deckblatt</div>
+            <div style="padding:16px 20px">
+                <label class="rev-field rev-inline" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                    <input type="checkbox" ${erfassungExtra.deckblatt ? 'checked' : ''}
+                           onchange="erfassungExtra.deckblatt=this.checked">
+                    <span style="font-size:13px;color:var(--text-primary)">Antragsschreiben an die Pflegekasse voranstellen</span>
+                </label>
+                <p style="font-size:11px;color:var(--text-muted);line-height:1.55;margin-top:8px">
+                    Erzeugt als erste Seite ein unterschriftsfertiges Antragsschreiben der versicherten Person
+                    mit Anschrift der Kasse, Versichertendaten und Unterschriftszeile.
+                </p>
+            </div>
+        </div>`
+        + (hoeher ? `<div class="card">
             <div class="card-header"><div class="dot"></div>Vorgutachten und Veränderung</div>
             <div style="padding:20px"><div class="grid-4" style="gap:16px">
                 <div><label class="field-label">Aktueller Pflegegrad</label>
