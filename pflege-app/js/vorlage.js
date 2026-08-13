@@ -23,6 +23,8 @@ const STELLUNGNAHME_CSS = `
 .stmt table.cmp th,.stmt table.cmp td{border:1px solid #000;padding:6px 9px;vertical-align:top;}
 .stmt table.cmp thead th{font-weight:bold;text-align:center;}
 .stmt table.cmp td.num{text-align:center;width:130px;}
+.stmt.deckblatt{page-break-after:always;margin-bottom:44px;padding-bottom:26px;border-bottom:2px dashed #bbb;}
+@media print{.stmt.deckblatt{border-bottom:none;margin-bottom:0;padding-bottom:0;}}
 .stmt .crit{margin:11px 0;}
 .stmt .crit .ct{font-weight:bold;}
 /* Arbeitshinweis zu nicht belegten Zitaten – nur am Bildschirm, nicht im Ausdruck */

@@ -52,6 +52,67 @@ function befundBlock() {
     return html;
 }
 
+// Deckblatt: Antragsschreiben an die Pflegekasse, das die versicherte Person unterschreibt.
+function buildDeckblatt() {
+    const g = id => (document.getElementById(id)?.value || '').trim();
+    const esc = escapeHtml;
+    const hoeher = (appModus === 'hoeherstufung');
+    let name = g('stam-betreffend');
+    const cm = name.match(/^([^,]+),\s*(.+)$/);
+    if (cm && !/^(herr|frau)/i.test(name)) name = (cm[2] + ' ' + cm[1]).trim();
+    if (!name) name = 'Herr/ Frau';
+    const kasse = g('stam-kasse') || 'Pflegekasse';
+    const pgAlt = erfassungExtra.pg;
+    const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}</span><span>: ${esc(v || '')}</span></div>`;
+
+    return `<div class="stmt deckblatt">
+    <div class="stmt-head">
+      <img class="stmt-logo" src="${FAMILIARA_LOGO}" alt="Familiara">
+      <div class="stmt-address">Familiara GmbH<br>Wiesbadener Straße 3<br>12161 Berlin<br><br>Telefon 030 577 015 900<br>Fax 030 577 015 901<br><br>www.familiara.de<br>kontakt@familiara.de</div>
+    </div>
+
+    <div class="stmt-top"><div class="left">
+      <div><b>An die</b></div>
+      <div>${esc(kasse)}</div>
+      <div>– Pflegekasse –</div>
+    </div></div>
+
+    <h1>${hoeher ? 'Antrag auf Höherstufung des Pflegegrades' : 'Antrag auf Feststellung der Pflegebedürftigkeit'}</h1>
+
+    <div class="data-block">
+      ${dataRow('Versicherte Person', name)}
+      ${dataRow('geboren am', formatDE(g('stam-geboren')))}
+      ${dataRow('Versicherungs-Nr.', g('stam-versnr'))}
+      ${hoeher && pgAlt ? dataRow('Bisheriger Pflegegrad', 'Pflegegrad ' + pgAlt) : ''}
+    </div>
+
+    <p>Sehr geehrte Damen und Herren,</p>
+
+    <p>hiermit beantrage ich ${hoeher
+        ? 'die Höherstufung meines Pflegegrades. Mein Gesundheitszustand hat sich seit der letzten Begutachtung '
+          + 'verschlechtert, sodass ein höherer pflegerischer Unterstützungsbedarf besteht'
+          + (erfassungExtra.verschlechterung ? ' (' + esc(erfassungExtra.verschlechterung) + ')' : '') + '.'
+        : 'die Feststellung meiner Pflegebedürftigkeit und die Zuordnung zu einem Pflegegrad nach dem SGB XI.'}</p>
+
+    <p>Zur fachlichen Begründung füge ich die beigefügte pflegefachliche Stellungnahme bei. Sie enthält die
+    erhobenen Befunde, die pflegerelevanten Diagnosen sowie eine Bewertung der sechs Begutachtungsmodule
+    nach den Richtlinien des Medizinischen Dienstes Bund.</p>
+
+    <p>Ich bitte um Bestätigung des Antragseingangs und um Mitteilung des Begutachtungstermins.
+    ${hoeher ? '' : 'Bitte teilen Sie mir mit, welche Unterlagen Sie darüber hinaus benötigen.'}</p>
+
+    <p>Mit freundlichen Grüßen</p>
+
+    <div style="margin-top:46px">
+      <div style="border-top:1px solid #000;width:280px;padding-top:5px">Ort, Datum</div>
+    </div>
+    <div style="margin-top:34px">
+      <div style="border-top:1px solid #000;width:280px;padding-top:5px">Unterschrift ${esc(name)}</div>
+    </div>
+    <p style="margin-top:26px;font-size:9pt;color:#555">Anlage: Pflegefachliche Stellungnahme</p>
+  </div>`;
+}
+
 function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
     const g = id => (document.getElementById(id)?.value || '').trim();
     const esc = escapeHtml;
@@ -160,7 +221,7 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
           + `der zu einer pflegerischen Versorgungsnotwendigkeit führt und somit eine Bewertung der Module erforderlich macht. `
           + `Im Folgenden werden die wesentlichen Bewertungen anhand der gutachterlichen Richtlinien SGB XI tabellarisch dargestellt:</p>`;
 
-    return `<div class="stmt">
+    return `${erfassungExtra.deckblatt ? buildDeckblatt() : ''}<div class="stmt">
     <div class="stmt-head">
       <img class="stmt-logo" src="${FAMILIARA_LOGO}" alt="Familiara">
       <div class="stmt-address">Familiara GmbH<br>Wiesbadener Straße 3<br>12161 Berlin<br><br>Telefon 030 577 015 900<br>Fax 030 577 015 901<br><br>Geschäftsführer: Dr. med. Jörg A. Zimmermann<br><br>HRB 184522 B<br>Amtsgericht Berlin-Charlottenburg<br>Umsatzsteuer-ID: DE311459777<br><br>www.familiara.de<br>kontakt@familiara.de</div>
