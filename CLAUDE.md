@@ -65,6 +65,12 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
   KI-Texte, solange kein gültiger Google-Schlüssel vorliegt.
 
 ## Geplante Ausbaustufen
-Startauswahl Widerspruch / Erstantrag / Höherstufungsantrag; gemeinsamer Befundkatalog;
-Formularfelder, die Modul 5 automatisch füllen. Der Widerspruch muss dabei unverändert
-funktionieren – dafür ist der Selbsttest da.
+Startauswahl Widerspruch / Erstantrag / Höherstufungsantrag; Befundkatalog für Erstantrag
+und Höherstufungsantrag; Formularfelder, die Modul 5 automatisch füllen. Der Widerspruch
+muss dabei unverändert funktionieren – dafür ist der Selbsttest da.
+
+**Der Befundkatalog gehört ausdrücklich NICHT in den Widerspruch.** Dort wird zu einem
+späteren Zeitpunkt ein anderer, eigener Befund gebraucht: eine Gegenüberstellung je
+Kriterium aus (1) was während der Begutachtung nicht geprüft wurde, (2) wie das Gutachten
+es beschreibt, (3) wie es tatsächlich ist. Das ist die strukturierte Form des inneren
+Widerspruchs und wird erst beim Feintuning der Widerspruchsbegründung angegangen.
