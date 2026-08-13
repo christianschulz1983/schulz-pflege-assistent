@@ -156,15 +156,17 @@ function selbsttest() {
         const modusVorher = appModus;
         pruefe('Drei Vorgangsarten vorhanden', Object.keys(MODI).length, 3);
         pruefeWahr('Widerspruch ist einsatzbereit', MODI.widerspruch.fertig === true);
-        pruefeWahr('Erstantrag als in Vorbereitung gekennzeichnet', MODI.erstantrag.fertig === false);
-        pruefeWahr('Höherstufung als in Vorbereitung gekennzeichnet', MODI.hoeherstufung.fertig === false);
+        pruefeWahr('Erstantrag ist einsatzbereit', MODI.erstantrag.fertig === true);
+        pruefeWahr('Höherstufungsantrag ist einsatzbereit', MODI.hoeherstufung.fertig === true);
         setzeModus('hoeherstufung');
         pruefe('Vorgangsart lässt sich setzen', appModus, 'hoeherstufung');
         setzeModus('unbekannt');
         pruefe('Unbekannte Vorgangsart fällt auf Widerspruch zurück', appModus, 'widerspruch');
-        // Noch nicht fertige Vorgänge dürfen den Modus nicht umschalten
+        // Auswahl über die Kachel schaltet um und schließt die Startauswahl
         waehleModus('erstantrag');
-        pruefe('Unfertiger Vorgang ändert die Vorgangsart nicht', appModus, 'widerspruch');
+        pruefe('Kachelauswahl setzt die Vorgangsart', appModus, 'erstantrag');
+        pruefeWahr('Kachelauswahl schließt die Startauswahl',
+            !document.getElementById('start-overlay').classList.contains('active'));
         document.getElementById('vorbereitung-box')?.remove();
         setzeModus(modusVorher);
         pruefeWahr('Verfasserfelder existieren genau einmal',
@@ -257,6 +259,49 @@ function selbsttest() {
             pruefeWahr('Modul 5: selbständige Maßnahmen zählen nicht',
                 !Object.keys(z).some(nr => nr === '4.5.14' && z[nr].count > 2));
             erfassungLaden(sicherungErf);
+        }
+
+        // ---------- 14. Antragsvorlage (Höherstufung und Erstantrag) ----------
+        if (typeof buildHoeherstufung === 'function') {
+            const modusVor = appModus, extraVor = erfassungExtra, erfVor = erfassung;
+            const bwVor = befundWerte, btVor = befundTexte;
+
+            setzeModus('hoeherstufung');
+            erfassungExtra = { pg: '2', vorgutachten: '2024-05-14', verschlechterung: 'seit dem Sturz im März 2026' };
+            erfassung = { pflegepersonen: [{ art: 'Pflegeperson', name: 'Erika Mustermann', tage: '7', stunden: '2', wochenstunden: '14' }] };
+            befundTexte = { groesse: '175', gewicht: '80' }; berechneBmi();
+            befundWerte = { 'schuerzengriff|rechts': 2 };
+            leeren();
+            const doc = document.createElement('div');
+            doc.innerHTML = buildHoeherstufung('', {}, '');
+
+            pruefeWahr('Antragsvorlage: Marken zum Zusammenführen vorhanden',
+                ['stmt-data', 'stmt-notes', 'stmt-cmp-body', 'stmt-crit'].every(i => doc.querySelector('#' + i)));
+            pruefe('Höherstufung: Gegenüberstellung hat zwei Wertespalten',
+                doc.querySelectorAll('#stmt-cmp-body tr')[0].children.length, 3);
+            pruefeWahr('Höherstufung: Verschlechterung steht im Dokument', doc.innerHTML.includes('seit dem Sturz im März 2026'));
+            pruefeWahr('Höherstufung: Pflegeperson steht im Dokument', doc.innerHTML.includes('Erika Mustermann'));
+            pruefeWahr('Höherstufung: BMI steht im Dokument', doc.innerHTML.includes('26,1'));
+            pruefeWahr('Höherstufung: kein Vorwurf an den Gutachter im Einleitungstext',
+                !/Fehler|übersehen|unterlassen|ignorier/i.test(doc.querySelector('#stmt-cmp-body')?.closest('table')?.previousElementSibling?.textContent || ''));
+            pruefeWahr('Befundblock zeigt nur Auffälligkeiten',
+                doc.innerHTML.includes('Schürzengriff rechts') && !doc.innerHTML.includes('4.2.1 Personen aus dem näheren Umfeld erkennen'));
+
+            setzeModus('erstantrag');
+            const doc2 = document.createElement('div');
+            doc2.innerHTML = buildHoeherstufung('', {}, '');
+            pruefe('Erstantrag: Gegenüberstellung hat eine Wertespalte',
+                doc2.querySelectorAll('#stmt-cmp-body tr')[0].children.length, 2);
+            pruefeWahr('Erstantrag: kein Bezug auf ein Vorgutachten',
+                !doc2.innerHTML.includes('Datum Vorgutachten'));
+
+            // Der Widerspruch nutzt weiterhin die alte Vorlage
+            setzeModus('widerspruch');
+            pruefeWahr('Widerspruch nutzt unverändert die bisherige Vorlage',
+                baueDokument('', {}, '') === buildStellungnahme('', {}, ''));
+
+            erfassungExtra = extraVor; erfassung = erfVor;
+            befundWerte = bwVor; befundTexte = btVor; setzeModus(modusVor);
         }
 
     } catch (e) {
