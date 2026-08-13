@@ -48,6 +48,7 @@
     </div>
     <nav class="tabs">
         <button onclick="switchTab(1)" id="btn-tab-1" class="tab-btn active">1. Stammdaten &amp; Diagnosen</button>
+        <button onclick="switchTab('befund')" id="btn-tab-befund" class="tab-btn" style="display:none">2. Befunderhebung</button>
         <button onclick="switchTab(3)" id="btn-tab-3" class="tab-btn">2. Einschätzung &amp; Vergleich</button>
         <button onclick="switchTab(4)" id="btn-tab-4" class="tab-btn">3. Auswertung</button>
     </nav>
@@ -150,6 +151,8 @@
         </div>
     </section>
 
+
+    <section id="tab-befund" class="tab-content space-y-6"></section>
 
     <section id="tab-3" class="tab-content"></section>
 
@@ -275,6 +278,8 @@ if (typeof pdfjsLib !== 'undefined') { try { pdfjsLib.GlobalWorkerOptions.worker
 <script src="js/dokument.js"></script>
 <script src="js/oberflaeche.js"></script>
 <script src="js/berechnung.js"></script>
+<script src="befund_katalog.js"></script>
+<script src="js/befund.js"></script>
 <script src="js/modus.js"></script>
 <script src="js/auswertung.js"></script>
 <script src="js/selbsttest.js"></script>

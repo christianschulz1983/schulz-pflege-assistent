@@ -446,6 +446,24 @@
         .own-box .m5-disp { color: var(--c) !important; }
         .own-box .m5-period-btn.active { background: var(--c); }
 
+        /* BEFUNDERHEBUNG */
+        .befund-zeile { padding: 9px 0; border-bottom: 1px solid var(--border); }
+        .befund-zeile:last-child { border-bottom: none; }
+        .bz-titel {
+            font-size: 12px; font-weight: 600; color: var(--text-primary);
+            margin-bottom: 5px; display: flex; align-items: center; gap: 8px;
+        }
+        .bz-seiten { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .bz-seite {
+            display: block; font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+            letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 3px;
+        }
+        .befund-nba {
+            font-family: var(--font-mono); font-size: 8px; font-weight: 700; letter-spacing: 0.1em;
+            padding: 2px 6px; border-radius: 4px; background: var(--accent-dim); color: var(--accent);
+        }
+        @media (max-width: 700px) { .bz-seiten { grid-template-columns: 1fr; } }
+
         /* STARTAUSWAHL: Verfasser und Vorgangsart */
         .start-overlay {
             display: none; position: fixed; inset: 0; z-index: 9600;

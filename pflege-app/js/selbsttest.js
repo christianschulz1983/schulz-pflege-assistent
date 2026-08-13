@@ -171,6 +171,52 @@ function selbsttest() {
             document.querySelectorAll('#verf-name-sel').length === 1 &&
             document.querySelectorAll('#verf-qual-sel').length === 1);
 
+        // ---------- 12. Befundkatalog ----------
+        if (typeof BEFUND_GRUPPEN !== 'undefined') {
+            pruefe('Befundkatalog: acht Gruppen', BEFUND_GRUPPEN.length, 8);
+            const verknuepfungsfehler = [];
+            BEFUND_GRUPPEN.forEach(g => g.eintraege.forEach(e => {
+                if (e.nba) {
+                    const it = ITEMS.find(i => i.nr === e.nba);
+                    if (!it) verknuepfungsfehler.push('unbekannt: ' + e.nba);
+                    else if (!it.opts || it.opts.length !== e.skala.length)
+                        verknuepfungsfehler.push(e.nba + ': Stufenzahl passt nicht');
+                }
+                (e.stuetzt || []).forEach(s => {
+                    if (!ITEMS.find(i => i.nr === s.nr)) verknuepfungsfehler.push('gestütztes Kriterium unbekannt: ' + s.nr);
+                });
+            }));
+            pruefe('Befundkatalog: alle Verknüpfungen gültig', verknuepfungsfehler, []);
+
+            const sicherungBefund = befundSichern();
+            const krit = nr => ITEMS.find(i => i.nr === nr);
+            leeren();
+            // NBA-Eintrag schreibt unmittelbar in die eigene Einschätzung
+            setzeBefund('kognition', 'k_4_2_6', null, '1');
+            pruefe('Befund: NBA-Eintrag wird übernommen', stateEigene.values[krit('4.2.6').id], 1);
+            // Funktionsbefund setzt nichts, schlägt nur vor
+            setzeBefund('obere', 'schuerzengriff', 'rechts', '3');
+            pruefe('Befund: Funktionsbefund setzt keine Bewertung', stateEigene.values[krit('4.4.3').id], 0);
+            const vorschlaege = befundVorschlaege().map(v => v.item.nr).sort();
+            pruefe('Befund: Schürzengriff schlägt 4.4.3, 4.4.6 und 4.4.10 vor', vorschlaege, ['4.4.10', '4.4.3', '4.4.6']);
+            // Bereits abweichend bewertete Kriterien nicht erneut vorschlagen
+            stateEigene.values[krit('4.4.3').id] = 1;
+            pruefeWahr('Befund: bereits abweichende Kriterien entfallen',
+                !befundVorschlaege().map(v => v.item.nr).includes('4.4.3'));
+            // BMI
+            setzeBefundText('groesse', null, '172'); setzeBefundText('gewicht', null, '68');
+            pruefe('Befund: BMI wird berechnet', befundTexte['bmi'], '23,0');
+            befundLaden(sicherungBefund);
+
+            // Reiter nur in den neuen Vorgängen
+            setzeModus('widerspruch');
+            pruefe('Befundreiter im Widerspruch verborgen', document.getElementById('btn-tab-befund').style.display, 'none');
+            setzeModus('hoeherstufung');
+            pruefeWahr('Befundreiter im Höherstufungsantrag sichtbar',
+                document.getElementById('btn-tab-befund').style.display !== 'none');
+            setzeModus('widerspruch');
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {
