@@ -1,5 +1,14 @@
 // Teil des Schulz Pflege-Assistenten. Diese Datei wurde aus der frueheren
 // Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
+// Wählt die Vorlage nach Vorgangsart: Widerspruch wie bisher, sonst die Antragsvorlage.
+function baueDokument(notes, begruendungen, allgemeinText) {
+    if (typeof appModus !== 'undefined' && appModus !== 'widerspruch'
+        && typeof buildHoeherstufung === 'function') {
+        return buildHoeherstufung(notes, begruendungen, allgemeinText);
+    }
+    return buildStellungnahme(notes, begruendungen, allgemeinText);
+}
+
 function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     const g = id => (document.getElementById(id)?.value || '').trim();
     const esc = escapeHtml;
@@ -331,7 +340,7 @@ async function generateAppealText() {
             showToast("Ohne API-Schlüssel werden nur die Standardtexte eingesetzt. Für ausformulierte Begründungen und Allgemeine Angaben bitte oben rechts einen Google-API-Schlüssel eintragen.", "error");
         }
 
-        const fresh = buildStellungnahme(notes, begruendungen, allgemeinText);
+        const fresh = baueDokument(notes, begruendungen, allgemeinText);
         const docEl = document.getElementById('appeal-document');
         const cont = document.getElementById('appeal-result-container');
         // Vorhandenen (ggf. vom Nutzer bearbeiteten) Stand ermitteln

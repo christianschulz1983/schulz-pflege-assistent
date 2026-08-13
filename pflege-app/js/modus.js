@@ -13,16 +13,16 @@ const MODI = {
     erstantrag: {
         titel: 'Erstantrag',
         zeichen: '📄',
-        text: 'Noch kein Gutachten vorhanden. Ärztliche Unterlagen einlesen, Befund erheben und den Antrag samt Deckblatt erstellen.',
-        fertig: false,
-        geplant: 'Mehrfach-Upload für Arztberichte, Befundkatalog, Antragsformular und Deckblatt an die Pflegekasse.'
+        text: 'Noch kein Gutachten vorhanden. Angaben und Befund erheben und den Antrag erstellen.',
+        fertig: true,
+        geplant: 'Noch offen: Mehrfach-Upload für Arztberichte und das Deckblatt an die Pflegekasse.'
     },
     hoeherstufung: {
         titel: 'Höherstufungsantrag',
         zeichen: '📈',
         text: 'Vorgutachten liegt vor, der Zustand hat sich verschlechtert. Befund erheben und die Verschlechterung begründen.',
-        fertig: false,
-        geplant: 'Angaben zu Pflegeperson und Pflegedienst, Krankenhausaufenthalte, Arzt- und Therapiebesuche, Behandlungspflege, Befundkatalog und die Begründung über die Veränderung seit der Begutachtung.'
+        fertig: true,
+        geplant: ''
     }
 };
 

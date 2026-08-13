@@ -207,6 +207,29 @@ function zeigeBefundVorschlaege() {
     renderVorschlaege();   // gleiche Auswahlliste wie beim Widerspruch
 }
 
+// Kurzfassung des erhobenen Befunds für die KI (nur ausgefüllte Einträge)
+function befundZusammenfassung() {
+    const zeilen = [];
+    BEFUND_GRUPPEN.forEach(g => {
+        const teil = [];
+        g.eintraege.forEach(e => {
+            if (e.frei) { const t = befundTexte[e.id]; if (t && t.trim()) teil.push(e.titel + ': ' + t.trim()); return; }
+            (e.seiten ? ['rechts', 'links'] : [null]).forEach(s => {
+                const w = befundWert(e, s);
+                if (w === null) return;
+                if (e.nba && w === 0) return;   // unauffällige Kriterien tragen nichts bei
+                const zusatz = befundTexte[e.id + '_zusatz'];
+                teil.push(e.titel + (s ? ' ' + s : '') + ': ' + e.skala[w] + (zusatz ? ' (' + zusatz + ')' : ''));
+            });
+        });
+        (befundExtra[g.id] || []).forEach(x => {
+            if ((x.titel || '').trim() || (x.text || '').trim()) teil.push((x.titel || '') + ': ' + (x.text || ''));
+        });
+        if (teil.length) zeilen.push(g.titel + ' – ' + teil.join('; '));
+    });
+    return zeilen.join('\n');
+}
+
 // ------------------------------------------------------- Speichern und Laden
 function befundSichern() {
     return { werte: befundWerte, texte: befundTexte, extra: befundExtra };

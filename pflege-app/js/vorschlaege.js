@@ -325,10 +325,95 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
     return p;
 }
 
+// Begründungen für Höherstufungsantrag und Erstantrag. Kein Vorwurf an den Gutachter,
+// sondern Darstellung der Veränderung beziehungsweise des bestehenden Hilfebedarfs.
+async function generateBegruendungenAntrag(diffs, mitAllgemein, vorgang) {
+    const hoeher = (vorgang === 'hoeherstufung');
+    const verschlechterung = (typeof erfassungExtra !== 'undefined' && erfassungExtra.verschlechterung) || '';
+
+    const systemPrompt = `Du bist ein erfahrener Pflegeberater und verfasst die Begründungen für ${hoeher
+        ? 'einen Antrag auf Höherstufung des Pflegegrades' : 'einen Erstantrag auf einen Pflegegrad'} (NBA, SGB XI).
+
+WICHTIG – anderer Charakter als ein Widerspruch:
+${hoeher
+    ? 'Das Vorgutachten war zum damaligen Zeitpunkt möglicherweise zutreffend. Kritisiere den Gutachter NICHT '
+    + 'und wirf ihm keine Fehler vor. Begründe ausschließlich über die VERÄNDERUNG: Was hat sich seit der '
+    + 'Begutachtung verschlechtert, wodurch, und welcher zusätzliche personelle Unterstützungsbedarf ist daraus '
+    + 'entstanden?' + (verschlechterung ? ' Anlass der Verschlechterung laut Angabe: ' + verschlechterung : '')
+    : 'Es liegt noch kein Gutachten vor. Stelle den bestehenden Hilfebedarf sachlich und erstmalig dar. '
+    + 'Es gibt keine fremde Bewertung, die du angreifen könntest.'}
+
+Schreibe zu JEDEM Kriterium eine Begründung im Stil der folgenden Beispiele des Verfassers – übernimm Aufbau,
+Ton und Wortwahl, nicht aber die Kritik am Gutachter:
+
+=== STILBEISPIELE DES VERFASSERS ===
+${getStilBeispiele()}
+=== ENDE STILBEISPIELE ===
+
+RANGFOLGE DER QUELLEN:
+1. Meine Notizen aus dem Erstgespräch und der erhobene Befund sind die Grundlage. Stichpunkte zu
+   vollständigem Fließtext ausformulieren, ohne Inhalte zu verändern oder hinzuzuerfinden.
+2. Danach die eigene Bewertung des Kriteriums.
+3. Abgleich mit dem BRi-Text (wörtliches Zitat).
+
+AUFBAU je Begründung (Fließtext, etwa 120–200 Wörter):
+1. ${hoeher ? 'Was hat sich seit der Begutachtung verändert?' : 'Welche Einschränkung besteht?'}
+2. Konkreter Sachverhalt aus Notizen und Befund, einschließlich der erforderlichen personellen Unterstützung.
+3. Richtlinienmaßstab mit wörtlichem BRi-Zitat.
+4. Schluss: „Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „…" ableitbar."
+
+ZITIERREGEL – wird technisch überprüft: Alles in Anführungszeichen MUSS zeichengenau in den
+mitgelieferten BRi-Texten dieses Kriteriums stehen. Im Zweifel ohne Anführungszeichen sinngemäß wiedergeben.
+
+Weiter zu beachten:
+- Erfinde keine Befunde, Diagnosen, Zeitangaben oder Vorkommnisse.
+- Verwende ausschließlich die je Kriterium angegebenen Stufenbezeichnungen. In den Modulen 2 und 3 gibt es
+  keine Stufe „selbständig".
+- Beachte die mitgelieferte Hilfsmittel-Regel und die Hinweise unter „Achtung"; widerspricht eine Argumentation
+  ihnen, verwende sie nicht.
+- Variiere die Eröffnungen über alle Begründungen hinweg.
+- Sachlich-fachlicher Gutachterstil in der dritten Person, ohne Aufzählungszeichen und Überschriften.
+- Gib NUR den Begründungstext zurück.`;
+
+    const responseSchema = {
+        type: "OBJECT",
+        properties: {
+            allgemein: { type: "STRING" },
+            begruendungen: { type: "ARRAY", items: { type: "OBJECT",
+                properties: { nr: { type: "STRING" }, text: { type: "STRING" } }, required: ["nr", "text"] } }
+        },
+        required: ["begruendungen"]
+    };
+    let prompt = buildBegruendungPrompt(diffs, mitAllgemein);
+    if (hoeher && verschlechterung) prompt = 'VERSCHLECHTERUNG SEIT DER BEGUTACHTUNG: ' + verschlechterung + '\n\n' + prompt;
+    if (typeof befundZusammenfassung === 'function') {
+        const bf = befundZusammenfassung();
+        if (bf) prompt += 'ERHOBENER BEFUND:\n' + bf + '\n\n';
+    }
+    const res = await callGeminiWithFallback({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json", responseSchema: responseSchema }
+    }, systemPrompt);
+    let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!txt) throw new Error("Keine Antwort der KI erhalten.");
+    const fence = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fence) txt = fence[1];
+    const data = JSON.parse(txt.trim());
+    const map = {};
+    (data.begruendungen || []).forEach(b => { if (b && b.nr && b.text) map[b.nr] = b.text.trim(); });
+    return { map: map, allgemein: (data.allgemein || '').trim() };
+}
+
 // Erzeugt Begründungen je Abweichung und – auf Wunsch – den Abschnitt „Allgemeine Angaben"
 // im Stil des Nutzers. Ein einziger KI-Aufruf für alles.
 async function generateBegruendungen(diffs, mitAllgemein) {
     if (!diffs.length && !mitAllgemein) return { map: {}, allgemein: '' };
+    // Bei Höherstufung und Erstantrag gilt eine andere Argumentation: Es geht nicht um Fehler
+    // des Gutachters, sondern um die Verschlechterung seit der Begutachtung bzw. um die
+    // erstmalige Darstellung des Hilfebedarfs.
+    const vorgang = (typeof appModus !== 'undefined') ? appModus : 'widerspruch';
+    if (vorgang !== 'widerspruch') return await generateBegruendungenAntrag(diffs, mitAllgemein, vorgang);
+
     const systemPrompt = `Du bist ein erfahrener Pflegeberater und Pflegesachverständiger und verfasst Begründungen für einen Widerspruch gegen ein Pflegegutachten (NBA, SGB XI).
 
 Schreibe zu JEDEM abweichenden Kriterium eine Begründung, die im Aufbau, im Ton und in der Wortwahl exakt den folgenden Beispielen des Verfassers entspricht:
