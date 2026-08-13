@@ -23,7 +23,13 @@ pflege-app/
   js/oberflaeche.js   NBA-Ansicht, Diagnosezeilen, init
   js/berechnung.js    Punkte, Pflegegrad
   js/auswertung.js    Sidebar, Auswertung, Fall speichern/laden
+  js/modus.js         Startauswahl: Verfasser und Vorgangsart
+  js/befund.js        Befunderhebung (Erstantrag, Höherstufung)
+  js/erfassung.js     Pflegepersonen, Aufenthalte, Versorgung, Übernahme in Modul 5
+  js/hoeherstufung.js Dokumentvorlage der Anträge und Deckblatt
+  js/arztberichte.js  Mehrfach-Upload ärztlicher Unterlagen mit Zusammenführung
   js/selbsttest.js    Selbsttest (Knopf oben rechts)
+  befund_katalog.js   Befundkatalog, acht Gruppen (nicht von Hand ändern)
   bri_texte.js        BRi-Originaltexte, 65 Kriterien (nicht von Hand ändern)
   laien_hinweise.js   Praxishinweise, 58 Kriterien (Hilfsmittel-Regeln, Fallstricke)
   pflege_server.py    Lokaler Server: PDF-Text, OCR, liefert die App aus
@@ -64,10 +70,21 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
 - Was nicht geprüft werden konnte, offen benennen – besonders die inhaltliche Qualität der
   KI-Texte, solange kein gültiger Google-Schlüssel vorliegt.
 
-## Geplante Ausbaustufen
-Startauswahl Widerspruch / Erstantrag / Höherstufungsantrag; Befundkatalog für Erstantrag
-und Höherstufungsantrag; Formularfelder, die Modul 5 automatisch füllen. Der Widerspruch
-muss dabei unverändert funktionieren – dafür ist der Selbsttest da.
+## Stand der Ausbaustufen
+Alle drei Vorgänge sind einsatzbereit: Widerspruch (unverändert), Erstantrag und
+Höherstufungsantrag mit Befundkatalog, erweiterter Erfassung, Übernahme in Modul 5,
+Arztbericht-Auslese und Deckblatt. Der Selbsttest umfasst 98 Prüfungen.
+
+Wichtige Grundsätze, die beim Weiterbauen gelten:
+- Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
+  dem BMI). Eine eigene Eingabe hat Vorrang und darf nicht automatisch überschrieben werden;
+  es muss einen Weg zurück zur Ableitung geben.
+- Angaben, die einem NBA-Kriterium entsprechen, werden nur EINMAL erfasst und schreiben
+  unmittelbar in die eigene Einschätzung. Funktionsbefunde schlagen nur vor.
+- Bei Höherstufung und Erstantrag keine Kritik am Gutachter; dort wird über die
+  Verschlechterung beziehungsweise den erstmaligen Hilfebedarf begründet.
+
+Offen: Für den Widerspruch später ein eigener Befund (siehe Abgrenzung oben).
 
 **Der Befundkatalog gehört ausdrücklich NICHT in den Widerspruch.** Dort wird zu einem
 späteren Zeitpunkt ein anderer, eigener Befund gebraucht: eine Gegenüberstellung je

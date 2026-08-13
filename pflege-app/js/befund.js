@@ -35,8 +35,27 @@ function setzeBefund(gruppenId, eintragId, seite, wert) {
     } else {
         if (idx === null) delete befundWerte[befundSchluessel(eintrag, seite)];
         else befundWerte[befundSchluessel(eintrag, seite)] = idx;
+        // Eine eigene Angabe zum Ernährungszustand hat Vorrang vor der BMI-Ableitung
+        if (eintragId === 'ernaehrungszustand') {
+            if (idx === null) {
+                delete befundTexte['ernaehrungszustand_manuell'];
+                leiteErnaehrungszustandAb();
+            } else {
+                befundTexte['ernaehrungszustand_manuell'] = '1';
+                const h = document.getElementById('befund-ez-hinweis');
+                if (h) h.innerText = 'von Hand gesetzt – die BMI-Ableitung wird nicht mehr angewendet';
+            }
+        }
     }
     aktualisiereBefundHinweis();
+}
+
+// Setzt den Ernährungszustand wieder auf die Ableitung aus dem BMI zurück
+function ernaehrungszustandAutomatisch() {
+    delete befundTexte['ernaehrungszustand_manuell'];
+    leiteErnaehrungszustandAb();
+    const h = document.getElementById('befund-ez-hinweis');
+    if (h && !befundTexte['bmi']) h.innerText = 'wird aus dem BMI abgeleitet, sobald Größe und Gewicht erfasst sind';
 }
 
 function setzeBefundText(eintragId, seite, text) {
@@ -64,6 +83,22 @@ function berechneBmi() {
     else delete befundTexte['bmi'];
     const feld = document.getElementById('befund-text-bmi');
     if (feld) feld.value = befundTexte['bmi'] || '';
+    leiteErnaehrungszustandAb();
+}
+
+// Leitet den Ernährungszustand aus dem BMI ab – aber NUR, solange er nicht von Hand
+// gesetzt wurde. Eine eigene Eingabe hat immer Vorrang und bleibt erhalten.
+function leiteErnaehrungszustandAb() {
+    if (befundTexte['ernaehrungszustand_manuell'] === '1') return;
+    const bmi = parseFloat((befundTexte['bmi'] || '').replace(',', '.'));
+    if (!(bmi > 0)) { delete befundWerte['ernaehrungszustand']; return; }
+    // Skala: 0 Normalgewicht, 1 Untergewicht, 2 Übergewicht, 3 Adipositas
+    const stufe = bmi < 18.5 ? 1 : bmi < 25 ? 0 : bmi < 30 ? 2 : 3;
+    befundWerte['ernaehrungszustand'] = stufe;
+    const feld = document.getElementById('befund-sel-ernaehrungszustand');
+    if (feld) feld.value = String(stufe);
+    const hinweis = document.getElementById('befund-ez-hinweis');
+    if (hinweis) hinweis.innerText = 'aus dem BMI abgeleitet – jederzeit änderbar';
 }
 
 // ---------------------------------------------------------------- Darstellung
@@ -105,10 +140,21 @@ function befundZeile(gruppe, e) {
                         ${e.berechnet ? 'readonly style="background:var(--bg-card2)"' : ''}
                         oninput="setzeBefundText('${e.id}',null,this.value)">`;
         }
-        return `<select class="field-input" onchange="setzeBefund('${gruppe.id}','${e.id}',${seite ? `'${seite}'` : 'null'},this.value)">
+        const kennung = (e.id === 'ernaehrungszustand') ? ' id="befund-sel-ernaehrungszustand"' : '';
+        return `<select class="field-input"${kennung} onchange="setzeBefund('${gruppe.id}','${e.id}',${seite ? `'${seite}'` : 'null'},this.value)">
                 <option value="">– keine Angabe –</option>
                 ${e.skala.map((s, i) => `<option value="${i}" ${aktuell === i ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
-            </select>`;
+            </select>`
+            + (e.id === 'ernaehrungszustand'
+                ? `<div style="display:flex;align-items:center;gap:10px;margin-top:5px">
+                     <span id="befund-ez-hinweis" style="font-size:11px;color:var(--text-muted)">${
+                        befundTexte['ernaehrungszustand_manuell'] === '1'
+                            ? 'von Hand gesetzt – die BMI-Ableitung wird nicht mehr angewendet'
+                            : (befundTexte['bmi'] ? 'aus dem BMI abgeleitet – jederzeit änderbar'
+                                                  : 'wird aus dem BMI abgeleitet, sobald Größe und Gewicht erfasst sind')}</span>
+                     <button type="button" class="btn btn-ghost" style="padding:3px 9px;font-size:10px"
+                             onclick="ernaehrungszustandAutomatisch()">aus BMI ableiten</button>
+                   </div>` : '');
     };
     const zusatz = e.zusatz
         ? `<input type="text" class="field-input" style="margin-top:6px" placeholder="${escapeHtml(e.zusatz)}"
