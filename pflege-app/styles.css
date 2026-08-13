@@ -446,6 +446,22 @@
         .own-box .m5-disp { color: var(--c) !important; }
         .own-box .m5-period-btn.active { background: var(--c); }
 
+        /* ERWEITERTE ERFASSUNG (Tabellen mit mitwachsenden Zeilen) */
+        .erf-tabelle { width: 100%; border-collapse: collapse; }
+        .erf-tabelle th {
+            font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+            text-transform: uppercase; color: var(--text-secondary); text-align: left;
+            padding: 6px 6px; border-bottom: 1px solid var(--border); white-space: nowrap;
+        }
+        .erf-tabelle td { padding: 4px 4px; vertical-align: top; }
+        .erf-tabelle .field-input { font-size: 12px; padding: 7px 9px; }
+        .erf-weg {
+            width: 26px; height: 26px; margin-top: 4px; border-radius: 6px; cursor: pointer;
+            background: var(--bg-card2); border: 1px solid var(--border); color: var(--text-muted);
+            font-size: 15px; line-height: 1;
+        }
+        .erf-weg:hover { border-color: #dc2626; color: #dc2626; }
+
         /* BEFUNDERHEBUNG */
         .befund-zeile { padding: 9px 0; border-bottom: 1px solid var(--border); }
         .befund-zeile:last-child { border-bottom: none; }

@@ -59,16 +59,11 @@ function befundEintrag(id) {
 function berechneBmi() {
     const gr = parseFloat((befundTexte['groesse'] || '').replace(',', '.'));
     const gw = parseFloat((befundTexte['gewicht'] || '').replace(',', '.'));
+    // Der Wert wird immer berechnet, auch wenn der Reiter gerade nicht angezeigt wird.
+    if (gr > 50 && gw > 10) befundTexte['bmi'] = (gw / Math.pow(gr / 100, 2)).toFixed(1).replace('.', ',');
+    else delete befundTexte['bmi'];
     const feld = document.getElementById('befund-text-bmi');
-    if (!feld) return;
-    if (gr > 50 && gw > 10) {
-        const bmi = gw / Math.pow(gr / 100, 2);
-        befundTexte['bmi'] = bmi.toFixed(1).replace('.', ',');
-        feld.value = befundTexte['bmi'];
-    } else {
-        delete befundTexte['bmi'];
-        feld.value = '';
-    }
+    if (feld) feld.value = befundTexte['bmi'] || '';
 }
 
 // ---------------------------------------------------------------- Darstellung
