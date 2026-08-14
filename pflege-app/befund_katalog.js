@@ -51,19 +51,6 @@ const BEFUND_GRUPPEN = [
         ]
     },
     {
-        id: 'untere', titel: 'Beweglichkeit untere Extremitäten',
-        eintraege: [
-            { id: 'kniebeugung', titel: 'Kniebeugung', seiten: true, skala: SKALA_GELENK,
-              stuetzt: [{ nr: '4.1.3', ab: 2 }, { nr: '4.4.6', ab: 2 }] },
-            { id: 'sprunggelenk', titel: 'Sprunggelenk', seiten: true, skala: SKALA_GELENK,
-              stuetzt: [{ nr: '4.1.4', ab: 2 }] },
-            { id: 'zehenstand', titel: 'Zehenstand', skala: ['Möglich', 'Unsicher möglich', 'Nicht möglich'],
-              stuetzt: [{ nr: '4.1.4', ab: 1 }] },
-            { id: 'fussheber', titel: 'Fußheberschwäche', skala: ['Nein', 'Einseitig', 'Beidseitig'],
-              stuetzt: [{ nr: '4.1.4', ab: 1 }, { nr: '4.1.5', ab: 1 }] }
-        ]
-    },
-    {
         id: 'mobilitaet', titel: 'Mobilität',
         hinweis: 'Die ersten fünf Einträge sind die Kriterien des Moduls 1 – die Eingabe wird direkt übernommen.',
         eintraege: _nbaEintraege(['4.1.1', '4.1.2', '4.1.3', '4.1.4', '4.1.5'], SKALA_SELBST).concat([
@@ -137,7 +124,11 @@ const BEFUND_GRUPPEN = [
               zusatz: 'Lokalisation und Auswirkung' },
             { id: 'atmung', titel: 'Atmung',
               skala: ['Unauffällig', 'Belastungsdyspnoe', 'Ruhedyspnoe', 'Sauerstoffpflichtig'],
-              stuetzt: [{ nr: '4.5.4', ab: 3 }] }
+              stuetzt: [{ nr: '4.5.4', ab: 3 }] },
+            { id: 'tremor', titel: 'Tremor', seiten: true,
+              skala: ['feinschlägig', 'grobschlägig'],
+              zusatzAuswahl: { titel: 'Auftreten', skala: ['bei Belastung', 'in Ruhe', 'bei Belastung und in Ruhe'] },
+              stuetzt: [{ nr: '4.4.7', ab: 1 }, { nr: '4.4.5', ab: 1 }] }
         ]
     }
 ];
