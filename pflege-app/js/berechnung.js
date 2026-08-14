@@ -1,5 +1,17 @@
-// Teil des Schulz Pflege-Assistenten. Diese Datei wurde aus der frueheren
-// Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
+// Punkte und Pflegegrad nach den Begutachtungs-Richtlinien.
+
+// Einzelpunkte eines Kriteriums. Kriterien mit eigener Punkteskala (val) werden darüber
+// abgebildet. Liegt ein unzulässiger Stufenindex vor, wird 0 gewertet – früher entstand
+// hier stillschweigend NaN, wodurch die gesamte Punktzahl und der Pflegegrad ausfielen.
+function nbaEinzelpunkte(st, id) {
+    const item = ITEMS.find(it => it.id === id);
+    const v = st.values[id];
+    if (typeof v !== 'number' || !item) return 0;
+    if (!item.val) return Number.isFinite(v) ? v : 0;
+    const p = item.val[v];
+    return Number.isFinite(p) ? p : 0;
+}
+
 function calculateInternal(pref) {
     const st = pref==='orig' ? stateOrig : stateEigene;
 
@@ -12,7 +24,7 @@ function calculateInternal(pref) {
         };
     }
 
-    const getV = (id) => { const item=ITEMS.find(it=>it.id===id); const v=st.values[id]; return (typeof v==='number')?(item.val?item.val[v]:v):0; };
+    const getV = (id) => nbaEinzelpunkte(st, id);
     let s1=ITEMS.filter(i=>i.m===1).reduce((s,i)=>s+(Number(st.values[i.id])||0),0);
     let s2=ITEMS.filter(i=>i.m===2).reduce((s,i)=>s+(Number(st.values[i.id])||0),0);
     let s3=ITEMS.filter(i=>i.m===3).reduce((s,i)=>s+getV(i.id),0);
@@ -53,7 +65,7 @@ function calculate(pref) {
     const res = calculateInternal(pref);
     const {raws:[s1,s2,s3,s4,ptsM5,s6], weights:[w1,p2,p3,w4,w5,w6], total, pg} = res;
 
-    const getV = (id) => { const item=ITEMS.find(it=>it.id===id); const v=st.values[id]; return (typeof v==='number')?(item.val?item.val[v]:v):0; };
+    const getV = (id) => nbaEinzelpunkte(st, id);
     // Modul 5 nach BRi: Häufigkeiten je Gruppe summieren -> EIN Punktwert je Gruppe.
     // Anzeige: der Gruppen-Punktwert erscheint NUR auf der untersten Zeile der Gruppe
     // (wie die "Summe"-Zeile im BRi), die übrigen Zeilen zeigen "–" – damit nicht der

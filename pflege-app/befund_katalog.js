@@ -12,7 +12,6 @@ const SKALA_FAUST     = ['Vollständig möglich', 'Mit reduzierter Kraft vollst�
 const SKALA_ARMHEBUNG = ['Vollständig möglich', 'Bis zum Hinterkopf möglich', 'Bis zum Ohr möglich', 'Bis zum Mund möglich'];
 const SKALA_SCHUERZE  = ['Vollständig möglich', 'Bis zum hinteren Beckenkamm möglich', 'Bis zum mittleren Beckenkamm möglich', 'Bis zum vorderen Beckenkamm möglich'];
 const SKALA_FUESSE    = ['Vollständig möglich', 'Bis zu den Sprunggelenken möglich', 'Bis zur Mitte der Unterschenkel möglich', 'Bis zu den Kniegelenken möglich', 'Bis zum Spann möglich'];
-const SKALA_GELENK    = ['Frei beweglich', 'Endgradig eingeschränkt', 'Deutlich eingeschränkt', 'Aufgehoben'];
 const SKALA_SELBST    = ['selbständig', 'überwiegend selbständig', 'überwiegend unselbständig', 'unselbständig'];
 const SKALA_FAEHIG    = ['unbeeinträchtigt', 'größtenteils vorhanden', 'in geringem Maße vorhanden', 'nicht vorhanden'];
 const SKALA_HAEUFIG   = ['nie oder sehr selten', 'selten', 'häufig', 'täglich'];
@@ -56,8 +55,6 @@ const BEFUND_GRUPPEN = [
         eintraege: _nbaEintraege(['4.1.1', '4.1.2', '4.1.3', '4.1.4', '4.1.5'], SKALA_SELBST).concat([
             { id: 'gangbild', titel: 'Gangbild', skala: ['Sicher', 'Unsicher', 'Stark unsicher', 'Nicht gehfähig'],
               stuetzt: [{ nr: '4.1.4', ab: 1 }, { nr: '4.1.5', ab: 1 }] },
-            { id: 'gehstrecke', titel: 'Gehstrecke', frei: true, platzhalter: 'z. B. ca. 20 m mit Rollator, dann Pause' },
-            { id: 'gehhilfen', titel: 'Genutzte Hilfsmittel', frei: true, platzhalter: 'z. B. Rollator, Gehstock, Rollstuhl' },
             { id: 'stuerze', titel: 'Sturzereignisse (letzte 6 Monate)', frei: true, platzhalter: 'Anzahl, Zeitpunkt, Folgen' }
         ])
     },
@@ -86,7 +83,6 @@ const BEFUND_GRUPPEN = [
             { id: 'schluckstoerung', titel: 'Schluckstörung',
               skala: ['Nein', 'Leicht', 'Ausgeprägt (diagnostiziert)'],
               stuetzt: [{ nr: '4.4.8', ab: 2 }, { nr: '4.4.9', ab: 2 }] },
-            { id: 'zahnstatus', titel: 'Kau- und Zahnstatus', frei: true, platzhalter: 'z. B. Prothese oben und unten' },
             { id: 'trinkmenge', titel: 'Trinkmenge', frei: true, platzhalter: 'z. B. etwa 1,2 Liter täglich' },
             { id: 'sonde', titel: 'Sonde oder Port', skala: ['Nein', 'PEG', 'Parenteral (Port)'],
               stuetzt: [{ nr: '4.4.13', ab: 1 }] }
@@ -112,19 +108,19 @@ const BEFUND_GRUPPEN = [
             { id: 'wunden', titel: 'Wunden oder Dekubitus',
               skala: ['Keine', 'Vorhanden, in Abheilung', 'Chronisch (über 6 Monate)'],
               zusatz: 'Lokalisation und Versorgung', stuetzt: [{ nr: '4.5.8', ab: 1 }] },
-            { id: 'oedeme', titel: 'Ödeme', skala: ['Keine', 'Gering', 'Ausgeprägt'] },
+            { id: 'oedeme', titel: 'Ödeme',
+              skala: ['Ödeme obere Extremitäten', 'Ödeme untere Extremitäten'],
+              zusatz: 'Ausprägung und Anmerkung' },
             { id: 'kontinenz_harn', titel: 'Harnkontinenz',
               skala: ['Kontinent', 'Teilkontinent', 'Inkontinent', 'Dauerkatheter oder Urostoma'],
               stuetzt: [{ nr: '4.4.11', ab: 1 }] },
             { id: 'kontinenz_stuhl', titel: 'Stuhlkontinenz',
               skala: ['Kontinent', 'Teilkontinent', 'Inkontinent', 'Stoma'],
               stuetzt: [{ nr: '4.4.12', ab: 1 }] },
-            { id: 'schmerz', titel: 'Schmerz',
-              skala: ['Keine Angabe von Schmerzen', 'Gelegentlich', 'Dauerhaft', 'Dauerhaft trotz Medikation'],
-              zusatz: 'Lokalisation und Auswirkung' },
             { id: 'atmung', titel: 'Atmung',
-              skala: ['Unauffällig', 'Belastungsdyspnoe', 'Ruhedyspnoe', 'Sauerstoffpflichtig'],
-              stuetzt: [{ nr: '4.5.4', ab: 3 }] },
+              skala: ['Unauffällig', 'Dyspnoe bei größerer Belastung', 'Dyspnoe bei geringer Belastung',
+                      'Dyspnoe bereits in Ruhe'],
+              stuetzt: [{ nr: '4.1.4', ab: 2 }, { nr: '4.1.5', ab: 2 }] },
             { id: 'tremor', titel: 'Tremor', seiten: true,
               skala: ['feinschlägig', 'grobschlägig'],
               zusatzAuswahl: { titel: 'Auftreten', skala: ['bei Belastung', 'in Ruhe', 'bei Belastung und in Ruhe'] },

@@ -66,6 +66,14 @@ function selbsttest() {
         };
         leeren();
         pruefe('Leerer Fall ergibt keinen Pflegegrad', calculateInternal('own').pg, 0);
+        // Ein unzulässiger Stufenindex darf die Berechnung nicht unbrauchbar machen
+        const unzulaessig = ITEMS.find(i => i.nr === '4.4.13');
+        stateEigene.values[unzulaessig.id] = 99;
+        const trotzdem = calculateInternal('own');
+        pruefeWahr('Unzulässiger Stufenindex ergibt keine ungültige Punktzahl',
+            Number.isFinite(trotzdem.total) && Number.isFinite(trotzdem.pg),
+            'Gesamt ' + trotzdem.total + ', Pflegegrad ' + trotzdem.pg);
+        leeren();
         alleAuf(4, 'max');
         const nurM4 = calculateInternal('own');
         pruefe('Modul 4 maximal ergibt 40 gewichtete Punkte', nurM4.weights[3], 40);
@@ -200,6 +208,34 @@ function selbsttest() {
                 });
             }));
             pruefe('Befundkatalog: alle Verknüpfungen gültig', verknuepfungsfehler, []);
+
+            // Aufbau des Katalogs prüfen: eindeutige Kennungen, gültige Schwellen, saubere Felder
+            const katalogfehler = [];
+            const gesehen = {};
+            BEFUND_GRUPPEN.forEach(g => g.eintraege.forEach(e => {
+                if (gesehen[e.id]) katalogfehler.push('Kennung doppelt: ' + e.id);
+                gesehen[e.id] = true;
+                if (!e.frei && (!Array.isArray(e.skala) || !e.skala.length))
+                    katalogfehler.push('ohne Skala: ' + e.id);
+                (e.stuetzt || []).forEach(s => {
+                    if (!(s.ab >= 1)) katalogfehler.push(e.id + ': Schwelle muss mindestens 1 sein');
+                    if (e.skala && s.ab > e.skala.length - 1)
+                        katalogfehler.push(e.id + ': Schwelle ' + s.ab + ' liegt über der Skala');
+                });
+                if (e.zusatzAuswahl && (!Array.isArray(e.zusatzAuswahl.skala) || !e.zusatzAuswahl.skala.length))
+                    katalogfehler.push(e.id + ': zweites Auswahlfeld ohne Optionen');
+            }));
+            pruefe('Befundkatalog: Aufbau fehlerfrei', katalogfehler, []);
+            pruefeWahr('Gehstrecke und genutzte Hilfsmittel entfernt',
+                !gesehen['gehstrecke'] && !gesehen['gehhilfen']);
+            pruefeWahr('Kau- und Zahnstatus entfernt', !gesehen['zahnstatus']);
+            pruefeWahr('Schmerz entfernt', !gesehen['schmerz']);
+            const atm = BEFUND_GRUPPEN.find(g => g.id === 'sonstiges').eintraege.find(e => e.id === 'atmung');
+            pruefe('Atmung: neue Auswahl', atm && atm.skala,
+                ['Unauffällig', 'Dyspnoe bei größerer Belastung', 'Dyspnoe bei geringer Belastung', 'Dyspnoe bereits in Ruhe']);
+            const oed = BEFUND_GRUPPEN.find(g => g.id === 'sonstiges').eintraege.find(e => e.id === 'oedeme');
+            pruefe('Ödeme: neue Auswahl', oed && oed.skala,
+                ['Ödeme obere Extremitäten', 'Ödeme untere Extremitäten']);
 
             const sicherungBefund = befundSichern();
             const krit = nr => ITEMS.find(i => i.nr === nr);
