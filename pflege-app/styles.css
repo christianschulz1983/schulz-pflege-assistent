@@ -495,6 +495,20 @@
         }
         @media (max-width: 700px) { .bz-seiten { grid-template-columns: 1fr; } }
 
+        /* MODUL 3: erfasste psychische Problemlagen */
+        .psyche-zeile {
+            padding: 10px 12px; margin-bottom: 8px; border-radius: 8px;
+            background: var(--bg-card2); border: 1px solid var(--border);
+        }
+        .pz-kopf { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
+        .pz-titel { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+        .pz-weg { padding: 2px 8px; font-size: 11px; line-height: 1.2; }
+        .pz-raster { display: grid; grid-template-columns: 1.1fr 1.1fr 1fr; gap: 10px; }
+        .pz-hinweis { margin-top: 6px; font-size: 10px; color: var(--text-muted); }
+        .pz-hinweis.ist-gewertet { color: var(--accent); font-weight: 600; }
+        .psyche-wahl { margin-top: 10px; }
+        @media (max-width: 900px) { .pz-raster { grid-template-columns: 1fr; } }
+
         /* STARTAUSWAHL: Verfasser und Vorgangsart */
         .start-overlay {
             display: none; position: fixed; inset: 0; z-index: 9600;

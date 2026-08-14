@@ -27,6 +27,17 @@ function befundBlock() {
     let html = '';
     BEFUND_GRUPPEN.forEach(g => {
         const zeilen = [];
+        // Modul 3: nur die tatsächlich erfassten Problemlagen, nicht alle dreizehn Kriterien
+        if (g.sonder === 'psyche') {
+            psycheListe.forEach(z => {
+                if (z.wertung === null && typeof z.haeufigkeit !== 'number') return;
+                const teile = [];
+                if (typeof z.haeufigkeit === 'number') teile.push(PSYCHE_HAEUFIGKEIT[z.haeufigkeit]);
+                if (z.wertung !== null) teile.push(PSYCHE_WERTUNG[z.wertung]);
+                if ((z.bemerkung || '').trim()) teile.push(z.bemerkung.trim());
+                zeilen.push([psycheTitel(z.nr), teile.join(' – ')]);
+            });
+        }
         g.eintraege.forEach(e => {
             if (e.frei) {
                 const t = befundTexte[e.id];

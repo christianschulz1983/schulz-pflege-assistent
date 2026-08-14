@@ -16,6 +16,24 @@ const SKALA_SELBST    = ['selbständig', 'überwiegend selbständig', 'überwieg
 const SKALA_FAEHIG    = ['unbeeinträchtigt', 'größtenteils vorhanden', 'in geringem Maße vorhanden', 'nicht vorhanden'];
 const SKALA_HAEUFIG   = ['nie oder sehr selten', 'selten', 'häufig', 'täglich'];
 
+// Modul 3: Häufigkeiten im Wortlaut der BRi (Kapitel F 4.3). Die Reihenfolge entspricht
+// den Optionen der Kriterien 4.3.1 bis 4.3.13 (0 / 1 / 3 / 5 Punkte).
+const PSYCHE_HAEUFIGKEIT = [
+    'nie oder sehr selten',
+    'selten – ein- bis dreimal innerhalb von zwei Wochen',
+    'häufig – zweimal bis mehrmals wöchentlich, aber nicht täglich',
+    'täglich'
+];
+
+// Nur die dritte Einstufung führt zu einer Wertung. Nach der BRi zählt allein die
+// Häufigkeit von Ereignissen, die personelle Unterstützung erforderlich machen.
+const PSYCHE_WERTUNG = [
+    'selbständig kompensiert',
+    'nach BRi nicht zu werten',
+    'umfassende personelle Intervention notwendig'
+];
+const PSYCHE_WERTUNG_ZAEHLT = 2;   // Index in PSYCHE_WERTUNG
+
 // Hilfsfunktion: erzeugt Einträge, die unmittelbar einem NBA-Kriterium entsprechen
 function _nbaEintraege(nummern, skala, zusatzfeld) {
     return nummern.map(nr => {
@@ -65,12 +83,16 @@ const BEFUND_GRUPPEN = [
                                   '4.2.7', '4.2.8', '4.2.9', '4.2.10', '4.2.11'], SKALA_FAEHIG)
     },
     {
-        id: 'psyche', titel: 'Psychische Problemlagen',
-        hinweis: 'Entspricht den Kriterien des Moduls 3. Voraussetzung ist eine fachärztliche Diagnose, '
-               + 'die seit mindestens sechs Monaten behandelt wird – diese bitte je Eintrag angeben.',
-        eintraege: _nbaEintraege(['4.3.1', '4.3.2', '4.3.3', '4.3.4', '4.3.5', '4.3.6', '4.3.7',
-                                  '4.3.8', '4.3.9', '4.3.10', '4.3.11', '4.3.12', '4.3.13'],
-                                 SKALA_HAEUFIG, 'Auftreten aufgrund welcher Diagnose')
+        // Sonderdarstellung: nicht alle dreizehn Kriterien werden aufgelistet. Es wird nur
+        // erfasst, welche Problemlagen tatsächlich bestehen (siehe psycheBlockHtml).
+        id: 'psyche', titel: 'Psychische Problemlagen', sonder: 'psyche',
+        hinweis: 'Nur bestehende Problemlagen erfassen. Voraussetzung ist eine fachärztliche Diagnose, '
+               + 'die seit mindestens sechs Monaten behandelt wird. In die Modulbewertung geht eine '
+               + 'Problemlage nur ein, wenn eine Häufigkeit gewählt ist UND umfassende personelle '
+               + 'Intervention notwendig ist.',
+        kriterien: ['4.3.1', '4.3.2', '4.3.3', '4.3.4', '4.3.5', '4.3.6', '4.3.7',
+                    '4.3.8', '4.3.9', '4.3.10', '4.3.11', '4.3.12', '4.3.13'],
+        eintraege: []
     },
     {
         id: 'ernaehrung', titel: 'Ernährung',

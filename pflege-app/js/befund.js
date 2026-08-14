@@ -7,6 +7,10 @@ let befundWerte = {};    // Schlüssel: eintragId oder eintragId|seite   ->  Stu
 let befundTexte = {};    // Schlüssel wie oben, jeweils Ergänzungstext
 let befundExtra = {};    // Zusätzliche Einträge je Gruppe: { gruppenId: [{titel, text}] }
 
+// Modul 3 wird nicht als vollständige Liste erfasst, sondern nur die tatsächlich
+// bestehenden Problemlagen: [{ nr, haeufigkeit, wertung, bemerkung }]
+let psycheListe = [];
+
 function befundSchluessel(eintrag, seite) {
     return seite ? eintrag.id + '|' + seite : eintrag.id;
 }
@@ -86,6 +90,137 @@ function befundEintrag(id) {
     return null;
 }
 
+// ------------------------------------------------- Modul 3: psychische Problemlagen
+// Erfasst werden nur bestehende Problemlagen. Die Bewertung wird ausschließlich dann in
+// die eigene Einschätzung übernommen, wenn eine Häufigkeit gewählt ist UND umfassende
+// personelle Intervention notwendig ist – nach der BRi zählt allein die Häufigkeit von
+// Ereignissen mit personellem Unterstützungsbedarf.
+
+function psycheGruppe() {
+    return BEFUND_GRUPPEN.find(g => g.sonder === 'psyche') || null;
+}
+
+function psycheTitel(nr) {
+    const item = ITEMS.find(i => i.nr === nr);
+    return nr + ' ' + (item ? item.title : '');
+}
+
+// Noch nicht erfasste Kriterien – nur diese stehen in der Auswahl zur Verfügung
+function psycheOffen() {
+    const g = psycheGruppe();
+    if (!g) return [];
+    const belegt = psycheListe.map(z => z.nr);
+    return g.kriterien.filter(nr => belegt.indexOf(nr) === -1);
+}
+
+function psycheHinzu(nr) {
+    if (!nr) return;
+    if (psycheListe.some(z => z.nr === nr)) return;
+    psycheListe.push({ nr: nr, haeufigkeit: null, wertung: null, bemerkung: '' });
+    psycheZeichnen();
+}
+
+function psycheEntfernen(i) {
+    const z = psycheListe[i];
+    if (!z) return;
+    psycheListe.splice(i, 1);
+    // Die Bewertung nicht einfach löschen: liegt ein Vorgutachten vor, gilt wieder dessen
+    // Wert, sonst null (nicht bewertet).
+    const item = ITEMS.find(x => x.nr === z.nr);
+    if (item) {
+        const vorher = stateOrig.values[item.id];
+        if (typeof vorher === 'number') stateEigene.values[item.id] = vorher;
+        else delete stateEigene.values[item.id];
+        psycheNeuBerechnen();
+    }
+    psycheZeichnen();
+}
+
+function psycheSetzen(i, feld, wert) {
+    const z = psycheListe[i];
+    if (!z) return;
+    if (feld === 'bemerkung') { z.bemerkung = wert; return; }
+    z[feld] = (wert === '') ? null : parseInt(wert, 10);
+    psycheUebernehmen(i);
+    psycheZeichnen();
+}
+
+// Schreibt eine Zeile in die eigene Einschätzung
+function psycheUebernehmen(i) {
+    const z = psycheListe[i];
+    if (!z) return;
+    const item = ITEMS.find(x => x.nr === z.nr);
+    if (!item) return;
+    if (z.wertung === PSYCHE_WERTUNG_ZAEHLT) {
+        if (typeof z.haeufigkeit === 'number') stateEigene.values[item.id] = z.haeufigkeit;
+    } else if (z.wertung === null) {
+        return;                              // noch keine Aussage getroffen
+    } else {
+        stateEigene.values[item.id] = 0;     // kompensiert oder nach BRi nicht zu werten
+    }
+    psycheNeuBerechnen();
+}
+
+function psycheNeuBerechnen() {
+    try { fillTable('own'); calculate('own'); } catch (e) {}
+}
+
+// Wird eine Zeile gewertet, obwohl noch etwas fehlt? Text für den Hinweis unter der Zeile.
+function psycheZeilenHinweis(z) {
+    if (z.wertung === PSYCHE_WERTUNG_ZAEHLT) {
+        if (typeof z.haeufigkeit !== 'number') return 'Häufigkeit fehlt – noch nicht gewertet.';
+        const item = ITEMS.find(x => x.nr === z.nr);
+        const p = (item && item.val) ? item.val[z.haeufigkeit] : null;
+        return 'In die Modulbewertung übernommen' + (p === null ? '' : ' (' + p + ' Punkte)') + '.';
+    }
+    if (z.wertung === null) return 'Bewertung noch offen.';
+    return 'Mit 0 Punkten übernommen – kein personeller Unterstützungsbedarf.';
+}
+
+function psycheZeile(z, i) {
+    const sel = (feld, skala, wert) => `
+        <select class="field-input" onchange="psycheSetzen(${i},'${feld}',this.value)">
+            <option value="">– keine Angabe –</option>
+            ${skala.map((s, k) => `<option value="${k}" ${wert === k ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
+        </select>`;
+    const gewertet = (z.wertung === PSYCHE_WERTUNG_ZAEHLT && typeof z.haeufigkeit === 'number');
+    return `<div class="psyche-zeile">
+        <div class="pz-kopf">
+            <span class="pz-titel">${escapeHtml(psycheTitel(z.nr))}</span>
+            <button type="button" class="btn btn-ghost pz-weg" onclick="psycheEntfernen(${i})" title="Problemlage entfernen">✕</button>
+        </div>
+        <div class="pz-raster">
+            <div><span class="bz-seite">Häufigkeit</span>${sel('haeufigkeit', PSYCHE_HAEUFIGKEIT, z.haeufigkeit)}</div>
+            <div><span class="bz-seite">Bewertung</span>${sel('wertung', PSYCHE_WERTUNG, z.wertung)}</div>
+            <div><span class="bz-seite">Bemerkung</span>
+                <input type="text" class="field-input" value="${escapeHtml(z.bemerkung || '')}"
+                       placeholder="Ausprägung, Auslöser, Diagnose"
+                       oninput="psycheSetzen(${i},'bemerkung',this.value)"></div>
+        </div>
+        <div class="pz-hinweis ${gewertet ? 'ist-gewertet' : ''}">${escapeHtml(psycheZeilenHinweis(z))}</div>
+    </div>`;
+}
+
+function psycheBlockHtml() {
+    const offen = psycheOffen();
+    return psycheListe.map((z, i) => psycheZeile(z, i)).join('')
+        + (offen.length
+            ? `<div class="psyche-wahl">
+                 <span class="bz-seite">Problemlage hinzufügen</span>
+                 <select class="field-input" onchange="psycheHinzu(this.value)">
+                     <option value="">– auswählen –</option>
+                     ${offen.map(nr => `<option value="${nr}">${escapeHtml(psycheTitel(nr))}</option>`).join('')}
+                 </select>
+               </div>`
+            : `<p style="font-size:11px;color:var(--text-muted)">Alle Problemlagen des Moduls 3 sind erfasst.</p>`);
+}
+
+function psycheZeichnen() {
+    const box = document.getElementById('befund-psyche');
+    if (box) box.innerHTML = psycheBlockHtml();
+    aktualisiereBefundHinweis();
+}
+
 // BMI aus Größe und Gewicht
 function berechneBmi() {
     const gr = parseFloat((befundTexte['groesse'] || '').replace(',', '.'));
@@ -122,6 +257,7 @@ function renderBefund() {
             <div class="card-header"><div class="dot"></div>${escapeHtml(g.titel)}</div>
             <div style="padding:16px 20px">
                 ${g.hinweis ? `<p style="font-size:11px;color:var(--text-muted);line-height:1.55;margin-bottom:14px">${escapeHtml(g.hinweis)}</p>` : ''}
+                ${g.sonder === 'psyche' ? `<div id="befund-psyche">${psycheBlockHtml()}</div>` : ''}
                 ${g.eintraege.map(e => befundZeile(g, e)).join('')}
                 <div id="befund-extra-${g.id}">${(befundExtra[g.id] || []).map((x, i) => befundExtraZeile(g.id, i, x)).join('')}</div>
                 <button class="btn btn-secondary" style="margin-top:10px" onclick="befundZeileHinzu('${g.id}')">+ Weiterer Eintrag</button>
@@ -277,6 +413,7 @@ function befundZusammenfassung() {
     const zeilen = [];
     BEFUND_GRUPPEN.forEach(g => {
         const teil = [];
+        if (g.sonder === 'psyche') psycheZusammenfassung().forEach(t => teil.push(t));
         g.eintraege.forEach(e => {
             if (e.frei) { const t = befundTexte[e.id]; if (t && t.trim()) teil.push(e.titel + ': ' + t.trim()); return; }
             (e.seiten ? ['rechts', 'links'] : [null]).forEach(s => {
@@ -295,12 +432,24 @@ function befundZusammenfassung() {
     return zeilen.join('\n');
 }
 
+// Die erfassten Problemlagen als Textzeilen (für die KI und für das Dokument)
+function psycheZusammenfassung() {
+    return psycheListe.filter(z => z.wertung !== null || typeof z.haeufigkeit === 'number').map(z => {
+        const teile = [];
+        if (typeof z.haeufigkeit === 'number') teile.push(PSYCHE_HAEUFIGKEIT[z.haeufigkeit]);
+        if (z.wertung !== null) teile.push(PSYCHE_WERTUNG[z.wertung]);
+        if ((z.bemerkung || '').trim()) teile.push(z.bemerkung.trim());
+        return psycheTitel(z.nr) + ': ' + teile.join('; ');
+    });
+}
+
 // ------------------------------------------------------- Speichern und Laden
 function befundSichern() {
-    return { werte: befundWerte, texte: befundTexte, extra: befundExtra };
+    return { werte: befundWerte, texte: befundTexte, extra: befundExtra, psyche: psycheListe };
 }
 function befundLaden(d) {
     befundWerte = (d && d.werte) || {};
     befundTexte = (d && d.texte) || {};
     befundExtra = (d && d.extra) || {};
+    psycheListe = (d && Array.isArray(d.psyche)) ? d.psyche : [];
 }

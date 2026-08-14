@@ -255,6 +255,64 @@ function selbsttest() {
             // BMI
             setzeBefundText('groesse', null, '172'); setzeBefundText('gewicht', null, '68');
             pruefe('Befund: BMI wird berechnet', befundTexte['bmi'], '23,0');
+
+            // ---------- Modul 3: nur bestehende Problemlagen ----------
+            const gPsy = BEFUND_GRUPPEN.find(g => g.id === 'psyche');
+            pruefeWahr('Modul 3: Sonderdarstellung statt Vollliste',
+                gPsy.sonder === 'psyche' && gPsy.eintraege.length === 0 && gPsy.kriterien.length === 13);
+            pruefe('Modul 3: Häufigkeiten im BRi-Wortlaut', PSYCHE_HAEUFIGKEIT, [
+                'nie oder sehr selten',
+                'selten – ein- bis dreimal innerhalb von zwei Wochen',
+                'häufig – zweimal bis mehrmals wöchentlich, aber nicht täglich',
+                'täglich']);
+            pruefe('Modul 3: drei Bewertungen', PSYCHE_WERTUNG,
+                ['selbständig kompensiert', 'nach BRi nicht zu werten', 'umfassende personelle Intervention notwendig']);
+            pruefe('Modul 3: Punktwerte der Häufigkeiten', krit('4.3.1').val, [0, 1, 3, 5]);
+            pruefeWahr('Modul 3: Skalenlänge passt zu den Häufigkeiten',
+                gPsy.kriterien.every(nr => krit(nr).opts.length === PSYCHE_HAEUFIGKEIT.length));
+
+            psycheListe = [];
+            stateEigene.values[krit('4.3.9').id] = 0;
+            stateOrig.values[krit('4.3.9').id] = 0;
+            psycheHinzu('4.3.9');
+            pruefe('Modul 3: Problemlage aufgenommen', psycheListe.length, 1);
+            pruefeWahr('Modul 3: erfasste Problemlage nicht mehr in der Auswahl',
+                !psycheOffen().includes('4.3.9'));
+            // Häufigkeit allein wertet noch nicht
+            psycheSetzen(0, 'haeufigkeit', '3');
+            pruefe('Modul 3: Häufigkeit allein wertet nicht', stateEigene.values[krit('4.3.9').id], 0);
+            // Erst mit personeller Intervention
+            psycheSetzen(0, 'wertung', '2');
+            pruefe('Modul 3: mit Intervention wird gewertet', stateEigene.values[krit('4.3.9').id], 3);
+            // Kompensiert setzt zurück auf 0
+            psycheSetzen(0, 'wertung', '0');
+            pruefe('Modul 3: kompensiert ergibt 0', stateEigene.values[krit('4.3.9').id], 0);
+            psycheSetzen(0, 'wertung', '1');
+            pruefe('Modul 3: nach BRi nicht zu werten ergibt 0', stateEigene.values[krit('4.3.9').id], 0);
+            // Bemerkung und Zusammenfassung
+            psycheSetzen(0, 'bemerkung', 'optische Halluzinationen abends');
+            pruefeWahr('Modul 3: Bemerkung in der Zusammenfassung',
+                psycheZusammenfassung()[0].includes('optische Halluzinationen abends'));
+            pruefeWahr('Modul 3: Zusammenfassung nennt Kriterium und Häufigkeit',
+                psycheZusammenfassung()[0].includes('4.3.9')
+                && psycheZusammenfassung()[0].includes('täglich'));
+            // Entfernen stellt den Wert des Vorgutachtens wieder her
+            stateOrig.values[krit('4.3.9').id] = 1;
+            psycheSetzen(0, 'wertung', '2');
+            pruefe('Modul 3: erneut gewertet', stateEigene.values[krit('4.3.9').id], 3);
+            psycheEntfernen(0);
+            pruefe('Modul 3: Entfernen stellt das Vorgutachten wieder her', stateEigene.values[krit('4.3.9').id], 1);
+            pruefe('Modul 3: Liste wieder leer', psycheListe.length, 0);
+            pruefeWahr('Modul 3: keine Zusammenfassung ohne Problemlage', psycheZusammenfassung().length === 0);
+            // Speichern und Laden
+            psycheHinzu('4.3.2'); psycheSetzen(0, 'haeufigkeit', '2'); psycheSetzen(0, 'wertung', '2');
+            const gesichertPsy = JSON.parse(JSON.stringify(befundSichern()));
+            psycheListe = [];
+            befundLaden(gesichertPsy);
+            pruefe('Modul 3: Problemlagen werden gesichert und geladen', psycheListe.length, 1);
+            pruefe('Modul 3: Häufigkeit übersteht das Laden', psycheListe[0].haeufigkeit, 2);
+            psycheListe = [];
+
             befundLaden(sicherungBefund);
 
             // Reiter nur in den neuen Vorgängen
