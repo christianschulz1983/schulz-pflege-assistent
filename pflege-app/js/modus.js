@@ -26,10 +26,6 @@ const MODI = {
     }
 };
 
-function modusTitel() {
-    return (MODI[appModus] || MODI.widerspruch).titel;
-}
-
 // Startauswahl anzeigen. schliessbar = false beim ersten Öffnen (es muss gewählt werden).
 function zeigeStart(schliessbar) {
     const ov = document.getElementById('start-overlay');
