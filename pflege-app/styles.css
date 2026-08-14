@@ -397,6 +397,21 @@
         }
         .side-step-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 
+        /* HANDREICHUNG: Erlaeuterung der Kriterien in einfacher Sprache */
+        .laien-zeile { font-size: 12.5px; line-height: 1.6; color: var(--text-secondary); }
+        .laien-zeile.punkt {
+            background: var(--bg-base); border: 1px solid var(--border); border-radius: 8px;
+            padding: 11px 13px; margin-bottom: 8px;
+        }
+        .laien-zeile.stufe {
+            padding: 7px 12px 7px 14px; margin: 0 0 5px 12px;
+            border-left: 2px solid var(--border); background: var(--bg-card2);
+            border-radius: 0 6px 6px 0; font-size: 12px;
+        }
+        .laien-zeile.stufe:last-child { margin-bottom: 0; }
+        .laien-lead { font-weight: 700; color: var(--accent); }
+        .laien-zeile.stufe .laien-lead { color: var(--text-primary); }
+
         /* ORIG-REF BADGE */
         .orig-ref-badge {
             display: inline-block; margin-top: 4px;
