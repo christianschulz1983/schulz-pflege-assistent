@@ -25,6 +25,7 @@ function selbsttest() {
         pruefe('Kriterienkatalog (ITEMS)', typeof ITEMS !== 'undefined' ? ITEMS.length : 0, 65);
         pruefe('BRi-Texte', typeof BRI_KRITERIEN !== 'undefined' ? Object.keys(BRI_KRITERIEN).length : 0, 65);
         pruefe('Praxishinweise', typeof LAIEN_HINWEISE !== 'undefined' ? Object.keys(LAIEN_HINWEISE).length : 0, 58);
+        pruefe('Handreichung im Wortlaut', typeof LAIEN_TEXTE !== 'undefined' ? Object.keys(LAIEN_TEXTE).length : 0, 58);
         pruefe('Durchführungsarten', typeof DURCHFUEHRUNGSARTEN !== 'undefined' ? DURCHFUEHRUNGSARTEN.length : 0, 3);
         pruefeWahr('PDF-Anzeige geladen', typeof pdfjsLib !== 'undefined');
 
@@ -184,6 +185,72 @@ function selbsttest() {
         pruefeWahr('Verfasserfelder existieren genau einmal',
             document.querySelectorAll('#verf-name-sel').length === 1 &&
             document.querySelectorAll('#verf-qual-sel').length === 1);
+
+        // ---------- 11b. Handreichung an der Schaltfläche (i) ----------
+        if (typeof LAIEN_TEXTE !== 'undefined') {
+            const nrs = Object.keys(LAIEN_TEXTE);
+            pruefe('Handreichung: nur bekannte Kriterien',
+                nrs.filter(nr => !ITEMS.some(i => i.nr === nr)), []);
+            pruefe('Handreichung: Modul 6 nicht enthalten (nicht beschrieben)',
+                nrs.filter(nr => nr.startsWith('4.6')), []);
+            // Ohne die Sonderregel „Besondere Bedarfskonstellation" (§ 15 Abs. 4) – kein Modulkriterium
+            pruefe('Handreichung: Module 1 bis 5 vollständig',
+                ITEMS.filter(i => /^4\.[1-5]\./.test(i.nr) && !LAIEN_TEXTE[i.nr]).map(i => i.nr), []);
+            pruefe('Handreichung: deckt 58 der 65 Einträge ab',
+                ITEMS.filter(i => LAIEN_TEXTE[i.nr]).length, 58);
+            pruefe('Handreichung: jeder Eintrag hat Titel und Inhalt',
+                nrs.filter(nr => !LAIEN_TEXTE[nr].titel
+                              || !Array.isArray(LAIEN_TEXTE[nr].zeilen)
+                              || !LAIEN_TEXTE[nr].zeilen.length), []);
+            pruefe('Handreichung: nur Ebene 0 und 1',
+                nrs.filter(nr => LAIEN_TEXTE[nr].zeilen.some(z => z[0] !== 0 && z[0] !== 1)), []);
+            pruefe('Handreichung: keine leeren Zeilen',
+                nrs.filter(nr => LAIEN_TEXTE[nr].zeilen.some(z => !String(z[1]).trim())), []);
+            pruefe('Handreichung: 374 Zeilen insgesamt',
+                nrs.reduce((s, nr) => s + LAIEN_TEXTE[nr].zeilen.length, 0), 374);
+
+            // Wortlaut unverändert – Stichproben aus dem Originaldokument
+            const wortlaut = (nr, i) => LAIEN_TEXTE[nr].zeilen[i][1];
+            pruefe('Wortlaut 4.1.1 Hilfsmittel-Regel', wortlaut('4.1.1', 1),
+                'Hilfsmittel-Regel: Nutzt die Person Hilfsmittel (Bettgalgen, Griffe, Seitengitter, '
+                + 'Strickleiter) und schafft sie damit ganz allein? -> selbständig (0 Punkte).');
+            pruefe('Wortlaut 4.5.1 Wichtig', wortlaut('4.5.1', 2),
+                'Wichtig: Das Richten der Tabletten zählt nur 1-mal wöchentlich. Das Bereitstellen am '
+                + 'Morgen zählt 1-mal täglich. Eine Erinnerung zählt nur bei kognitiven Einschränkungen. '
+                + 'Nicht verordnete Medikamente, Vitaminpräparate, frei verkäufliche Medikamente oder '
+                + 'Bedarfsmedikation (z. B. Einnahme bei Schmerzen) werden hier nicht gewertet.');
+            pruefe('Wortlaut 4.3.11 höchste Stufe', wortlaut('4.3.11', 7),
+                '5: Täglich: Völlige Apathie und keine Motivation von außen erreicht die Person mehr.');
+            pruefeWahr('Handreichung: Ansprache des Verfassers erhalten',
+                wortlaut('4.1.1', 4).includes('Du musst nur geringfügig helfen'));
+
+            // Schaltfläche (i) und Anzeige
+            pruefe('Schaltfläche (i) bei allen beschriebenen Kriterien',
+                ITEMS.filter(i => LAIEN_TEXTE[i.nr] && !hatErlaeuterung(i)).map(i => i.nr), []);
+            const modul6 = ITEMS.find(i => i.nr === '4.6.2');
+            pruefeWahr('Modul 6 fällt auf die bisherigen Kurzhinweise zurück',
+                !LAIEN_TEXTE['4.6.2'] && hatErlaeuterung(modul6) === !!(modul6.info && (modul6.info.check || modul6.info.steps)));
+
+            const itemA = ITEMS.find(i => i.nr === '4.1.1');
+            const knopf = document.querySelector('#row-own-' + itemA.id + ' .info-btn');
+            pruefeWahr('Schaltfläche zeigt (i) statt Strich', !!knopf && knopf.innerText.trim() === 'i');
+            selectItem(itemA.id, 'own', knopf);
+            const rumpf = document.getElementById('side-body-own');
+            pruefe('Anzeige: alle Zeilen des Kriteriums',
+                rumpf.querySelectorAll('.laien-zeile').length, LAIEN_TEXTE['4.1.1'].zeilen.length);
+            pruefeWahr('Anzeige: Wortlaut erscheint unverändert',
+                rumpf.innerText.includes('Bettgalgen, Griffe, Seitengitter, Strickleiter'));
+            pruefe('Anzeige: Titel aus der Handreichung',
+                document.getElementById('side-title-own').innerText, '4.1.1 Positionswechsel im Bett');
+            pruefe('Anzeige: Abstufungen eingerückt',
+                rumpf.querySelectorAll('.laien-zeile.stufe').length,
+                LAIEN_TEXTE['4.1.1'].zeilen.filter(z => z[0] === 1).length);
+            selectItem(itemA.id, 'own', knopf);   // wieder zuklappen
+
+            // Sonderzeichen dürfen die Anzeige nicht zerlegen
+            pruefeWahr('Anzeige: Sonderzeichen werden entschärft',
+                laienZeileHtml(0, 'Test: <b>x</b> & "y"').includes('&lt;b&gt;'));
+        }
 
         // ---------- 12. Befundkatalog ----------
         if (typeof BEFUND_GRUPPEN !== 'undefined') {

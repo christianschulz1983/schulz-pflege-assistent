@@ -86,10 +86,7 @@ function renderNBASection(prefix) {
                 <div class="sidebar-empty" id="sidebar-empty-${prefix}">Info-Button (i) wählen</div>
                 <div class="sidebar-content" id="sidebar-content-${prefix}">
                     <div class="side-item-title" id="side-title-${prefix}"></div>
-                    <div class="side-section-label">Laien-Check</div>
-                    <div class="side-check-box" id="side-check-${prefix}"></div>
-                    <div class="side-section-label">Offizielle Abstufungen</div>
-                    <div id="side-steps-${prefix}"></div>
+                    <div id="side-body-${prefix}"></div>
                 </div>
             </div>
         </div>
@@ -194,7 +191,7 @@ function renderRow(i, pref) {
     const st = pref === 'orig' ? stateOrig : stateEigene;
     // Prominenter Vorgutachten-Balken ÜBER der eigenen Einschätzung (nur Reiter "own").
     const vorgBox = pref === 'own' ? `<div class="vorg-box" id="origref-own-${i.id}">${getOriginalRef(i.id)}</div>` : '';
-    const hasInfo = !!(i.info && (i.info.check || i.info.steps));
+    const hasInfo = hatErlaeuterung(i);
 
     if(i.m===5 && i.group!=='D'){
         const val = st.values[i.id];

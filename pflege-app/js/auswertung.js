@@ -1,23 +1,61 @@
 // Teil des Pflegegradassistenten für Berater. Diese Datei wurde aus der frueheren
 // Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
 let activeSidebarBtn = {};
+
+// Erlaeuterung des Verfassers zu einem Kriterium (Handreichung in einfacher Sprache).
+function laienText(nr) {
+    return (typeof LAIEN_TEXTE !== 'undefined' && nr) ? (LAIEN_TEXTE[nr] || null) : null;
+}
+
+function hatErlaeuterung(item) {
+    if (!item) return false;
+    if (laienText(item.nr)) return true;
+    return !!(item.info && (item.info.check || item.info.steps));
+}
+
+// Gibt den Wortlaut unveraendert wieder. Hervorgehoben wird lediglich die Beschriftung
+// vor dem ersten Doppelpunkt („Laien-Check:", „Hilfsmittel-Regel:", „0:" und so weiter).
+function laienZeileHtml(ebene, text) {
+    const t = escapeHtml(text);
+    const m = t.match(/^([^:]{1,40}):\s*([\s\S]*)$/);
+    const inhalt = m
+        ? `<span class="laien-lead">${m[1]}:</span>${m[2] ? ' ' + m[2] : ''}`
+        : t;
+    return `<div class="laien-zeile ${ebene ? 'stufe' : 'punkt'}">${inhalt}</div>`;
+}
+
 function selectItem(id, pref, btn) {
     const item=ITEMS.find(i=>i.id===id);
-    if(!item || !item.info) return;
+    if(!item || !hatErlaeuterung(item)) return;
     if(activeSidebarBtn[pref] && activeSidebarBtn[pref] !== btn) activeSidebarBtn[pref].classList.remove('active');
     if(btn){ btn.classList.toggle('active'); if(!btn.classList.contains('active')){ document.getElementById('sidebar-empty-'+pref).style.display='flex'; document.getElementById('sidebar-content-'+pref).style.display='none'; activeSidebarBtn[pref]=null; return; } }
     activeSidebarBtn[pref]=btn;
     document.getElementById('sidebar-empty-'+pref).style.display='none';
     document.getElementById('sidebar-content-'+pref).style.display='block';
-    document.getElementById('side-title-'+pref).innerText=(item.nr?item.nr+' ':'')+item.title;
-    document.getElementById('side-check-'+pref).innerHTML=item.info?.check||'—';
-    const steps=item.info?.steps;
-    const stepsEl=document.getElementById('side-steps-'+pref);
-    if(steps && steps.length){
-        stepsEl.innerHTML=steps.map(s=>`<div class="side-step"><div class="side-step-label">${s.l}</div><div class="side-step-text">${s.d}</div></div>`).join('');
-    } else if(item.info?.rule){
-        stepsEl.innerHTML=`<div class="side-step"><div class="side-step-label">Hinweis</div><div class="side-step-text">${item.info.rule}</div></div>`;
-    } else { stepsEl.innerHTML='<div style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono)">Keine weiteren Details.</div>'; }
+
+    const lt = laienText(item.nr);
+    document.getElementById('side-title-'+pref).innerText =
+        (item.nr ? item.nr+' ' : '') + ((lt && lt.titel) ? lt.titel : item.title);
+
+    const koerper = document.getElementById('side-body-'+pref);
+    if (lt) {
+        koerper.innerHTML = lt.zeilen.map(z => laienZeileHtml(z[0], z[1])).join('');
+        return;
+    }
+    // Kriterien ohne Handreichung (Modul 6): bisherige Kurzhinweise
+    let html = '';
+    if (item.info?.check) {
+        html += '<div class="side-section-label">Laien-Check</div>'
+              + `<div class="side-check-box">${item.info.check}</div>`;
+    }
+    const steps = item.info?.steps;
+    if (steps && steps.length) {
+        html += '<div class="side-section-label">Offizielle Abstufungen</div>'
+              + steps.map(s=>`<div class="side-step"><div class="side-step-label">${s.l}</div><div class="side-step-text">${s.d}</div></div>`).join('');
+    } else if (item.info?.rule) {
+        html += `<div class="side-step"><div class="side-step-label">Hinweis</div><div class="side-step-text">${item.info.rule}</div></div>`;
+    }
+    koerper.innerHTML = html || '<div style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono)">Keine weiteren Details.</div>';
 }
 
 function renderAuswertung() {
