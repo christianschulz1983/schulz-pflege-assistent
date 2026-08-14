@@ -179,7 +179,14 @@ function selbsttest() {
 
         // ---------- 12. Befundkatalog ----------
         if (typeof BEFUND_GRUPPEN !== 'undefined') {
-            pruefe('Befundkatalog: acht Gruppen', BEFUND_GRUPPEN.length, 8);
+            pruefe('Befundkatalog: sieben Gruppen', BEFUND_GRUPPEN.length, 7);
+            pruefeWahr('Befundkatalog: untere Extremitäten entfernt', !BEFUND_GRUPPEN.some(g => g.id === 'untere'));
+            const tremor = (BEFUND_GRUPPEN.find(g => g.id === 'sonstiges') || { eintraege: [] })
+                .eintraege.find(e => e.id === 'tremor');
+            pruefeWahr('Tremor vorhanden, seitengetrennt', !!tremor && tremor.seiten === true);
+            pruefe('Tremor: feinschlägig oder grobschlägig', tremor && tremor.skala, ['feinschlägig', 'grobschlägig']);
+            pruefe('Tremor: Auftreten wählbar', tremor && tremor.zusatzAuswahl && tremor.zusatzAuswahl.skala,
+                ['bei Belastung', 'in Ruhe', 'bei Belastung und in Ruhe']);
             const verknuepfungsfehler = [];
             BEFUND_GRUPPEN.forEach(g => g.eintraege.forEach(e => {
                 if (e.nba) {
@@ -260,6 +267,23 @@ function selbsttest() {
             pruefe('Modul 5: Injektionen (4.5.2)', kurz('4.5.2'), '4D');
             pruefe('Modul 5: körpernahe Hilfsmittel summiert (4.5.7)', kurz('4.5.7'), '2D');
             pruefe('Modul 5: Verbandswechsel (4.5.8)', kurz('4.5.8'), '3W');
+
+            // Hilfsmittel: mit personeller Hilfe zu 4.5.7, mit den Ausschlüssen der BRi
+            erfassung.hilfsmittel = [
+                { bezeichnung: 'Kompressionsstrümpfe', anzahl: '2', zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' },
+                { bezeichnung: 'Brille', anzahl: '2', zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' },
+                { bezeichnung: 'Zahnprothesen', anzahl: '2', zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' },
+                { bezeichnung: 'Walkingstöcke', anzahl: '1', zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' },
+                { bezeichnung: 'Katheter für intermittierenden Selbstkatheterismus', anzahl: '4', zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' },
+                { bezeichnung: 'Hörgerät', anzahl: '2', zeitraum: 'pro Tag', durchfuehrung: 'selbständig' }
+            ];
+            erfassung.behandlungspflege = []; erfassung.medikation = []; erfassung.arztbesuche = [];
+            const zh = modul5AusErfassung();
+            const kurzH = nr => zh[nr] ? zh[nr].count + zh[nr].period : 'fehlt';
+            pruefe('Hilfsmittel: Kompressionsstrümpfe zu 4.5.7', kurzH('4.5.7'), '2D');
+            pruefe('Hilfsmittel: Katheter zu 4.5.10', kurzH('4.5.10'), '4D');
+            pruefe('Hilfsmittel: Brille, Zahnprothese und Gehhilfen zählen nicht',
+                Object.keys(zh).sort(), ['4.5.10', '4.5.7']);
             pruefeWahr('Modul 5: selbständige Maßnahmen zählen nicht',
                 !Object.keys(z).some(nr => nr === '4.5.14' && z[nr].count > 2));
             erfassungLaden(sicherungErf);

@@ -66,6 +66,18 @@ function setzeBefundText(eintragId, seite, text) {
     if (eintragId === 'groesse' || eintragId === 'gewicht') berechneBmi();
 }
 
+function setzeBefundZusatz(eintragId, wert) {
+    if (wert === '') delete befundWerte[eintragId + '_zw'];
+    else befundWerte[eintragId + '_zw'] = parseInt(wert, 10);
+}
+
+// Text der zweiten Auswahl, etwa „in Ruhe" beim Tremor
+function befundZusatzText(e) {
+    if (!e.zusatzAuswahl) return '';
+    const i = befundWerte[e.id + '_zw'];
+    return (typeof i === 'number') ? e.zusatzAuswahl.skala[i] : '';
+}
+
 function befundEintrag(id) {
     for (const g of BEFUND_GRUPPEN) {
         const e = g.eintraege.find(x => x.id === id);
@@ -160,6 +172,13 @@ function befundZeile(gruppe, e) {
         ? `<input type="text" class="field-input" style="margin-top:6px" placeholder="${escapeHtml(e.zusatz)}"
               value="${escapeHtml(befundTexte[e.id + '_zusatz'] || '')}"
               oninput="setzeBefundText('${e.id}','_zusatz',this.value)">` : '';
+    // Zweites Auswahlfeld, zum Beispiel beim Tremor das Auftreten
+    const zusatzWahl = e.zusatzAuswahl
+        ? `<div style="margin-top:6px"><span class="bz-seite">${escapeHtml(e.zusatzAuswahl.titel)}</span>
+             <select class="field-input" onchange="setzeBefundZusatz('${e.id}',this.value)">
+               <option value="">– keine Angabe –</option>
+               ${e.zusatzAuswahl.skala.map((s, i) => `<option value="${i}" ${befundWerte[e.id + '_zw'] === i ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
+             </select></div>` : '';
     const kennung = e.nba ? '<span class="befund-nba" title="Wird unmittelbar in die eigene Einschätzung übernommen">NBA</span>' : '';
 
     if (e.seiten) {
@@ -169,7 +188,7 @@ function befundZeile(gruppe, e) {
                 <div><span class="bz-seite">rechts</span>${feldReihe('rechts')}</div>
                 <div><span class="bz-seite">links</span>${feldReihe('links')}</div>
             </div>
-            ${zusatz}
+            ${zusatzWahl}${zusatz}
         </div>`;
     }
     return `<div class="befund-zeile">
@@ -264,7 +283,7 @@ function befundZusammenfassung() {
                 const w = befundWert(e, s);
                 if (w === null) return;
                 if (e.nba && w === 0) return;   // unauffällige Kriterien tragen nichts bei
-                const zusatz = befundTexte[e.id + '_zusatz'];
+                const zusatz = [befundZusatzText(e), befundTexte[e.id + '_zusatz']].filter(Boolean).join(', ');
                 teil.push(e.titel + (s ? ' ' + s : '') + ': ' + e.skala[w] + (zusatz ? ' (' + zusatz + ')' : ''));
             });
         });

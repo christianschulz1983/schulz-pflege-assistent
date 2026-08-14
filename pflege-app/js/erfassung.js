@@ -26,16 +26,17 @@ const ERFASSUNG_TABELLEN = [
     {
         id: 'pflegepersonen', titel: 'Pflegeperson und Pflegedienst',
         hinweis: 'Mehrere Einträge möglich – Pflegeperson, Pflegedienst oder beides.',
+        alsFormular: true,          // untereinander statt in einer schmalen Tabelle
         spalten: [
-            { k: 'art', l: 'Art', typ: 'select', opt: ['Pflegeperson', 'Ambulanter Pflegedienst'], b: '150px' },
-            { k: 'name', l: 'Name', typ: 'text' },
-            { k: 'geboren', l: 'Geburtsdatum', typ: 'date', b: '140px' },
-            { k: 'adresse', l: 'Adresse', typ: 'text' },
-            { k: 'telefon', l: 'Telefon', typ: 'text', b: '130px' },
-            { k: 'tage', l: 'Tage/Woche', typ: 'number', b: '95px' },
-            { k: 'stunden', l: 'Std./Tag', typ: 'number', b: '85px' },
-            { k: 'wochenstunden', l: 'Wochenstd.', typ: 'text', b: '95px', berechnet: true },
-            { k: 'unterstuetzung', l: 'Wobei wird unterstützt', typ: 'text' }
+            { k: 'art', l: 'Art', typ: 'select', opt: ['Pflegeperson', 'Ambulanter Pflegedienst'], breit: 1 },
+            { k: 'name', l: 'Name', typ: 'text', breit: 2 },
+            { k: 'geboren', l: 'Geburtsdatum', typ: 'date', breit: 1 },
+            { k: 'telefon', l: 'Telefon', typ: 'text', breit: 1 },
+            { k: 'adresse', l: 'Adresse', typ: 'text', breit: 3 },
+            { k: 'tage', l: 'Tage pro Woche', typ: 'number', breit: 1 },
+            { k: 'stunden', l: 'Stunden am Tag', typ: 'number', breit: 1 },
+            { k: 'wochenstunden', l: 'Wochenstunden', typ: 'text', breit: 1, berechnet: true },
+            { k: 'unterstuetzung', l: 'Wobei wird unterstützt', typ: 'text', breit: 4 }
         ]
     },
     {
@@ -48,9 +49,14 @@ const ERFASSUNG_TABELLEN = [
     },
     {
         id: 'hilfsmittel', titel: 'Hilfsmittel',
+        hinweis: 'Nur Hilfsmittel mit personeller Hilfe fließen in Modul 5 ein (körpernahe Hilfsmittel zu 4.5.7). '
+               + 'Nicht gewertet werden laut BRi: Brille, Zahnprothese (gehört zu 4.4.2) sowie Gehhilfen wie '
+               + 'Rollator, Gehstock oder Rollstuhl.',
         spalten: [
             { k: 'bezeichnung', l: 'Hilfsmittel', typ: 'text' },
-            { k: 'seit', l: 'vorhanden seit', typ: 'text', b: '150px' },
+            { k: 'anzahl', l: 'Anzahl', typ: 'number', b: '80px' },
+            { k: 'zeitraum', l: 'Zeitraum', typ: 'select', opt: HAEUFIGKEIT_ZEITRAUM, b: '120px' },
+            { k: 'durchfuehrung', l: 'Durchführung', typ: 'select', opt: DURCHFUEHRUNG, b: '170px' },
             { k: 'anmerkung', l: 'Anmerkung', typ: 'text' }
         ]
     },
@@ -144,10 +150,12 @@ function renderErfassung() {
                 <div class="card-header"><div class="dot"></div>${escapeHtml(t.titel)}</div>
                 <div style="padding:16px 20px">
                     ${t.hinweis ? `<p style="font-size:11px;color:var(--text-muted);line-height:1.55;margin-bottom:12px">${escapeHtml(t.hinweis)}</p>` : ''}
-                    <div style="overflow-x:auto"><table class="erf-tabelle">
+                    ${t.alsFormular
+                        ? `<div id="erf-body-${t.id}">${erfZeilen(t)}</div>`
+                        : `<div style="overflow-x:auto"><table class="erf-tabelle">
                         <thead><tr>${t.spalten.map(s => `<th${s.b ? ` style="width:${s.b}"` : ''}>${escapeHtml(s.l)}</th>`).join('')}<th style="width:38px"></th></tr></thead>
                         <tbody id="erf-body-${t.id}">${erfZeilen(t)}</tbody>
-                    </table></div>
+                    </table></div>`}
                     <button class="btn btn-secondary" style="margin-top:10px" onclick="erfZeileHinzu('${t.id}')">+ Weitere Zeile</button>
                 </div>
             </div>`).join('')
@@ -173,6 +181,21 @@ function erfZeilen(t) {
 }
 
 function erfZeile(t, i, z) {
+    if (t.alsFormular) {
+        // Untereinander mit Beschriftung über dem Feld, damit alles lesbar bleibt
+        return `<div class="erf-block">
+            <div class="erf-block-kopf">
+                <span class="erf-block-nr">Eintrag ${i + 1}</span>
+                <button class="erf-weg" title="Eintrag entfernen" onclick="erfZeileWeg('${t.id}',${i})">×</button>
+            </div>
+            <div class="erf-raster">
+                ${t.spalten.map(s => `<div style="grid-column:span ${s.breit || 1}">
+                    <label class="field-label">${escapeHtml(s.l)}</label>
+                    ${erfFeld(t, i, s, z[s.k])}
+                </div>`).join('')}
+            </div>
+        </div>`;
+    }
     return `<tr>${t.spalten.map(s => `<td>${erfFeld(t, i, s, z[s.k])}</td>`).join('')}
         <td><button class="erf-weg" title="Zeile entfernen" onclick="erfZeileWeg('${t.id}',${i})">×</button></td></tr>`;
 }
@@ -262,6 +285,18 @@ function modul5AusErfassung() {
     (erfassung.medikation || []).forEach(z => {
         if (z.durchfuehrung !== 'durch Pflegeperson') return;
         addieren(z.applikation === 'Injektion' ? '4.5.2' : '4.5.1', z.anzahl, z.zeitraum);
+    });
+    // Hilfsmittel: nur mit personeller Hilfe. Laut BRi zählen Brille, Zahnprothese und
+    // Gehhilfen hier NICHT – Zahnprothesen gehören zu 4.4.2, Gehhilfen begründen nichts.
+    (erfassung.hilfsmittel || []).forEach(z => {
+        if (z.durchfuehrung !== 'durch Pflegeperson') return;
+        const b = (z.bezeichnung || '').toLowerCase();
+        if (/brille|zahnprothese|gebiss|rollator|gehstock|walking|rollstuhl|gehhilfe/.test(b)) return;
+        let nr = '4.5.7';
+        if (/katheter/.test(b)) nr = '4.5.10';
+        else if (/stoma/.test(b)) nr = '4.5.9';
+        else if (/sauerstoff|cpap/.test(b)) nr = '4.5.4';
+        addieren(nr, z.anzahl, z.zeitraum);
     });
     (erfassung.behandlungspflege || []).forEach(z => {
         if (z.durchfuehrung !== 'durch Pflegeperson') return;

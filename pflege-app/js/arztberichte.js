@@ -176,7 +176,8 @@ function uebernehmeBerichtFunde() {
         } else if (bereich === 'krankenhaus') {
             erfHinzufuegen('krankenhaus', { von: formatToYYYYMMDD(e.von) || '', bis: formatToYYYYMMDD(e.bis) || '', grund: e.grund || '' });
         } else if (bereich === 'hilfsmittel') {
-            erfHinzufuegen('hilfsmittel', { bezeichnung: e.bezeichnung || '', seit: e.seit || '' });
+            erfHinzufuegen('hilfsmittel', { bezeichnung: e.bezeichnung || '',
+                anmerkung: e.seit ? 'vorhanden seit ' + e.seit : '' });
         } else if (bereich === 'medikation') {
             erfHinzufuegen('medikation', { bezeichnung: e.bezeichnung || '', applikation: e.applikation || '',
                 anzahl: e.anzahl || '', zeitraum: e.zeitraum || '' });

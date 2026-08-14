@@ -40,7 +40,7 @@ function befundBlock() {
                 // Unauffällige NBA-Kriterien (Stufe 0) nicht auflisten – sie tragen nichts bei
                 // und würden das Dokument mit 35 Zeilen ohne Aussage füllen.
                 if (e.nba && w === 0) return;
-                const zusatz = befundTexte[e.id + '_zusatz'];
+                const zusatz = [befundZusatzText(e), befundTexte[e.id + '_zusatz']].filter(Boolean).join(', ');
                 zeilen.push([e.titel + (s ? ' ' + s : ''), e.skala[w] + (zusatz ? ' – ' + zusatz : '')]);
             });
         });
@@ -260,8 +260,9 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
     <h2>Aktuelle Situation</h2>
     <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${notesBlock}</div>
 
-    ${tabellenBlock('Hilfsmittel', ['Hilfsmittel', 'vorhanden seit', 'Anmerkung'],
-        erfZeilenGefuellt('hilfsmittel', ['bezeichnung', 'seit', 'anmerkung']))}
+    ${tabellenBlock('Hilfsmittel', ['Hilfsmittel', 'Häufigkeit', 'Durchführung', 'Anmerkung'],
+        (erfassung.hilfsmittel || []).filter(z => (z.bezeichnung || '').trim())
+            .map(z => [z.bezeichnung, haeufigkeitText(z), z.durchfuehrung || '', z.anmerkung || '']))}
 
     <h2>Körperlicher Befund</h2>
     <table class="cmp"><thead><tr><th>Körpergröße (cm)</th><th>Gewicht (kg)</th><th>BMI</th><th>Status</th></tr></thead>
