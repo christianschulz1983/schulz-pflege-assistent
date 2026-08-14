@@ -1,4 +1,4 @@
-// Selbsttest des Schulz Pflege-Assistenten.
+// Selbsttest des Pflegegradassistenten für Berater.
 // Prüft die kritischen Wege des Widerspruchs auf Knopfdruck. Der Test sichert den
 // aktuellen Fall vorher und stellt ihn danach wieder her – er verändert nichts.
 

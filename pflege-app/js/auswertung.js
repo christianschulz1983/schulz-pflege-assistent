@@ -1,4 +1,4 @@
-// Teil des Schulz Pflege-Assistenten. Diese Datei wurde aus der frueheren
+// Teil des Pflegegradassistenten für Berater. Diese Datei wurde aus der frueheren
 // Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
 let activeSidebarBtn = {};
 function selectItem(id, pref, btn) {
@@ -178,7 +178,7 @@ function saveCase() {
                 erfassung: (typeof erfassungSichern === 'function') ? erfassungSichern() : null};
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
     const name=(document.getElementById('stam-betreffend').value||'Fall').replace(/\s/g,'_');
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${name}_PflegeAssistent.json`; a.click();
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${name}_Pflegegradassistent.json`; a.click();
 }
 
 function loadCase(e) {
@@ -216,7 +216,7 @@ function loadCase(e) {
             }, 100);
             showToast('Fall erfolgreich geladen!', 'success');
         } catch(err) {
-            showToast('Fehler: Keine gültige Pflege-Assistent-Datei.', 'error');
+            showToast('Fehler: Keine gültige Pflegegradassistent-Datei.', 'error');
         }
         e.target.value = '';
     };

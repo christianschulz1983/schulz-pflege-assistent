@@ -1,4 +1,4 @@
-// Teil des Schulz Pflege-Assistenten. Diese Datei wurde aus der frueheren
+// Teil des Pflegegradassistenten für Berater. Diese Datei wurde aus der frueheren
 // Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
 async function callGeminiWithRetry(url, payload) {
     let delay = 1000;

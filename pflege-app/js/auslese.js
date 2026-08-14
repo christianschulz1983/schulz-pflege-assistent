@@ -1,4 +1,4 @@
-// Teil des Schulz Pflege-Assistenten. Diese Datei wurde aus der frueheren
+// Teil des Pflegegradassistenten für Berater. Diese Datei wurde aus der frueheren
 // Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
 const LOCAL_SERVER_URL = "http://127.0.0.1:8765";
 let lastServerReachable = false; // wurde der lokale Server beim letzten Versuch erreicht?

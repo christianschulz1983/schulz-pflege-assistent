@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lokaler Pflege-Assistent-Hilfsserver (Stufe 2 / Alternative B)
+Lokaler Hilfsserver des Pflegegradassistenten fuer Berater
 
 Aufgabe:
 - Nimmt ein PDF/Bild von der lokalen HTML-App entgegen (nur localhost).
@@ -508,7 +508,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 def main():
     print("=" * 56)
-    print(" Pflege-Assistent – lokaler Hilfsserver")
+    print(" Pflegegradassistent für Berater – lokaler Hilfsserver")
     print("=" * 56)
     print(" App im Browser oeffnen:  http://127.0.0.1:%d" % PORT)
     print(" (genau diese Adresse verwenden, NICHT die Datei direkt)")
