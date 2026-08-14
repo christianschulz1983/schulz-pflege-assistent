@@ -2,7 +2,7 @@
 chcp 65001 >nul
 cd /d "%~dp0"
 echo ============================================================
-echo  Pflege-Assistent - lokaler Hilfsserver
+echo  Pflegegradassistent für Berater - lokaler Hilfsserver
 echo ============================================================
 echo.
 

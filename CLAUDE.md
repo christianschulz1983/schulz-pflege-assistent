@@ -1,4 +1,4 @@
-# Schulz Pflege-Assistent – Projektanweisung
+# Pflegegradassistent für Berater – Projektanweisung
 
 Diese Datei wird bei jeder Sitzung automatisch geladen. Sie ersetzt das fehlende
 Gedächtnis zwischen Sitzungen. Bei Änderungen an der Arbeitsweise hier nachtragen.

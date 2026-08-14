@@ -1,4 +1,4 @@
-# Schulz Pflege-Assistent
+# Pflegegradassistent für Berater
 
 Lokale Web-App zur Auswertung von Pflegegutachten (NBA / SGB XI) und zur Erstellung
 pflegefachlicher Stellungnahmen / Widersprüche. Entwickelt für die Familiara GmbH.

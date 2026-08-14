@@ -1,4 +1,4 @@
-// Teil des Schulz Pflege-Assistenten. Diese Datei wurde aus der frueheren
+// Teil des Pflegegradassistenten für Berater. Diese Datei wurde aus der frueheren
 // Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
 // Wählt die Vorlage nach Vorgangsart: Widerspruch wie bisher, sonst die Antragsvorlage.
 function baueDokument(notes, begruendungen, allgemeinText) {

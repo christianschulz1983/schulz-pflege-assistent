@@ -1,4 +1,4 @@
-// Teil des Schulz Pflege-Assistenten. Diese Datei wurde aus der frueheren
+// Teil des Pflegegradassistenten für Berater. Diese Datei wurde aus der frueheren
 // Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
 // API Key: Always set const apiKey = "" (empty string). The execution environment provides the key at runtime.
 const apiKey = "";
