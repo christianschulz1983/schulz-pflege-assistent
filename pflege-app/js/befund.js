@@ -33,7 +33,7 @@ function setzeBefund(gruppenId, eintragId, seite, wert) {
     if (eintrag.nba) {
         const item = ITEMS.find(i => i.nr === eintrag.nba);
         if (item && idx !== null) {
-            stateEigene.values[item.id] = idx;      // gemeinsame Angabe, keine Doppelerfassung
+            setzeBewertung('own', item.id, idx, 'befund');   // gemeinsame Angabe, keine Doppelerfassung
             try { fillTable('own'); calculate('own'); } catch (e) {}
         }
     } else {
@@ -129,8 +129,8 @@ function psycheEntfernen(i) {
     const item = ITEMS.find(x => x.nr === z.nr);
     if (item) {
         const vorher = stateOrig.values[item.id];
-        if (typeof vorher === 'number') stateEigene.values[item.id] = vorher;
-        else delete stateEigene.values[item.id];
+        if (typeof vorher === 'number') setzeBewertung('own', item.id, vorher, 'befund');
+        else { delete stateEigene.values[item.id]; }
         psycheNeuBerechnen();
     }
     psycheZeichnen();
@@ -152,11 +152,11 @@ function psycheUebernehmen(i) {
     const item = ITEMS.find(x => x.nr === z.nr);
     if (!item) return;
     if (z.wertung === PSYCHE_WERTUNG_ZAEHLT) {
-        if (typeof z.haeufigkeit === 'number') stateEigene.values[item.id] = z.haeufigkeit;
+        if (typeof z.haeufigkeit === 'number') setzeBewertung('own', item.id, z.haeufigkeit, 'befund');
     } else if (z.wertung === null) {
         return;                              // noch keine Aussage getroffen
     } else {
-        stateEigene.values[item.id] = 0;     // kompensiert oder nach BRi nicht zu werten
+        setzeBewertung('own', item.id, 0, 'befund');   // kompensiert oder nach BRi nicht zu werten
     }
     psycheNeuBerechnen();
 }

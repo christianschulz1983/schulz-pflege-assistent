@@ -143,12 +143,12 @@ function zeigeBerichtFunde() {
         box.innerHTML = '<div class="vs-leer">In den Unterlagen ließen sich keine übernehmbaren Angaben finden.</div>';
     } else {
         box.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px">'
-            + 'Bitte prüfen. Nur Angehaktes wird übernommen und an die vorhandenen Einträge angehängt.</p>'
+            + 'Bitte prüfen. <b>Nichts ist vorausgewählt.</b> Nur Angehaktes wird übernommen und an die vorhandenen Einträge angehängt.</p>'
             + abschnitte.filter(([k]) => (berichtFunde[k] || []).length).map(([k, titel, felder]) => `
                 <div class="rev-sec-title" style="margin-top:14px">${escapeHtml(titel)}</div>
                 ${berichtFunde[k].map((e, i) => `
                     <label class="vs-item" style="border-left-color:var(--accent2)">
-                        <input type="checkbox" checked data-bereich="${k}" data-idx="${i}">
+                        <input type="checkbox" data-bereich="${k}" data-idx="${i}">
                         <div style="flex:1">
                             <div class="vs-grund">${felder(e).filter(Boolean).map(escapeHtml).join(' · ')}</div>
                             <div class="vs-fund">Quelle: ${escapeHtml((e._quellen || []).join(', '))}</div>

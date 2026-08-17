@@ -53,6 +53,13 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    immer „kein Pflegegrad". Schrift Calibri 11 pt, blaue Überschriften 14 pt, Briefkopf 9 pt.
 7. **Die drei Durchführungsarten** sind abschließend: Hausbesuch mit persönlicher
    Befunderhebung / per Aktenlage / strukturiertes Telefoninterview.
+8. **Die App trägt niemals eigenmächtig Bewertungen ein.** Nach dem geprüften und
+   bestätigten Import ist die Bepunktung Sache des Beraters. Die KI darf ausschließlich
+   vorschlagen; übernommen wird nur, was ausdrücklich angehakt wurde – Auswahllisten
+   starten deshalb **ohne** gesetzte Haken. Jeder Schreibzugriff läuft über
+   `setzeBewertung()` in `js/bewertung.js`, nennt seine Quelle und wird protokolliert;
+   ein unbekannter Ursprung wird abgewiesen. Neue Schreibstellen niemals direkt auf
+   `stateEigene.values` / `stateOrig.values` setzen.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung

@@ -330,7 +330,7 @@ function uebernehmeModul5(mitMeldung) {
     Object.keys(z).forEach(nr => {
         const item = ITEMS.find(i => i.nr === nr);
         if (!item || item.group === 'D') return;
-        stateEigene.values[item.id] = { count: z[nr].count, period: z[nr].period };
+        setzeBewertung('own', item.id, { count: z[nr].count, period: z[nr].period }, 'modul5');
         n++;
     });
     try { fillTable('own'); calculate('own'); } catch (e) {}

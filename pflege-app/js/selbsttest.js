@@ -186,6 +186,83 @@ function selbsttest() {
             document.querySelectorAll('#verf-name-sel').length === 1 &&
             document.querySelectorAll('#verf-qual-sel').length === 1);
 
+        // ---------- 10c. Keine eigenmächtigen Bewertungen durch die App ----------
+        // Nach dem bestätigten Import darf die App von sich aus KEINE Punkte mehr eintragen.
+        {
+            const abbild = () => JSON.stringify({ v: stateEigene.values, s: stateEigene.special,
+                                                  o: stateOrig.values, os: stateOrig.special });
+            leeren();
+            const k = nr => ITEMS.find(i => i.nr === nr);
+            stateOrig.values[k('4.4.1').id] = 1; stateEigene.values[k('4.4.1').id] = 1;
+            stateOrig.values[k('4.2.6').id] = 2; stateEigene.values[k('4.2.6').id] = 2;
+            const vorher = abbild();
+
+            // Alles, was ohne ausdrückliches Zutun des Beraters läuft
+            fillTable('own'); calculate('own'); calculate('orig');
+            renderAuswertung();
+            switchTab(3); switchTab(4); switchTab(3);
+            computeDiffs();
+            if (typeof befundVorschlaege === 'function') befundVorschlaege();
+            if (typeof renderBefund === 'function') { setzeModus('hoeherstufung'); renderBefund(); setzeModus('widerspruch'); }
+            if (typeof buildStellungnahme === 'function') buildStellungnahme();
+            if (typeof modul5AusErfassung === 'function') modul5AusErfassung();
+            if (typeof zeigeModul5Vorschau === 'function') zeigeModul5Vorschau();
+            pruefe('Keine Bewertung ohne Zutun des Beraters', abbild(), vorher);
+
+            // Vorschläge zeigen heisst nicht übernehmen
+            vorschlagListe = [{ item: k('4.4.1'), stufe: 3, alt: 1, begruendung: 'Probe', fundstelle: '' }];
+            renderVorschlaege();
+            pruefe('Vorschlagsliste ändert nichts', abbild(), vorher);
+            const haken = document.querySelectorAll('#vorschlag-body input[type="checkbox"]');
+            pruefe('Vorschläge sind nicht vorausgewählt',
+                Array.from(haken).filter(c => c.checked).length, 0);
+            // Ohne Haken darf „Übernehmen" nichts ändern
+            uebernehmeVorschlaege();
+            pruefe('Übernehmen ohne Haken ändert nichts', abbild(), vorher);
+            // Mit Haken wird genau der eine Wert gesetzt
+            renderVorschlaege();
+            document.querySelector('#vorschlag-body input[type="checkbox"]').checked = true;
+            uebernehmeVorschlaege();
+            pruefe('Angehakter Vorschlag wird übernommen', stateEigene.values[k('4.4.1').id], 3);
+            pruefe('Vorschlag verändert das Vorgutachten nicht', stateOrig.values[k('4.4.1').id], 1);
+
+            // Protokoll: jede Änderung hat einen nachvollziehbaren Ursprung
+            const letzte = bewertungsProtokoll[bewertungsProtokoll.length - 1];
+            pruefe('Änderung wird protokolliert', letzte && letzte.nr, '4.4.1');
+            pruefe('Protokoll nennt den Ursprung', letzte && letzte.quelle, BEWERTUNG_QUELLEN.vorschlag);
+            pruefeWahr('Protokoll nennt alten und neuen Wert',
+                !!letzte && letzte.alt !== letzte.neu && !!letzte.alt && !!letzte.neu);
+
+            // Ein unbekannter Ursprung wird abgewiesen – so kann sich nichts einschleichen
+            const stand = stateEigene.values[k('4.2.6').id];
+            const angenommen = setzeBewertung('own', k('4.2.6').id, 3, 'ki');
+            pruefe('Unzulässiger Ursprung wird abgewiesen', angenommen, false);
+            pruefe('Wert bleibt nach Abweisung unverändert', stateEigene.values[k('4.2.6').id], stand);
+
+            // Abweichung zwischen KI-Zusammenfassung und freigegebenen Kriterien wird gemeldet
+            protokollLeeren();
+            leeren();
+            stateOrig.values[k('4.4.1').id] = 1;
+            pruefe('Ohne KI-Zusammenfassung keine Abweichungsmeldung', vorgutachtenAbweichung(), null);
+            const echteWerte = calculateInternal('orig');
+            stateOrig.extracted = { raws: [0,0,0,0,0,0], weights: [0,0,0,0,0,0],
+                                    total: echteWerte.total, pg: echteWerte.pg };
+            pruefe('Übereinstimmung wird nicht gemeldet', vorgutachtenAbweichung(), null);
+            stateOrig.extracted = { raws: [0,0,0,0,0,0], weights: [0,0,0,0,0,0], total: 48.75, pg: 3 };
+            const abw = vorgutachtenAbweichung();
+            pruefeWahr('Abweichung wird erkannt', !!abw);
+            pruefe('Abweichung nennt die Angabe aus dem Gutachten', abw && abw.lautGutachten.pg, 3);
+            pruefe('Abweichung nennt das Ergebnis aus den Kriterien', abw && abw.ausKriterien.pg, 0);
+            pruefeWahr('Abweichung erscheint in der Auswertung',
+                abweichungHtml().includes('Bitte prüfen'));
+            pruefeWahr('Prüfung verändert die Zusammenfassung nicht',
+                !!stateOrig.extracted && stateOrig.extracted.pg === 3);
+            delete stateOrig.extracted;
+
+            protokollLeeren();
+            leeren();
+        }
+
         // ---------- 11a. Notizfeld im Reiter „Einschätzung" ----------
         {
             const feld = document.getElementById('erstgespraech-notes');

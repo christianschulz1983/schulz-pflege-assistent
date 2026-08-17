@@ -140,11 +140,14 @@ function renderVorschlaege() {
         box.innerHTML = '<div class="vs-leer">Aus den Notizen, dem Befund und der Anamnese lässt sich derzeit keine weitere Höherbewertung belastbar begründen. '
                       + 'Ergänzen Sie gegebenenfalls Ihre Notizen und starten Sie die Prüfung erneut.</div>';
     } else {
+        // Nichts ist vorausgewählt: die App aendert von sich aus keine Bewertung.
+        // Uebernommen wird ausschliesslich, was der Berater ausdruecklich anhakt.
         box.innerHTML = `<p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px">`
-            + `${vorschlagListe.length} Vorschlag${vorschlagListe.length > 1 ? 'e' : ''} – bitte fachlich prüfen. Nur Angehaktes wird übernommen; Ihre bisherigen Bewertungen bleiben sonst unverändert.</p>`
+            + `${vorschlagListe.length} Vorschlag${vorschlagListe.length > 1 ? 'e' : ''} – bitte fachlich prüfen. `
+            + `<b>Nichts ist vorausgewählt.</b> Übernommen wird nur, was Sie anhaken; ohne Haken bleibt jede Bewertung unverändert.</p>`
             + vorschlagListe.map((v, idx) => `
             <label class="vs-item">
-                <input type="checkbox" checked data-idx="${idx}">
+                <input type="checkbox" data-idx="${idx}">
                 <div style="flex:1">
                     <div class="vs-nr">${escapeHtml(v.item.nr)}</div>
                     <div class="vs-titel">${escapeHtml(v.item.title)}</div>
@@ -168,7 +171,7 @@ function uebernehmeVorschlaege() {
         if (!cb.checked) return;
         const v = vorschlagListe[parseInt(cb.getAttribute('data-idx'), 10)];
         if (!v) return;
-        stateEigene.values[v.item.id] = v.stufe;
+        setzeBewertung('own', v.item.id, v.stufe, 'vorschlag');
         n++;
     });
     closeVorschlaege();

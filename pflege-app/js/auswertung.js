@@ -71,6 +71,19 @@ function renderAuswertung() {
     document.getElementById('auswertung-content').innerHTML=`
     <div class="space-y-6">
         <div class="card">
+            <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Woher stammen die Bewertungen?</div>
+            <div style="padding:16px 20px">
+                <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+                    Nach dem geprüften Import trägt die App von sich aus keine Punkte mehr ein. Jede Änderung
+                    steht hier mit ihrem Ursprung – so ist nachvollziehbar, was von Ihnen kommt und was aus
+                    einem von Ihnen angehakten Vorschlag stammt.
+                </p>
+                ${abweichungHtml()}
+                ${protokollHtml()}
+            </div>
+        </div>
+
+        <div class="card">
             <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Vergleichsbericht: Vorgutachten vs. Eigene Einschätzung</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)">
                 ${[
@@ -223,6 +236,11 @@ function loadCase(e) {
             if (!data.stateOrig || !data.stateEigene) throw new Error('Ungueltiges Format');
             stateOrig = data.stateOrig;
             stateEigene = data.stateEigene;
+            protokollLeeren();
+            bewertungsProtokoll.push({ zeit: new Date().toLocaleTimeString('de-DE'),
+                spalte: 'Vorgutachten und eigene Einschätzung', nr: '—',
+                titel: 'Bewertungen aus der gespeicherten Datei', alt: 'leer', neu: 'geladen',
+                quelle: BEWERTUNG_QUELLEN.laden });
             erstgespraechNotes = data.erstgespraechNotes || "";
             appealDraft = data.appealDraft || "";
             setzeModus(data.appModus || 'widerspruch');   // ältere Fälle sind immer Widersprüche

@@ -397,6 +397,15 @@
         }
         .side-step-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 
+        /* WARNHINWEIS in Fliesstext (nicht in Versalien wie .gap-footer) */
+        .hinweis-warnung {
+            background: rgba(220,38,38,0.06); border: 1px solid rgba(220,38,38,0.35);
+            border-left: 3px solid var(--red); border-radius: 8px;
+            padding: 12px 14px; margin-bottom: 14px;
+            font-size: 12.5px; line-height: 1.65; color: var(--text-secondary); text-align: left;
+        }
+        .hinweis-warnung b { color: var(--red); }
+
         /* HANDREICHUNG: Erlaeuterung der Kriterien in einfacher Sprache */
         .laien-zeile { font-size: 12.5px; line-height: 1.6; color: var(--text-secondary); }
         .laien-zeile.punkt {
