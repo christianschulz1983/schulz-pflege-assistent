@@ -494,6 +494,9 @@ function applyImportedData(rev) {
         }
     });
 
+    // Ab hier gilt: die App traegt von sich aus nichts mehr ein. Alles Weitere sind
+    // Vorschlaege, die der Berater ausdruecklich anhaken muss.
+    protokolliereImport(ITEMS.filter(i => i.m).length);
     fillTable('orig'); fillTable('own'); calculate('orig'); calculate('own'); syncSpecialUI();
     setTimeout(() => { autoResize(document.getElementById('stam-anamnese')); autoResize(document.getElementById('stam-befund')); }, 200);
 }

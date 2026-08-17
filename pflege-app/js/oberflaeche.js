@@ -304,7 +304,7 @@ function applyVorgHighlight(id) {
 function updateValue(pref, id, idx) {
     const st = pref==='orig' ? stateOrig : stateEigene;
     if (pref === 'orig') { delete stateOrig.extracted; }
-    st.values[id] = parseInt(idx);
+    setzeBewertung(pref, id, parseInt(idx), 'berater');
     const labelEl = document.getElementById('label-'+pref+'-'+id);
     if(labelEl) labelEl.innerText = ITEMS.find(it=>it.id===id).opts[idx];
     calculate(pref);
@@ -313,8 +313,8 @@ function updateValue(pref, id, idx) {
 function updateM5Count(pref, id, val) {
     const st = pref==='orig' ? stateOrig : stateEigene;
     if (pref === 'orig') { delete stateOrig.extracted; }
-    if(!st.values[id]) st.values[id]={count:0,period:'W'};
-    st.values[id].count = Number(val);
+    const a = st.values[id] || {count:0,period:'W'};
+    setzeBewertung(pref, id, {count:Number(val), period:a.period||'W'}, 'berater');
     const disp = document.getElementById('m5-disp-'+pref+'-'+id);
     if(disp) disp.innerText = val;
     calculate(pref);
@@ -323,8 +323,8 @@ function updateM5Count(pref, id, val) {
 function updateM5Period(pref, id, p) {
     const st = pref==='orig' ? stateOrig : stateEigene;
     if (pref === 'orig') { delete stateOrig.extracted; }
-    if(!st.values[id]) st.values[id]={count:0,period:'W'};
-    st.values[id].period = p;
+    const b = st.values[id] || {count:0,period:'W'};
+    setzeBewertung(pref, id, {count:Number(b.count)||0, period:p}, 'berater');
     fillTable(pref); calculate(pref);
     if(pref==='orig'){ refreshOrigRef(id); calculate('own'); updateLiveCompRows(); }
 }
