@@ -186,6 +186,40 @@ function selbsttest() {
             document.querySelectorAll('#verf-name-sel').length === 1 &&
             document.querySelectorAll('#verf-qual-sel').length === 1);
 
+        // ---------- 11a. Notizfeld im Reiter „Einschätzung" ----------
+        {
+            const feld = document.getElementById('erstgespraech-notes');
+            pruefeWahr('Notizfeld vorhanden', !!feld);
+            pruefeWahr('Notizfeld liegt im Reiter Einschätzung',
+                !!feld && !!feld.closest('#tab-3'));
+            pruefeWahr('Notizfeld nicht mehr in der Auswertung',
+                !!feld && !feld.closest('#tab-4'));
+            // Es darf nur ein einziges Feld dieser Kennung geben, sonst greift die falsche Eingabe
+            pruefe('Notizfeld genau einmal im Dokument',
+                document.querySelectorAll('#erstgespraech-notes').length, 1);
+            // Steht über der Einschätzung der einzelnen Module
+            const tabelle = document.getElementById('table-body-own');
+            pruefeWahr('Notizfeld steht über der Modultabelle',
+                !!feld && !!tabelle &&
+                (feld.compareDocumentPosition(tabelle) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
+
+            // Eingabe wird übernommen und übersteht den Aufbau der Auswertung
+            const vorher = erstgespraechNotes;
+            feld.value = 'Probe: Notiz aus dem Erstgespräch.';
+            feld.dispatchEvent(new Event('input'));
+            pruefe('Notiz wird übernommen', erstgespraechNotes, 'Probe: Notiz aus dem Erstgespräch.');
+            renderAuswertung();
+            pruefe('Notiz überlebt den Wechsel in die Auswertung',
+                document.getElementById('erstgespraech-notes').value, 'Probe: Notiz aus dem Erstgespräch.');
+            // Beim Laden eines Falls wird der Text zurückgeschrieben
+            erstgespraechNotes = 'Aus dem gespeicherten Fall.';
+            init();
+            pruefe('Notiz wird beim Aufbau zurückgeschrieben',
+                document.getElementById('erstgespraech-notes').value, 'Aus dem gespeicherten Fall.');
+            erstgespraechNotes = vorher;
+            init();
+        }
+
         // ---------- 11b. Handreichung an der Schaltfläche (i) ----------
         if (typeof LAIEN_TEXTE !== 'undefined') {
             const nrs = Object.keys(LAIEN_TEXTE);

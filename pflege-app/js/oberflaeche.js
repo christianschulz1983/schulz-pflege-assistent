@@ -5,6 +5,16 @@ function renderNBASection(prefix) {
     return `
     <div class="grid-2col">
         <div class="space-y-6">
+            ${isEig ? `<div class="card" style="border:1px solid rgba(13,148,136,0.25)">
+                <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Allgemeine Angaben / Anamnese (Mitschrift Erstgespräch)</div>
+                <div style="padding:20px">
+                    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6">
+                        Notieren Sie hier alle Anmerkungen aus dem Erstgespräch – unmittelbar neben der Einschätzung der einzelnen Module. Diese Mitschrift wird beim Erzeugen der Begründung berücksichtigt: sie fließt in die modulbezogene Argumentation ein und erscheint zusätzlich als zusammenfassender Fließtext.
+                    </p>
+                    <textarea id="erstgespraech-notes" class="field-input" style="min-height:160px;font-size:13px;line-height:1.6;padding:14px" placeholder="Mitschrift des Erstgesprächs / allgemeine Angaben / Anamnese ..." oninput="erstgespraechNotes = this.value; autoResize(this)"></textarea>
+                </div>
+            </div>` : ''}
+
             <div class="special-card" onclick="selectItem(0,'${prefix}')">
                 <div class="special-header">⚠ Besondere Bedarfskonstellation (§ 15 Abs. 4 SGB XI)</div>
                 <div class="special-body">
@@ -154,6 +164,10 @@ function init() {
     // Reiter "Laut Vorgutachten" entfällt – die Vorgutachten-Werte kommen aus dem Import
     // (Prüfansicht) und werden in Reiter "Einschätzung & Vergleich" je Kriterium angezeigt.
     document.getElementById('tab-3').innerHTML = renderNBASection('own');
+    // Das Notizfeld steht jetzt in diesem Reiter und wird hier neu aufgebaut –
+    // beim Laden eines Falls muss der gespeicherte Text zurückgeschrieben werden.
+    const notizen = document.getElementById('erstgespraech-notes');
+    if (notizen) { notizen.value = erstgespraechNotes || ''; autoResize(notizen); }
     fillTable('own');
     calculate('own');
     syncSpecialUI();

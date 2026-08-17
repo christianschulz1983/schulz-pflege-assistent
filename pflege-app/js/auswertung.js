@@ -70,16 +70,6 @@ function renderAuswertung() {
 
     document.getElementById('auswertung-content').innerHTML=`
     <div class="space-y-6">
-        <div class="card" style="border: 1px solid rgba(13,148,136,0.25);">
-            <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Allgemeine Angaben / Anamnese (Mitschrift Erstgespräch)</div>
-            <div style="padding:20px;">
-                <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px; line-height:1.6">
-                    Notieren Sie hier alle Anmerkungen aus dem Erstgespräch. Diese Mitschrift wird beim Erzeugen der Widerspruchsbegründung berücksichtigt – sie fließt in die modulbezogene Argumentation ein und erscheint zusätzlich als zusammenfassender Fließtext in der Begründung.
-                </p>
-                <textarea id="erstgespraech-notes" class="field-input" style="min-height:160px; font-size:13px; line-height:1.6; padding:14px;" placeholder="Mitschrift des Erstgesprächs / allgemeine Angaben / Anamnese ..." oninput="erstgespraechNotes = this.value; autoResize(this)"></textarea>
-            </div>
-        </div>
-
         <div class="card">
             <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Vergleichsbericht: Vorgutachten vs. Eigene Einschätzung</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)">
@@ -183,10 +173,9 @@ function renderAuswertung() {
         </div>
     </div>`;
 
-    // Eingaben nach dem Neu-Rendern wiederherstellen (Tab-Wechsel baut den Inhalt neu auf)
+    // Eingaben nach dem Neu-Rendern wiederherstellen (Tab-Wechsel baut den Inhalt neu auf).
+    // Das Notizfeld liegt jetzt im Reiter "Einschätzung" und wird davon nicht berührt.
     injectStellungnahmeCss();
-    const notesEl = document.getElementById('erstgespraech-notes');
-    if (notesEl) { notesEl.value = erstgespraechNotes; autoResize(notesEl); }
     const stilEl = document.getElementById('stil-beispiele');
     if (stilEl) {
         let s = null;
