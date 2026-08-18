@@ -53,7 +53,14 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    immer „kein Pflegegrad". Schrift Calibri 11 pt, blaue Überschriften 14 pt, Briefkopf 9 pt.
 7. **Die drei Durchführungsarten** sind abschließend: Hausbesuch mit persönlicher
    Befunderhebung / per Aktenlage / strukturiertes Telefoninterview.
-8. **Die App trägt niemals eigenmächtig Bewertungen ein.** Nach dem geprüften und
+8. **Längenvorgaben für erzeugte Texte** (`js/laenge.js`, Grenzen nur dort pflegen):
+   Einleitung („Allgemeine Angaben" bzw. „Anamnese") höchstens 390 Wörter / 2.700 Zeichen –
+   das ist eine halbe bis drei viertel A4-Seite bei Calibri 11 pt. Jede Begründung zu einem
+   Modulpunkt höchstens **5 Sätze** / 150 Wörter, dabei aber Notizen, BRi-Bezug und
+   Schlusssatz enthalten. Die Grenzen werden nach der Erzeugung gemessen; bei Überschreitung
+   läuft **ein** gezielter Kürzungsdurchgang, danach wird der Berater gewarnt. Niemals
+   mechanisch abschneiden – das zerstört Zitate und den Ableitungssatz.
+9. **Die App trägt niemals eigenmächtig Bewertungen ein.** Nach dem geprüften und
    bestätigten Import ist die Bepunktung Sache des Beraters. Die KI darf ausschließlich
    vorschlagen; übernommen wird nur, was ausdrücklich angehakt wurde – Auswahllisten
    starten deshalb **ohne** gesetzte Haken. Jeder Schreibzugriff läuft über

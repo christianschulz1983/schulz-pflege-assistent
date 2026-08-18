@@ -303,10 +303,13 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
         p += 'MODULÜBERSICHT (gewichtete Punkte):\n' + mo
            + `Gesamt: Gutachten ${rO.total.toFixed(2)} (${rO.pg ? 'Pflegegrad ' + rO.pg : 'kein Pflegegrad'}) / meine Einschätzung `
            + `${rE.total.toFixed(2)} (${rE.pg ? 'Pflegegrad ' + rE.pg : 'kein Pflegegrad'})\n\n`;
-        p += 'ZUSÄTZLICHE AUFGABE – Abschnitt „Allgemeine Angaben":\n'
-           + 'Verfasse außerdem den einleitenden Abschnitt „Allgemeine Angaben" als zusammenhängenden\n'
-           + 'Fließtext aus 3 bis 5 Absätzen (Absätze durch Leerzeile trennen, KEINE Aufzählungszeichen),\n'
-           + 'individuell auf diesen Fall bezogen:\n'
+        const einleitTitel = (typeof appModus !== 'undefined' && appModus !== 'widerspruch')
+            ? 'Anamnese' : 'Allgemeine Angaben';
+        p += `ZUSÄTZLICHE AUFGABE – Abschnitt „${einleitTitel}":\n`
+           + laengenVorgabeAllgemein(einleitTitel) + '\n'
+           + `Verfasse den einleitenden Abschnitt „${einleitTitel}" als zusammenhängenden\n`
+           + 'Fließtext aus 3 bis 4 knappen Absätzen (Absätze durch Leerzeile trennen, KEINE\n'
+           + 'Aufzählungszeichen), individuell auf diesen Fall bezogen:\n'
            + '- ZWINGEND: Dieser Abschnitt baut inhaltlich auf MEINEN NOTIZEN aus dem Erstgespräch auf.\n'
            + '  Übernimm deren Feststellungen vollständig und forme die Stichpunkte zu Fließtext aus;\n'
            + '  ordne sie sachlich, ohne Inhalte zu verändern oder hinzuzuerfinden. Erst darauf stützt\n'
@@ -359,11 +362,15 @@ RANGFOLGE DER QUELLEN:
 2. Danach die eigene Bewertung des Kriteriums.
 3. Abgleich mit dem BRi-Text (wörtliches Zitat).
 
-AUFBAU je Begründung (Fließtext, etwa 120–200 Wörter):
+${laengenVorgabeBegruendung()}
+
+AUFBAU je Begründung – GENAU EIN SATZ je Nummer, zusammenhängender Fließtext:
 1. ${hoeher ? 'Was hat sich seit der Begutachtung verändert?' : 'Welche Einschränkung besteht?'}
-2. Konkreter Sachverhalt aus Notizen und Befund, einschließlich der erforderlichen personellen Unterstützung.
-3. Richtlinienmaßstab mit wörtlichem BRi-Zitat.
+2. Konkreter Sachverhalt aus Notizen und Befund, einschließlich der erforderlichen personellen
+   Unterstützung – der einzige Satz, der etwas länger sein darf.
+3. Richtlinienmaßstab mit einem wörtlichen, knapp gehaltenen BRi-Zitat.
 4. Schluss: „Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „…" ableitbar."
+Ein fünfter Satz ist zulässig, wenn der Sachverhalt es zwingend erfordert – mehr nicht.
 
 ZITIERREGEL – wird technisch überprüft: Alles in Anführungszeichen MUSS zeichengenau in den
 mitgelieferten BRi-Texten dieses Kriteriums stehen. Im Zweifel ohne Anführungszeichen sinngemäß wiedergeben.
@@ -404,7 +411,24 @@ Weiter zu beachten:
     const data = JSON.parse(txt.trim());
     const map = {};
     (data.begruendungen || []).forEach(b => { if (b && b.nr && b.text) map[b.nr] = b.text.trim(); });
-    return { map: map, allgemein: (data.allgemein || '').trim() };
+    return await haltenLaengenGrenzen(map, (data.allgemein || '').trim());
+}
+
+// Hält die Längenvorgaben ein: Überschreitet die KI sie, wird einmal gezielt nachgekürzt.
+// Bleibt danach etwas zu lang, wird das dem Berater gemeldet statt stillschweigend hingenommen.
+async function haltenLaengenGrenzen(map, allgemein) {
+    const titel = (typeof appModus !== 'undefined' && appModus !== 'widerspruch')
+        ? 'Anamnese' : 'Allgemeine Angaben';
+    const vorher = laengenVerstoesse(map, allgemein);
+    if (!vorher.length) return { map: map, allgemein: allgemein };
+    showOverlay('Stellungnahme wird erstellt...', vorher.length + ' Abschnitt(e) werden gekürzt');
+    let e;
+    try { e = await kuerzeUeberlaenge(map, allgemein, titel); } finally { hideOverlay(); }
+    if (e.offen.length) {
+        const namen = e.offen.map(v => v.art === 'allgemein' ? titel : v.nr).join(', ');
+        showToast('Zu lang geblieben: ' + namen + '. Bitte im Text noch kürzen.', 'error');
+    }
+    return { map: e.map, allgemein: e.allgemein };
 }
 
 // Erzeugt Begründungen je Abweichung und – auf Wunsch – den Abschnitt „Allgemeine Angaben"
@@ -448,11 +472,13 @@ Feststellung des Gutachters ausdrücklich („Der Gutachter dokumentiert im eige
 stelle den Widerspruch zur Bewertung heraus und verbinde ihn mit meiner Feststellung aus den
 Notizen. Erfinde eine solche Stelle niemals.
 
-AUFBAU jeder Begründung (ein zusammenhängender Fließtext, etwa 130–220 Wörter):
-1. Eröffnung: Stelle die gutachterliche Wertung fachlich infrage – zum Beispiel „Die gutachterliche Einstufung als … ignoriert …", „Die pauschale Bewertung dieses Kriteriums als … hält einer fachlichen Überprüfung anhand der geltenden Richtlinien nicht stand" oder „Laut gutachterlichen Richtlinien SGB XI ist eine Wertung mit „…" ableitbar".
-2. Konkreter Sachverhalt – der Kern: Was ist der versicherten Person tatsächlich nicht möglich und welche personelle Unterstützung ist erforderlich? Baue dies auf MEINEN NOTIZEN auf und formuliere die dortigen Stichpunkte zu vollständigem Fließtext aus. Ergänzend, nicht ersetzend, kannst du Angaben aus Befund und Anamnese heranziehen.
-3. Kritik am gutachterlichen Vorgehen, soweit das Material sie hergibt: innerer Widerspruch (siehe oben), unterlassene praktische Überprüfung oder Erprobung, ignorierte Hinweise der versicherten Person oder der Pflegeperson, zu kurze Begutachtungsdauer. Halte ausdrücklich fest, wenn eine in meinen Notizen festgehaltene Feststellung im Gutachten übergangen wurde.
-4. Richtlinienmaßstab: Gib wieder, was die BRi für dieses Kriterium und die strittige Stufe verlangen, und zitiere dabei wörtlich aus den mitgelieferten BRi-Texten.
+${laengenVorgabeBegruendung()}
+
+AUFBAU jeder Begründung – GENAU EIN SATZ je Nummer, zusammenhängender Fließtext:
+1. Eröffnung: Stelle die gutachterliche Wertung fachlich infrage – zum Beispiel „Die gutachterliche Einstufung als … ignoriert …" oder „Die pauschale Bewertung dieses Kriteriums als … hält einer fachlichen Überprüfung nicht stand".
+2. Konkreter Sachverhalt – der Kern und der einzige Satz, der etwas länger sein darf: Was ist der versicherten Person tatsächlich nicht möglich und welche personelle Unterstützung ist erforderlich? Baue dies auf MEINEN NOTIZEN auf. Ergänzend, nicht ersetzend, Angaben aus Befund und Anamnese.
+3. Kritik am gutachterlichen Vorgehen, soweit das Material sie hergibt – NUR der stärkste Punkt, nicht mehrere: innerer Widerspruch, unterlassene Erprobung, übergangene Angaben oder zu kurze Begutachtungsdauer. Gibt das Material nichts her, lasse diesen Satz ersatzlos weg (dann sind es vier Sätze).
+4. Richtlinienmaßstab mit einem wörtlichen, knapp gehaltenen BRi-Zitat.
 5. Zwingender Schluss, in der Regel: „Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „…" ableitbar." (Varianten: „… ist … zwingend abzuleiten", „… muss die Bewertung zwingend auf „…" korrigiert werden".)
 
 FACHLICHE FEHLER VERMEIDEN – prüfe vor jeder Begründung die mitgelieferte HILFSMITTEL-REGEL und
@@ -530,7 +556,7 @@ Beachte zwingend:
     const data = JSON.parse(txt.trim());
     const map = {};
     (data.begruendungen || []).forEach(b => { if (b && b.nr && b.text) map[b.nr] = b.text.trim(); });
-    return { map: map, allgemein: (data.allgemein || '').trim() };
+    return await haltenLaengenGrenzen(map, (data.allgemein || '').trim());
 }
 
 // Baut die Stellungnahme im Familiara-Format aus den App-Daten (Gutachten/Bescheide).
