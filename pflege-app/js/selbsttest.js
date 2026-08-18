@@ -2,7 +2,8 @@
 // Prüft die kritischen Wege des Widerspruchs auf Knopfdruck. Der Test sichert den
 // aktuellen Fall vorher und stellt ihn danach wieder her – er verändert nichts.
 
-function selbsttest() {
+// Asynchron, weil einzelne Prüfungen die KI-Wege mit einer nachgestellten Antwort durchlaufen.
+async function selbsttest() {
     const pruefungen = [];
     const pruefe = (name, istWert, sollWert) => {
         const ok = JSON.stringify(istWert) === JSON.stringify(sollWert);
@@ -185,6 +186,69 @@ function selbsttest() {
         pruefeWahr('Verfasserfelder existieren genau einmal',
             document.querySelectorAll('#verf-name-sel').length === 1 &&
             document.querySelectorAll('#verf-qual-sel').length === 1);
+
+        // ---------- 10b. Längenvorgaben für die erzeugten Texte ----------
+        {
+            pruefe('Satzzählung: einfache Sätze',
+                zaehleSaetze('Erster Satz. Zweiter Satz! Dritter Satz?'), 3);
+            pruefe('Satzzählung: Kriteriennummern trennen nicht',
+                zaehleSaetze('Zu 4.5.13 besteht Hilfebedarf. Das ist belegt.'), 2);
+            pruefe('Satzzählung: Abkürzungen trennen nicht',
+                zaehleSaetze('Es besteht Bedarf, z. B. beim Waschen bzw. Ankleiden. Das ist belegt.'), 2);
+            pruefe('Satzzählung: Zitat am Satzende',
+                zaehleSaetze('Die BRi verlangt „überwiegend unselbständig". Somit ist zu werten.'), 2);
+            pruefe('Satzzählung: Dezimalzahlen trennen nicht',
+                zaehleSaetze('Der Wert liegt bei 3.24 pro Tag.'), 1);
+            pruefe('Wortzählung ohne Auszeichnung', zaehleWoerter('<b>Ein</b> kurzer Satz'), 3);
+
+            const langeBegruendung = Array.from({ length: 8 }, (_, i) => 'Dies ist Satz Nummer ' + i + '.').join(' ');
+            const kurzeBegruendung = 'Satz eins. Satz zwei. Satz drei. Satz vier. Satz fünf.';
+            pruefe('Fünf Sätze sind zulässig',
+                laengenVerstoesse({ '4.1.1': kurzeBegruendung }, '').length, 0);
+            const v = laengenVerstoesse({ '4.1.1': langeBegruendung }, '');
+            pruefe('Acht Sätze werden beanstandet', v.length, 1);
+            pruefe('Beanstandung nennt das Kriterium', v[0] && v[0].nr, '4.1.1');
+
+            const langerAllgemein = 'Wort '.repeat(LAENGE.allgemeinWoerterMax + 30);
+            pruefeWahr('Zu lange Einleitung wird beanstandet',
+                laengenVerstoesse({}, langerAllgemein).some(x => x.art === 'allgemein'));
+            pruefe('Einleitung innerhalb der Grenze ist zulässig',
+                laengenVerstoesse({}, 'Wort '.repeat(200)).length, 0);
+            // Die Grenze entspricht einer halben bis drei viertel A4-Seite
+            pruefeWahr('Grenze passt zu drei viertel A4-Seite',
+                LAENGE.allgemeinZeichenMax >= 2400 && LAENGE.allgemeinZeichenMax <= 3000);
+
+            // Die Vorgaben stehen tatsächlich in den Anweisungen an die KI
+            pruefeWahr('Vorgabe nennt die Satzgrenze',
+                laengenVorgabeBegruendung().includes(String(LAENGE.begruendungSaetzeMax) + ' Sätzen'));
+            pruefeWahr('Vorgabe nennt die Wortgrenze der Einleitung',
+                laengenVorgabeAllgemein('Anamnese').includes(String(LAENGE.allgemeinWoerterMax)));
+            pruefeWahr('Vorgabe nennt den richtigen Abschnittstitel',
+                laengenVorgabeAllgemein('Anamnese').includes('Anamnese'));
+
+            // Nachkürzen: zu lange Abschnitte werden ersetzt, unbrauchbare Antworten verworfen
+            const echterAufruf = window.callGeminiWithFallback;
+            window.callGeminiWithFallback = async () => ({ candidates: [{ content: { parts: [{
+                text: JSON.stringify({ abschnitte: [{ nr: '4.1.1', text: kurzeBegruendung }] }) }] } }] });
+            let e = await kuerzeUeberlaenge({ '4.1.1': langeBegruendung }, '', 'Allgemeine Angaben');
+            pruefe('Zu langer Abschnitt wird gekürzt', e.gekuerzt, 1);
+            pruefe('Nach dem Kürzen keine Überschreitung mehr', e.offen.length, 0);
+            pruefe('Gekürzter Text wird übernommen', e.map['4.1.1'], kurzeBegruendung);
+
+            // Eine Antwort, die nicht kürzer ist, darf den Text nicht ersetzen
+            window.callGeminiWithFallback = async () => ({ candidates: [{ content: { parts: [{
+                text: JSON.stringify({ abschnitte: [{ nr: '4.1.1', text: langeBegruendung + ' Noch ein Satz.' }] }) }] } }] });
+            e = await kuerzeUeberlaenge({ '4.1.1': langeBegruendung }, '', 'Allgemeine Angaben');
+            pruefe('Nicht kürzere Antwort wird verworfen', e.map['4.1.1'], langeBegruendung);
+            pruefe('Verbliebene Überschreitung wird gemeldet', e.offen.length, 1);
+
+            // Fällt die KI aus, bleibt der ursprüngliche Text erhalten
+            window.callGeminiWithFallback = async () => { throw new Error('Probe'); };
+            e = await kuerzeUeberlaenge({ '4.1.1': langeBegruendung }, '', 'Allgemeine Angaben');
+            pruefe('Bei Ausfall bleibt der Text erhalten', e.map['4.1.1'], langeBegruendung);
+            pruefe('Ausfall wird nicht als Kürzung gezählt', e.gekuerzt, 0);
+            window.callGeminiWithFallback = echterAufruf;
+        }
 
         // ---------- 10c. Keine eigenmächtigen Bewertungen durch die App ----------
         // Nach dem bestätigten Import darf die App von sich aus KEINE Punkte mehr eintragen.
