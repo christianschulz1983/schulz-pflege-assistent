@@ -471,7 +471,9 @@
         .own-box .m5-period-btn.active { background: var(--c); }
 
         /* ERWEITERTE ERFASSUNG (Tabellen mit mitwachsenden Zeilen) */
-        .erf-tabelle { width: 100%; border-collapse: collapse; }
+        /* Mindestbreite, damit die Auswahlfelder lesbar bleiben ("im Quartal" statt "im Q…").
+           Der umgebende Bereich rollt waagerecht, statt die Spalten zusammenzudrücken. */
+        .erf-tabelle { width: 100%; min-width: 760px; border-collapse: collapse; }
         .erf-tabelle th {
             font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
             text-transform: uppercase; color: var(--text-secondary); text-align: left;

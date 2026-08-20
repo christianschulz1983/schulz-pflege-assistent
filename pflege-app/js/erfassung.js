@@ -7,6 +7,20 @@ let erfassung = {};        // { tabellenId: [ {spalte: wert, ...}, ... ] }
 let erfassungExtra = {};   // Einzelfelder (Vorgutachten, Veränderung)
 
 const HAEUFIGKEIT_ZEITRAUM = ['pro Tag', 'pro Woche', 'pro Monat'];
+// Arztbesuche finden oft nur quartalsweise oder jährlich statt (Kontrolltermine).
+const ARZT_ZEITRAUM = ['pro Tag', 'pro Woche', 'pro Monat', 'im Quartal', 'im Jahr'];
+
+// Umrechnung eines Zeitraums auf die Einheiten des NBA (Tag/Woche/Monat).
+// Modul 5 kennt nur diese drei; Quartal und Jahr werden auf den Monat umgelegt.
+// Beispiel: viermal im Jahr entspricht 0,33 pro Monat. Das ist für sich genommen
+// wenig, zählt in der Gruppe C aber zur Summe aller Besuche hinzu.
+const ZEITRAUM_UMRECHNUNG = {
+    'pro Tag':    { period: 'D', teiler: 1 },
+    'pro Woche':  { period: 'W', teiler: 1 },
+    'pro Monat':  { period: 'M', teiler: 1 },
+    'im Quartal': { period: 'M', teiler: 3 },
+    'im Jahr':    { period: 'M', teiler: 12 }
+};
 const BEGLEITUNG = ['selbständig', 'in Begleitung'];
 const DURCHFUEHRUNG = ['selbständig', 'durch Pflegeperson'];
 
@@ -67,7 +81,7 @@ const ERFASSUNG_TABELLEN = [
         spalten: [
             { k: 'fach', l: 'Fachrichtung oder Therapie', typ: 'select', opt: ARZT_FACH.concat(THERAPIE_ART), frei: true },
             { k: 'anzahl', l: 'Anzahl', typ: 'number', b: '80px' },
-            { k: 'zeitraum', l: 'Zeitraum', typ: 'select', opt: HAEUFIGKEIT_ZEITRAUM, b: '120px' },
+            { k: 'zeitraum', l: 'Zeitraum', typ: 'select', opt: ARZT_ZEITRAUM, b: '130px' },
             { k: 'begleitung', l: 'Durchführung', typ: 'select', opt: BEGLEITUNG, b: '140px' },
             { k: 'dauer3h', l: 'über 3 Std.', typ: 'select', opt: ['nein', 'ja'], b: '105px' }
         ]
@@ -261,11 +275,13 @@ function erfZeileWeg(tid, i) {
 // Liefert { kriteriumNr: {count, period} } aus den erfassten Angaben.
 function modul5AusErfassung() {
     const ziel = {};
-    const zeitraumKurz = z => (z === 'pro Tag' ? 'D' : z === 'pro Woche' ? 'W' : 'M');
     const addieren = (nr, anzahl, zeitraum) => {
-        const n = parseFloat(anzahl);
+        let n = parseFloat(anzahl);
         if (!(n > 0) || !zeitraum) return;
-        const p = zeitraumKurz(zeitraum);
+        // Quartal und Jahr auf den Monat umlegen; alles Übrige bleibt, wie es ist.
+        const u = ZEITRAUM_UMRECHNUNG[zeitraum] || { period: 'M', teiler: 1 };
+        const p = u.period;
+        if (u.teiler !== 1) n = Math.round(n / u.teiler * 100) / 100;
         // je Kriterium auf einen gemeinsamen Zeitraum bringen (den bisher genutzten)
         if (!ziel[nr]) { ziel[nr] = { count: n, period: p }; return; }
         const proTag = { D: 1, W: 1 / 7, M: 1 / 30 };

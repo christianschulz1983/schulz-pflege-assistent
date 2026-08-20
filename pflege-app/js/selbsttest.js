@@ -141,6 +141,11 @@ async function selbsttest() {
 
         // ---------- 10. Word-Ausgabe ----------
         const wordProbe = (function () {
+            // Das Dokumentfeld entsteht erst mit dem Aufbau der Auswertung. Ohne diesen
+            // Anstoß wurden die folgenden drei Prüfungen beim ersten Durchgang übersprungen.
+            if (!document.getElementById('appeal-document') && typeof renderAuswertung === 'function') {
+                try { renderAuswertung(); } catch (e) {}
+            }
             const el = document.getElementById('appeal-document');
             if (!el) return null;
             const alt = el.innerHTML;
@@ -160,6 +165,7 @@ async function selbsttest() {
             el.innerHTML = alt;
             return inhalt;
         })();
+        pruefeWahr('Word-Ausgabe konnte geprüft werden', !!wordProbe);
         if (wordProbe) {
             pruefeWahr('Word-Datei enthält Seitenzahl-Feld', wordProbe.includes('mso-field-code: PAGE'));
             pruefeWahr('Word-Datei ohne Erstellungsdatum', !wordProbe.includes(todayDE()));
@@ -603,6 +609,52 @@ async function selbsttest() {
             pruefe('Modul 5: Injektionen (4.5.2)', kurz('4.5.2'), '4D');
             pruefe('Modul 5: körpernahe Hilfsmittel summiert (4.5.7)', kurz('4.5.7'), '2D');
             pruefe('Modul 5: Verbandswechsel (4.5.8)', kurz('4.5.8'), '3W');
+
+            // Quartal und Jahr: nur bei den Arztbesuchen wählbar, Umlage auf den Monat
+            pruefe('Arztbesuche: fünf Zeiträume wählbar', ARZT_ZEITRAUM,
+                ['pro Tag', 'pro Woche', 'pro Monat', 'im Quartal', 'im Jahr']);
+            pruefe('Übrige Tabellen behalten drei Zeiträume', HAEUFIGKEIT_ZEITRAUM,
+                ['pro Tag', 'pro Woche', 'pro Monat']);
+            pruefe('Zeitraumspalte der Arztbesuche nutzt die erweiterte Liste',
+                ERFASSUNG_TABELLEN.find(t => t.id === 'arztbesuche').spalten.find(s => s.k === 'zeitraum').opt,
+                ARZT_ZEITRAUM);
+            ['medikation', 'behandlungspflege', 'hilfsmittel'].forEach(tid => {
+                const sp = (ERFASSUNG_TABELLEN.find(t => t.id === tid) || { spalten: [] })
+                    .spalten.find(s => s.k === 'zeitraum');
+                pruefeWahr('Tabelle „' + tid + '" ohne Quartal und Jahr',
+                    !sp || sp.opt.indexOf('im Quartal') === -1);
+            });
+
+            erfassung.medikation = []; erfassung.behandlungspflege = []; erfassung.hilfsmittel = [];
+            erfassung.arztbesuche = [
+                { fach: 'Kardiologe', anzahl: '1', zeitraum: 'im Quartal', begleitung: 'in Begleitung', dauer3h: 'nein' }
+            ];
+            let zq = modul5AusErfassung();
+            pruefe('Einmal im Quartal ergibt 0,33 pro Monat',
+                zq['4.5.13'] && zq['4.5.13'].count + zq['4.5.13'].period, '0.33M');
+            erfassung.arztbesuche = [
+                { fach: 'Augenarzt', anzahl: '2', zeitraum: 'im Jahr', begleitung: 'in Begleitung', dauer3h: 'nein' }
+            ];
+            zq = modul5AusErfassung();
+            pruefe('Zweimal im Jahr ergibt 0,17 pro Monat',
+                zq['4.5.13'] && zq['4.5.13'].count + zq['4.5.13'].period, '0.17M');
+            // Zusammen mit häufigeren Terminen wird korrekt aufsummiert
+            erfassung.arztbesuche = [
+                { fach: 'Hausarzt', anzahl: '1', zeitraum: 'pro Monat', begleitung: 'in Begleitung', dauer3h: 'nein' },
+                { fach: 'Kardiologe', anzahl: '1', zeitraum: 'im Quartal', begleitung: 'in Begleitung', dauer3h: 'nein' }
+            ];
+            zq = modul5AusErfassung();
+            pruefe('Monatlich und quartalsweise werden addiert',
+                zq['4.5.13'] && zq['4.5.13'].count + zq['4.5.13'].period, '1.33M');
+            // Ohne Begleitung weiterhin keine Wertung
+            erfassung.arztbesuche = [
+                { fach: 'Urologe', anzahl: '4', zeitraum: 'im Jahr', begleitung: 'selbständig', dauer3h: 'nein' }
+            ];
+            pruefe('Selbständige Termine zählen auch quartalsweise nicht',
+                Object.keys(modul5AusErfassung()).length, 0);
+            // Darstellung im Dokument gibt den gewählten Zeitraum wörtlich wieder
+            pruefe('Dokument nennt den Zeitraum wörtlich',
+                haeufigkeitText({ anzahl: '2', zeitraum: 'im Quartal' }), '2× im Quartal');
 
             // Hilfsmittel: mit personeller Hilfe zu 4.5.7, mit den Ausschlüssen der BRi
             erfassung.hilfsmittel = [
