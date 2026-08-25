@@ -42,6 +42,8 @@
             <button class="btn btn-ai" onclick="document.getElementById('gutachtenFile').click()">⚡ KI Gutachten einlesen</button>
             <input type="file" id="gutachtenFile" accept=".pdf,image/*" onchange="aiReadGutachten(event)" style="display:none">
 
+            <button class="btn btn-secondary" title="Öffnet die Prüfansicht erneut: links die Unterlagen, rechts die übernommenen Werte" onclick="oeffneKorrektur()">✎ Erfasste Daten korrigieren</button>
+
             <button class="btn btn-ghost" onclick="showConfirmModal()">Reset</button>
             <button class="btn btn-ghost" title="Prüft die Rechen- und Dokumentfunktionen; verändert Ihren Fall nicht" onclick="selbsttest()">🧪 Selbsttest</button>
         </div>
@@ -193,12 +195,13 @@
 <div id="review-overlay" class="review-overlay">
     <div class="review-box">
         <div class="review-header">
-            <div class="rh-title">Gutachten prüfen &amp; übernehmen</div>
+            <div class="rh-title" id="review-titel">Gutachten prüfen &amp; übernehmen</div>
             <div style="display:flex; gap:10px;">
-                <button class="btn btn-secondary" onclick="closeReview()">Verwerfen</button>
-                <button class="btn btn-primary" onclick="applyReviewedImport()">✓ Werte übernehmen</button>
+                <button class="btn btn-secondary" id="review-abbrechen" onclick="closeReview()">Verwerfen</button>
+                <button class="btn btn-primary" id="review-uebernehmen" onclick="applyReviewedImport()">✓ Werte übernehmen</button>
             </div>
         </div>
+        <div id="review-hinweis" class="review-hinweis" style="display:none"></div>
         <div class="review-body">
             <div id="review-pdf" class="review-pdf"></div>
             <div id="review-form" class="review-form"></div>
@@ -285,6 +288,7 @@ if (typeof pdfjsLib !== 'undefined') { try { pdfjsLib.GlobalWorkerOptions.worker
 <script src="js/oberflaeche.js"></script>
 <script src="js/bewertung.js"></script>
 <script src="js/berechnung.js"></script>
+<script src="js/korrektur.js"></script>
 <script src="befund_katalog.js"></script>
 <script src="js/befund.js"></script>
 <script src="js/erfassung.js"></script>

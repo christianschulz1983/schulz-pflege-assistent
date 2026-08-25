@@ -173,6 +173,7 @@ function renderAuswertung() {
                 </details>
 
                 <div id="appeal-result-container" style="display:none; margin-top:20px;">
+                    <div id="appeal-veraltet">${typeof veraltetHinweisHtml === 'function' ? veraltetHinweisHtml() : ''}</div>
                     <label class="field-label">Generierte Stellungnahme (Vorschau – frei editierbar)</label>
                     <div id="appeal-document" contenteditable="true" spellcheck="false" oninput="appealDraft = this.innerHTML"></div>
 
@@ -236,6 +237,9 @@ function loadCase(e) {
             if (!data.stateOrig || !data.stateEigene) throw new Error('Ungueltiges Format');
             stateOrig = data.stateOrig;
             stateEigene = data.stateEigene;
+            // Dateien lassen sich nicht mitspeichern; die Prüfansicht zeigt dann nur die Werte.
+            if (typeof letzteProvided !== 'undefined') letzteProvided = null;
+            if (typeof stellungnahmeVeraltet !== 'undefined') stellungnahmeVeraltet = false;
             protokollLeeren();
             bewertungsProtokoll.push({ zeit: new Date().toLocaleTimeString('de-DE'),
                 spalte: 'Vorgutachten und eigene Einschätzung', nr: '—',

@@ -366,7 +366,15 @@ function rvExtract(kind, idx, v) {
     else if (kind === 'pg') reviewData.extracted.pg = parseInt(v) || 0;
     else reviewData.extracted[kind][idx] = parseFloat(v) || 0;
 }
-function rvMarkEdited(id) { const el = document.getElementById('rev-row-' + id); if (el) { el.classList.remove('rev-missing'); el.classList.add('rev-ok'); } }
+// Merkt sich, welche Kriterien in der Prüfansicht tatsächlich angefasst wurden. Beim
+// Korrigieren wird ausschliesslich das übernommen – nicht angerührte Kriterien bleiben,
+// wie sie sind (sonst schriebe die App unbemerkt Nullen in unbewertete Kriterien).
+let reviewGeaendert = new Set();
+function rvMarkEdited(id) {
+    reviewGeaendert.add(id);
+    const el = document.getElementById('rev-row-' + id);
+    if (el) { el.classList.remove('rev-missing'); el.classList.add('rev-ok'); }
+}
 function rvValNum(id, v) { reviewData.valuesMap[id] = parseInt(v); rvMarkEdited(id); }
 function rvM5Count(id, v) { if (typeof reviewData.valuesMap[id] !== 'object') reviewData.valuesMap[id] = { count: 0, period: 'W' }; reviewData.valuesMap[id].count = Number(v); rvMarkEdited(id); }
 function rvM5Period(id, v) { if (typeof reviewData.valuesMap[id] !== 'object') reviewData.valuesMap[id] = { count: 0, period: 'W' }; reviewData.valuesMap[id].period = v; rvMarkEdited(id); }
@@ -416,6 +424,8 @@ async function renderPdfPreview(file, container) {
 }
 
 function openImportReview(file, data, mimeType) {
+    if (typeof setzeReviewKopfZurueck === 'function') setzeReviewKopfZurueck();
+    if (typeof merkeImportDokument === 'function') merkeImportDokument(file, mimeType);
     reviewData = normalizeImport(data);
     if (reviewBlobUrl) { try { URL.revokeObjectURL(reviewBlobUrl); } catch (e) {} }
     reviewBlobUrl = URL.createObjectURL(file);
@@ -442,6 +452,9 @@ function openImportReview(file, data, mimeType) {
 function closeReview() {
     document.getElementById('review-overlay').classList.remove('active');
     if (reviewBlobUrl) { try { URL.revokeObjectURL(reviewBlobUrl); } catch (e) {} reviewBlobUrl = null; }
+    // Überschrift und Schaltflächen wieder auf das Einlesen stellen, falls die Ansicht
+    // zuletzt zum Korrigieren geöffnet war.
+    if (typeof setzeReviewKopfZurueck === 'function') setzeReviewKopfZurueck();
 }
 
 // Übernimmt die (geprüften/korrigierten) Werte in die App.
@@ -497,6 +510,10 @@ function applyImportedData(rev) {
     // Ab hier gilt: die App traegt von sich aus nichts mehr ein. Alles Weitere sind
     // Vorschlaege, die der Berater ausdruecklich anhaken muss.
     protokolliereImport(ITEMS.filter(i => i.m).length);
+    // Merken, welche Kriterien die KI tatsaechlich gelesen hat – die uebrigen sind beim
+    // spaeteren Korrigieren die wahrscheinlichsten Kandidaten.
+    if (typeof letzteProvided !== 'undefined') letzteProvided = rev.provided || null;
+    if (typeof stellungnahmeVeraltet !== 'undefined') stellungnahmeVeraltet = false;
     fillTable('orig'); fillTable('own'); calculate('orig'); calculate('own'); syncSpecialUI();
     setTimeout(() => { autoResize(document.getElementById('stam-anamnese')); autoResize(document.getElementById('stam-befund')); }, 200);
 }
@@ -528,7 +545,7 @@ function buildReviewForm(rev) {
     html += tf('Gesamtpunkte (Gutachten)', 'pts');
     html += `</div></div>`;
 
-    html += `<div class="rev-section"><label class="rev-field rev-inline"><input type="checkbox" ${rev.special == 1 ? 'checked' : ''} onchange="reviewData.special=this.checked?1:0"> <span>Besondere Bedarfskonstellation (§ 15 Abs. 4) – Gebrauchsunfähigkeit beider Arme und Beine</span></label></div>`;
+    html += `<div class="rev-section"><label class="rev-field rev-inline"><input type="checkbox" ${rev.special == 1 ? 'checked' : ''} onchange="reviewData.special=this.checked?1:0; specialGeaendert=true;"> <span>Besondere Bedarfskonstellation (§ 15 Abs. 4) – Gebrauchsunfähigkeit beider Arme und Beine</span></label></div>`;
 
     // So viele Zeilen wie Diagnosen gefunden wurden, mindestens sechs, plus eine Leerzeile
     html += `<div class="rev-section"><div class="rev-sec-title">Diagnosen</div><div id="rev-diag-rows">`;

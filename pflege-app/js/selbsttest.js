@@ -333,6 +333,131 @@ async function selbsttest() {
             leeren();
         }
 
+        // ---------- 10d. Erfasste Daten nachträglich korrigieren ----------
+        {
+            const k = nr => ITEMS.find(i => i.nr === nr);
+            leeren();
+            protokollLeeren();
+            stellungnahmeVeraltet = false;
+            letzteProvided = null;
+            const merkDok = importDokumente.slice();
+            importDokumente = [];
+
+            // Ausgangslage: Gutachten eingelesen, Berater hat EIN Kriterium abweichend bewertet
+            stateOrig.values[k('4.1.1').id] = 0; stateEigene.values[k('4.1.1').id] = 0;   // unberührt
+            stateOrig.values[k('4.4.1').id] = 1; stateEigene.values[k('4.4.1').id] = 3;   // bewusst abweichend
+            stateOrig.values[k('4.2.6').id] = 0; stateEigene.values[k('4.2.6').id] = 0;   // unberührt
+            document.getElementById('stam-betreffend').value = 'Herr Max Muster';
+            document.getElementById('stam-kasse').value = 'AOK';
+            erstgespraechNotes = 'Wichtige Notiz aus dem Erstgespräch.';
+            const notizFeld = document.getElementById('erstgespraech-notes');
+            if (notizFeld) notizFeld.value = erstgespraechNotes;
+            appealDraft = '<div id="stmt-notes">Bereits geschriebene Stellungnahme.</div>';
+
+            // Schaltfläche vorhanden
+            const knopfKorr = Array.from(document.querySelectorAll('button'))
+                .find(b => (b.getAttribute('onclick') || '').includes('oeffneKorrektur'));
+            pruefeWahr('Schaltfläche „Erfasste Daten korrigieren" vorhanden', !!knopfKorr);
+
+            // Prüfansicht öffnen: zeigt den AKTUELLEN Stand des Vorgutachtens
+            oeffneKorrektur();
+            pruefeWahr('Prüfansicht ist offen',
+                document.getElementById('review-overlay').classList.contains('active'));
+            pruefe('Überschrift im Korrekturmodus',
+                document.getElementById('review-titel').textContent, 'Erfasste Daten korrigieren');
+            pruefeWahr('Schaltfläche heißt „Korrekturen übernehmen"',
+                document.getElementById('review-uebernehmen').getAttribute('onclick').includes('uebernehmeKorrektur'));
+            pruefe('Angezeigt wird das Vorgutachten, nicht die eigene Einschätzung',
+                reviewData.valuesMap[k('4.4.1').id], 1);
+            pruefe('Stammdaten stehen in der Prüfansicht', reviewData.stam.betreffend, 'Herr Max Muster');
+            pruefeWahr('Hinweis zum Korrigieren wird eingeblendet',
+                document.getElementById('review-hinweis').style.display === 'block');
+            pruefeWahr('Ohne Unterlage erscheint eine Erläuterung',
+                document.getElementById('review-pdf').innerText.includes('Keine Unterlage'));
+
+            // Korrigieren: 4.1.1 war falsch gelesen, 4.4.1 ebenfalls.
+            // rvValNum ist der Weg, den auch die Auswahlfelder gehen.
+            rvValNum(k('4.1.1').id, '2');
+            rvValNum(k('4.4.1').id, '2');
+            reviewData.stam.kasse = 'Barmer';
+            uebernehmeKorrektur();
+
+            pruefe('Vorgutachten korrigiert (4.1.1)', stateOrig.values[k('4.1.1').id], 2);
+            pruefe('Unberührte eigene Einschätzung zieht mit', stateEigene.values[k('4.1.1').id], 2);
+            pruefe('Vorgutachten korrigiert (4.4.1)', stateOrig.values[k('4.4.1').id], 2);
+            pruefe('Abweichende eigene Bewertung bleibt erhalten', stateEigene.values[k('4.4.1').id], 3);
+            pruefe('Nicht berührtes Kriterium bleibt unverändert', stateOrig.values[k('4.2.6').id], 0);
+            pruefe('Stammdaten werden korrigiert',
+                document.getElementById('stam-kasse').value, 'Barmer');
+
+            // Nichts darf verloren gehen
+            pruefe('Notizen bleiben erhalten', erstgespraechNotes, 'Wichtige Notiz aus dem Erstgespräch.');
+            pruefe('Notizfeld bleibt gefüllt',
+                document.getElementById('erstgespraech-notes').value, 'Wichtige Notiz aus dem Erstgespräch.');
+            pruefeWahr('Geschriebene Stellungnahme bleibt erhalten',
+                (appealDraft || '').includes('Bereits geschriebene Stellungnahme'));
+            pruefe('Betreffende Person bleibt stehen',
+                document.getElementById('stam-betreffend').value, 'Herr Max Muster');
+            pruefeWahr('Prüfansicht ist wieder geschlossen',
+                !document.getElementById('review-overlay').classList.contains('active'));
+            pruefe('Überschrift wieder auf Einlesen gestellt',
+                document.getElementById('review-titel').textContent, 'Gutachten prüfen & übernehmen');
+
+            // Protokoll und Veraltet-Hinweis
+            pruefeWahr('Korrekturen stehen im Protokoll',
+                bewertungsProtokoll.some(e => e.nr === '4.1.1')
+                && bewertungsProtokoll.some(e => e.quelle === BEWERTUNG_QUELLEN.import));
+            pruefeWahr('Stellungnahme wird als veraltet gekennzeichnet', stellungnahmeVeraltet === true);
+            pruefeWahr('Hinweis über der Stellungnahme erscheint',
+                veraltetHinweisHtml().includes('korrigiert'));
+
+            // Ohne bereits geschriebene Stellungnahme keine Veraltet-Warnung
+            stellungnahmeVeraltet = false;
+            appealDraft = '';
+            const docEl0 = document.getElementById('appeal-document');
+            if (docEl0) docEl0.innerHTML = '';
+            oeffneKorrektur();
+            rvValNum(k('4.2.6').id, '1');
+            uebernehmeKorrektur();
+            pruefe('Ohne Stellungnahme keine Veraltet-Warnung', stellungnahmeVeraltet, false);
+            pruefe('Korrektur wirkt trotzdem', stateOrig.values[k('4.2.6').id], 1);
+            pruefe('Kein Hinweis ohne Veraltung', veraltetHinweisHtml(), '');
+
+            // Nicht angefasste Kriterien dürfen NICHT geschrieben werden – sonst landete
+            // in jedem unbewerteten Kriterium stillschweigend eine Null.
+            delete stateOrig.values[k('4.3.9').id];
+            delete stateEigene.values[k('4.3.9').id];
+            protokollLeeren();
+            oeffneKorrektur();
+            rvValNum(k('4.2.6').id, '2');          // nur EIN Kriterium anfassen
+            uebernehmeKorrektur();
+            pruefeWahr('Unangetastetes Kriterium bleibt unbewertet',
+                stateOrig.values[k('4.3.9').id] === undefined);
+            pruefe('Nur das angefasste Kriterium wird geschrieben',
+                bewertungsProtokoll.filter(e => e.nr !== '—').map(e => e.nr), ['4.2.6', '4.2.6']);
+            pruefe('Angefasstes Kriterium ist gesetzt', stateOrig.values[k('4.2.6').id], 2);
+
+            // Hochgeladene Unterlagen werden gemerkt und nicht doppelt geführt
+            const probeDatei = new File(['x'], 'Gutachten.pdf', { type: 'application/pdf' });
+            merkeImportDokument(probeDatei, 'application/pdf');
+            merkeImportDokument(probeDatei, 'application/pdf');
+            merkeImportDokument(new File(['y'], 'Bescheid.pdf', { type: 'application/pdf' }), 'application/pdf');
+            pruefe('Unterlagen werden gemerkt, ohne Dopplung', importDokumente.map(d => d.name),
+                ['Gutachten.pdf', 'Bescheid.pdf']);
+            oeffneKorrektur();
+            pruefe('Bei mehreren Unterlagen erscheint eine Auswahlleiste',
+                document.querySelectorAll('#review-pdf .dok-tab').length, 2);
+            closeReview();
+            pruefe('Abbrechen stellt den Kopf zurück',
+                document.getElementById('review-titel').textContent, 'Gutachten prüfen & übernehmen');
+            pruefe('Abbrechen ändert nichts', stateOrig.values[k('4.2.6').id], 2);
+
+            importDokumente = merkDok;
+            stellungnahmeVeraltet = false;
+            protokollLeeren();
+            leeren();
+        }
+
         // ---------- 11a. Notizfeld im Reiter „Einschätzung" ----------
         {
             const feld = document.getElementById('erstgespraech-notes');

@@ -60,7 +60,13 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Schlusssatz enthalten. Die Grenzen werden nach der Erzeugung gemessen; bei Überschreitung
    läuft **ein** gezielter Kürzungsdurchgang, danach wird der Berater gewarnt. Niemals
    mechanisch abschneiden – das zerstört Zitate und den Ableitungssatz.
-9. **Die App trägt niemals eigenmächtig Bewertungen ein.** Nach dem geprüften und
+9. **Korrigieren zerstört nichts** (`js/korrektur.js`): „Erfasste Daten korrigieren" öffnet
+   die Prüfansicht erneut, setzt aber – anders als das Einlesen – nichts zurück. Notizen,
+   Befund, Erfassung und die geschriebene Stellungnahme bleiben erhalten. Übernommen werden
+   nur Kriterien, die in der Ansicht tatsächlich angefasst wurden (`reviewGeaendert`);
+   korrigiert wird das Vorgutachten, die eigene Einschätzung zieht nur dort mit, wo sie
+   bisher unverändert dem Vorgutachten entsprach.
+10. **Die App trägt niemals eigenmächtig Bewertungen ein.** Nach dem geprüften und
    bestätigten Import ist die Bepunktung Sache des Beraters. Die KI darf ausschließlich
    vorschlagen; übernommen wird nur, was ausdrücklich angehakt wurde – Auswahllisten
    starten deshalb **ohne** gesetzte Haken. Jeder Schreibzugriff läuft über
