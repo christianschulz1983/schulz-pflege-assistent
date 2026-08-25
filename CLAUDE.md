@@ -82,6 +82,9 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
 - Modul 3 setzt eine fachärztliche Diagnose mit mindestens sechs Monaten Behandlung voraus.
 - Modul 5 setzt in der Regel ärztliche Verordnung und sechs Monate Dauerhaftigkeit voraus.
 - Modul 5 wird je Gruppe summiert und dann **einmal** bepunktet, nicht je Kriterium.
+- Modul 5, Kriterien **4.5.1 bis 4.5.14**: Ist keine Maßnahme festgestellt, steht im erzeugten
+  Schriftstück **„entfällt oder selbständig"** – niemals „0", „null" oder „0x pro Woche".
+  Eine Häufigkeit von null ist keine Bewertung (`m5HaeufigkeitText` in `js/vorschlaege.js`).
 
 ## Arbeitsweise
 - Große Datei nie am Stück neu schreiben. Gezielt suchen, lesen, punktuell ändern.

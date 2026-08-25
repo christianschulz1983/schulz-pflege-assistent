@@ -193,6 +193,54 @@ async function selbsttest() {
             document.querySelectorAll('#verf-name-sel').length === 1 &&
             document.querySelectorAll('#verf-qual-sel').length === 1);
 
+        // ---------- 10a. Modul 5: keine „0" als Wertung im Schriftstück ----------
+        {
+            const k = nr => ITEMS.find(i => i.nr === nr);
+            pruefe('4.5.1 ohne Maßnahme', m5HaeufigkeitText('4.5.1', { count: 0, period: 'W' }),
+                'entfällt oder selbständig');
+            pruefe('4.5.14 ohne Maßnahme', m5HaeufigkeitText('4.5.14', { count: 0, period: 'M' }),
+                'entfällt oder selbständig');
+            pruefe('Fehlender Wert wird wie null behandelt',
+                m5HaeufigkeitText('4.5.7', null), 'entfällt oder selbständig');
+            pruefe('Mit Maßnahme bleibt die Häufigkeit stehen',
+                m5HaeufigkeitText('4.5.1', { count: 3, period: 'D' }), '3x pro Tag');
+            pruefe('Dezimalwerte mit Komma',
+                m5HaeufigkeitText('4.5.13', { count: 0.33, period: 'M' }), '0,33x pro Monat');
+            // Nur 4.5.1 bis 4.5.14 – ausserhalb bleibt es bei der Häufigkeit
+            pruefe('4.5.15 bleibt unverändert',
+                m5HaeufigkeitText('4.5.15', { count: 0, period: 'W' }), '0x pro Woche');
+            pruefe('Kriterien anderer Module unberührt',
+                m5HaeufigkeitText('4.1.1', { count: 0, period: 'W' }), '0x pro Woche');
+            pruefe('Bereich umfasst genau 4.5.1 bis 4.5.14',
+                ITEMS.filter(i => m5OhneWertungMoeglich(i.nr)).map(i => i.nr),
+                ['4.5.1','4.5.2','4.5.3','4.5.4','4.5.5','4.5.6','4.5.7',
+                 '4.5.8','4.5.9','4.5.10','4.5.11','4.5.12','4.5.13','4.5.14']);
+
+            // Wirkung im erzeugten Schriftstück
+            leeren();
+            stateOrig.values[k('4.5.1').id] = { count: 0, period: 'W' };
+            stateEigene.values[k('4.5.1').id] = { count: 3, period: 'D' };
+            const d = computeDiffs().find(x => x.nr === '4.5.1');
+            pruefe('Abweichung nennt „entfällt oder selbständig"', d && d.o, 'entfällt oder selbständig');
+            pruefe('Eigene Bewertung bleibt eine Häufigkeit', d && d.e, '3x pro Tag');
+            const doku = buildStellungnahme('', {}, '');
+            pruefeWahr('Schriftstück nennt „entfällt oder selbständig"',
+                doku.includes('entfällt oder selbständig'));
+            pruefeWahr('Schriftstück enthält kein „0x pro"', !doku.includes('0x pro'));
+            // Auch in der Antragsvorlage
+            const modusVorM5 = appModus;
+            setzeModus('hoeherstufung');
+            const antrag = buildHoeherstufung('', {}, '');
+            pruefeWahr('Antragsvorlage nennt „entfällt oder selbständig"',
+                antrag.includes('entfällt oder selbständig'));
+            pruefeWahr('Antragsvorlage enthält kein „0x pro"', !antrag.includes('0x pro'));
+            setzeModus(modusVorM5);
+            // Die Anweisung an die KI verbietet die Null ausdrücklich
+            pruefeWahr('Vorgabe an die KI nennt die Regel',
+                buildBegruendungPrompt([d], false).includes('entfällt oder selbständig'));
+            leeren();
+        }
+
         // ---------- 10b. Längenvorgaben für die erzeugten Texte ----------
         {
             pruefe('Satzzählung: einfache Sätze',
