@@ -191,6 +191,29 @@ function allgemeinSignature(notes, diffs) {
     return 'a' + h.toString(36);
 }
 
+// Modul 5: Die Kriterien 4.5.1 bis 4.5.14 werden über Häufigkeiten erfasst. Wurde keine
+// Maßnahme festgestellt, darf im erzeugten Schriftstück NICHT „0x pro Woche" stehen – das
+// läse sich wie eine erhobene Bewertung. Nach der BRi entfällt das Kriterium dann oder die
+// versicherte Person ist selbständig; genau das wird ausgewiesen.
+const M5_KEINE_WERTUNG = 'entfällt oder selbständig';
+
+function m5OhneWertungMoeglich(nr) {
+    const t = /^4\.5\.(\d+)$/.exec(nr || '');
+    if (!t) return false;
+    const n = Number(t[1]);
+    return n >= 1 && n <= 14;
+}
+
+// Häufigkeit als Text für das Schriftstück. Dezimalwerte (etwa aus „im Quartal")
+// werden mit Komma geschrieben, wie im Deutschen üblich.
+function m5HaeufigkeitText(nr, wert) {
+    const o = (wert && typeof wert === 'object') ? wert : { count: 0, period: 'W' };
+    const anzahl = Number(o.count) || 0;
+    if (anzahl === 0 && m5OhneWertungMoeglich(nr)) return M5_KEINE_WERTUNG;
+    const zahl = String(anzahl).replace('.', ',');
+    return zahl + 'x pro ' + (o.period === 'D' ? 'Tag' : o.period === 'W' ? 'Woche' : 'Monat');
+}
+
 // Alle Abweichungen Vorgutachten <-> eigene Einschätzung ermitteln
 function computeDiffs() {
     const diffs = [];
@@ -202,8 +225,9 @@ function computeDiffs() {
             const oO = (vO && typeof vO === 'object') ? vO : { count: 0, period: 'W' };
             const oE = (vE && typeof vE === 'object') ? vE : { count: 0, period: 'W' };
             if (oO.count !== oE.count || oO.period !== oE.period) {
-                const fp = o => `${o.count}x pro ${o.period === 'D' ? 'Tag' : o.period === 'W' ? 'Woche' : 'Monat'}`;
-                diffs.push({ id: i.id, m: i.m, nr: i.nr, title: i.title, o: fp(oO), e: fp(oE), oIdx: null, eIdx: null });
+                diffs.push({ id: i.id, m: i.m, nr: i.nr, title: i.title,
+                             o: m5HaeufigkeitText(i.nr, oO), e: m5HaeufigkeitText(i.nr, oE),
+                             oIdx: null, eIdx: null });
             }
         } else if (i.opts) {
             if (vO !== vE) {
@@ -379,6 +403,8 @@ Weiter zu beachten:
 - Erfinde keine Befunde, Diagnosen, Zeitangaben oder Vorkommnisse.
 - Verwende ausschließlich die je Kriterium angegebenen Stufenbezeichnungen. In den Modulen 2 und 3 gibt es
   keine Stufe „selbständig".
+- Modul 5, Kriterien 4.5.1 bis 4.5.14: Ist keine Maßnahme festgestellt, lautet die Bewertung
+  „${M5_KEINE_WERTUNG}". Schreibe dafür NIEMALS „0", „null" oder „0x pro Woche".
 - Beachte die mitgelieferte Hilfsmittel-Regel und die Hinweise unter „Achtung"; widerspricht eine Argumentation
   ihnen, verwende sie nicht.
 - Variiere die Eröffnungen über alle Begründungen hinweg.
@@ -525,6 +551,7 @@ Beachte zwingend:
 4. Module 1, 4 und 6 (Selbständigkeit): Begründe über die notwendige personelle Unterstützung bei wesentlichen Teilschritten sowie über Sicherheit und Schmerz – eine Aktivität gilt nur dann als selbständig, wenn sie ohne personelle Hilfe, adäquat und sicher durchführbar ist. Bei psychischer Grunderkrankung zählt auch der Bedarf an Aufforderung, Anleitung, Motivierung und Kontrolle: Ist die Handlung motorisch möglich, wird sie aber ohne personelle Anstöße nicht zuverlässig ausgeführt, liegt keine Selbständigkeit vor.
 5. Modul 3 (Verhaltensweisen und psychische Problemlagen): Begründe über die nachgewiesene Häufigkeit der Ereignisse, die eine personelle Intervention erfordern; eine aufwändige Motivierung durch andere Personen ist dabei zwingend zu werten. Nenne die Zielstufe (nie oder sehr selten / selten / häufig / täglich).
 6. Modul 5: Begründe über die dauerhafte, regelmäßige Häufigkeit der Maßnahmen und nenne die Zielfrequenz ausdrücklich, etwa „3 mal täglich" oder „2 mal wöchentlich". Personelle Hilfe ist auch dann zu werten, wenn die Maßnahme ohne Erinnerung, Anleitung oder Kontrolle nicht zuverlässig umgesetzt wird.
+6a. Modul 5, Kriterien 4.5.1 bis 4.5.14: Ist im Gutachten keine Maßnahme festgestellt, lautet die dortige Bewertung „${M5_KEINE_WERTUNG}". Schreibe dafür NIEMALS „0", „null", „0x pro Woche" oder „keine Wertung" – eine Häufigkeit von null ist keine Bewertung.
 7. Bei Kriterien der Module 2 und 3 nenne im Schlusssatz die Einzelpunkte in Klammern, zum Beispiel „größtenteils vorhanden" (1 Einzelpunkt).
 8. Schreibe sachlich-fachlichen Gutachterstil in der dritten Person („die versicherte Person", „Herr/Frau …"), ohne Aufzählungszeichen und ohne Überschriften. Der Ton ist bestimmt und fachlich zugespitzt, aber sachlich begründet – keine pauschalen Unterstellungen ohne Beleg im Material.
 9. Gib NUR den Begründungstext zurück – ohne die Zeilen "Kriterium ..." und "Gutachterliche Bewertung ...", diese ergänzt die Software selbst.`;
