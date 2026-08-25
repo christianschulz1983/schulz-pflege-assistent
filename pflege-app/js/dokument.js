@@ -356,6 +356,12 @@ async function generateAppealText() {
         appealDraft = finalHtml;
         if (docEl) docEl.innerHTML = finalHtml;
         if (cont) cont.style.display = 'block';
+        // Die Stellungnahme gibt jetzt wieder den aktuellen Stand der Bewertungen wieder.
+        if (typeof stellungnahmeVeraltet !== 'undefined') {
+            stellungnahmeVeraltet = false;
+            const w = document.getElementById('appeal-veraltet');
+            if (w) w.innerHTML = '';
+        }
         // Auf nicht belegte BRi-Zitate hinweisen – die müssen vor dem Versand geprüft werden.
         const warnAnzahl = (docEl ? docEl.querySelectorAll('.zitat-warnung[data-warn]').length : 0);
         if (warnAnzahl) {
