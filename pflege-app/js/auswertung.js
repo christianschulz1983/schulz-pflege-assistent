@@ -71,6 +71,18 @@ function renderAuswertung() {
     document.getElementById('auswertung-content').innerHTML=`
     <div class="space-y-6">
         <div class="card">
+            <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Zuletzt gespeicherte Dateien</div>
+            <div style="padding:16px 20px">
+                <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+                    Nachweis darüber, was tatsächlich geschrieben wurde – Falldateien und Word-Dokumente.
+                    Wird ein Speichern-Dialog abgebrochen, erscheint hier nichts. Den Ordner wählen Sie
+                    im Dialog selbst; der Browser gibt ihn der App nicht bekannt.
+                </p>
+                ${typeof speicherungenHtml === 'function' ? speicherungenHtml() : ''}
+            </div>
+        </div>
+
+        <div class="card">
             <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Woher stammen die Bewertungen?</div>
             <div style="padding:16px 20px">
                 <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
