@@ -206,7 +206,10 @@ function renderAuswertung() {
     }
 }
 
-function saveCase() {
+// Speichert den Fall. Wie beim Word-Dokument über einen „Speichern unter"-Dialog, damit
+// der Ordner frei wählbar ist und wiedergefunden wird. Kennt der Browser den Dialog nicht,
+// landet die Datei wie bisher im Download-Ordner.
+async function saveCase() {
     const stammdaten={};
     document.querySelectorAll('[id^="stam-"], [id^="diag-"]').forEach(el=>stammdaten[el.id]=el.value);
     const notesEl = document.getElementById('erstgespraech-notes');
@@ -219,7 +222,15 @@ function saveCase() {
                 erfassung: (typeof erfassungSichern === 'function') ? erfassungSichern() : null};
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
     const name=(document.getElementById('stam-betreffend').value||'Fall').replace(/\s/g,'_');
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${name}_Pflegegradassistent.json`; a.click();
+    const dateiname=`${name}_Pflegegradassistent.json`;
+    if (typeof speichereDatei === 'function') {
+        // Eigene Kennung: der Ordner für Falldateien wird getrennt von dem der
+        // Word-Dokumente gemerkt.
+        return await speichereDatei(blob, dateiname, 'fall-datei',
+            'Mit „Fall laden" lässt sich die Datei wieder öffnen.');
+    }
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=dateiname; a.click();
+    return true;
 }
 
 function loadCase(e) {
