@@ -225,9 +225,10 @@ async function saveCase() {
     const dateiname=`${name}_Pflegegradassistent.json`;
     if (typeof speichereDatei === 'function') {
         // Eigene Kennung: der Ordner für Falldateien wird getrennt von dem der
-        // Word-Dokumente gemerkt.
-        return await speichereDatei(blob, dateiname, 'fall-datei',
-            'Mit „Fall laden" lässt sich die Datei wieder öffnen.');
+        // Word-Dokumente gemerkt. Vorgabe ist der Download-Ordner – dort liegen die
+        // bisher gespeicherten Fälle, und dort sucht auch „Fall laden" zuerst.
+        return await speichereDatei(blob, dateiname, 'fall-datei-download',
+            'Mit „Fall laden" lässt sich die Datei wieder öffnen.', 'downloads');
     }
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=dateiname; a.click();
     return true;

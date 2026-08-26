@@ -442,7 +442,7 @@ ${STELLUNGNAHME_CSS.replace(/\.stmt \.zitat-warnung\{[^}]*\}/g, '').replace(/@me
 /* Speichern unter: öffnet den Dateidialog des Betriebssystems, sodass Ordner und
    Dateiname frei gewählt werden können. Der zuletzt genutzte Ordner wird je Kennung
    gemerkt. Kennt der Browser den Dialog nicht, wird wie bisher heruntergeladen. */
-async function speichereDatei(blob, dateiname, kennung, erfolgstext) {
+async function speichereDatei(blob, dateiname, kennung, erfolgstext, startOrdner) {
     const endung = '.' + (dateiname.split('.').pop() || 'doc').toLowerCase();
     const typen = {
         '.doc': { beschreibung: 'Word-Dokument', mime: 'application/msword' },
@@ -454,7 +454,7 @@ async function speichereDatei(blob, dateiname, kennung, erfolgstext) {
             const griff = await window.showSaveFilePicker({
                 suggestedName: dateiname,
                 id: kennung,                 // Chrome merkt sich den Ordner je Kennung
-                startIn: 'documents',
+                startIn: startOrdner || 'documents',
                 types: [{ description: typen.beschreibung, accept: { [typen.mime]: [endung] } }]
             });
             const schreiber = await griff.createWritable();
