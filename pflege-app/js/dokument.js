@@ -460,10 +460,15 @@ async function speichereDatei(blob, dateiname, kennung, erfolgstext, startOrdner
             const schreiber = await griff.createWritable();
             await schreiber.write(blob);
             await schreiber.close();
+            merkeSpeicherung(griff.name);
             showToast('Gespeichert als „' + griff.name + '". ' + (erfolgstext || ''), 'success');
             return true;
         } catch (e) {
-            if (e && e.name === 'AbortError') return false;    // Nutzer hat abgebrochen
+            if (e && e.name === 'AbortError') {
+                // Früher geschah hier nichts – der Berater konnte glauben, gespeichert zu haben.
+                showToast('Speichern abgebrochen – die Datei wurde NICHT gespeichert.', 'error');
+                return false;
+            }
             console.warn('Speichern-unter nicht möglich, nutze Download:', e);
         }
     }
@@ -473,8 +478,46 @@ async function speichereDatei(blob, dateiname, kennung, erfolgstext, startOrdner
     a.href = url; a.download = dateiname;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 4000);
+    merkeSpeicherung(dateiname);
     showToast((erfolgstext || 'Datei gespeichert.') + ' Der Speicherort ist der Download-Ordner des Browsers.', 'success');
     return true;
+}
+
+/* Nachweis über tatsächlich geschriebene Dateien. Der Browser verrät den vollständigen
+   Pfad nicht, wohl aber den Dateinamen – zusammen mit dem Zeitpunkt genügt das, um zu
+   sehen, ob und wann gespeichert wurde. Bleibt im Browser dieses Rechners. */
+const SPEICHER_PROTOKOLL = 'pflege_speicherungen';
+
+function merkeSpeicherung(dateiname) {
+    try {
+        const liste = leseSpeicherungen();
+        liste.unshift({ name: dateiname, zeit: new Date().toISOString() });
+        localStorage.setItem(SPEICHER_PROTOKOLL, JSON.stringify(liste.slice(0, 25)));
+    } catch (e) { /* privater Modus o. Ä. – dann eben ohne Nachweis */ }
+}
+
+function leseSpeicherungen() {
+    try {
+        const roh = localStorage.getItem(SPEICHER_PROTOKOLL);
+        const l = roh ? JSON.parse(roh) : [];
+        return Array.isArray(l) ? l : [];
+    } catch (e) { return []; }
+}
+
+function speicherungenHtml() {
+    const liste = leseSpeicherungen();
+    if (!liste.length) {
+        return '<p style="font-size:12px;color:var(--text-muted);line-height:1.6">'
+             + 'In diesem Browser wurde noch nichts gespeichert.</p>';
+    }
+    const zeilen = liste.map(e => {
+        let z = e.zeit;
+        try { z = new Date(e.zeit).toLocaleString('de-DE'); } catch (x) {}
+        return `<tr><td style="white-space:nowrap;font-family:var(--font-mono);font-size:11px">${escapeHtml(z)}</td>`
+             + `<td style="font-size:12px">${escapeHtml(e.name)}</td></tr>`;
+    }).join('');
+    return `<div style="overflow-x:auto"><table class="result-table" style="font-size:12px">
+        <thead><tr><th>Zeitpunkt</th><th>Datei</th></tr></thead><tbody>${zeilen}</tbody></table></div>`;
 }
 
 function printAppealText() {

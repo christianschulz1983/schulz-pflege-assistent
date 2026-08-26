@@ -18,7 +18,9 @@ async function selbsttest() {
         orig: JSON.parse(JSON.stringify(stateOrig)),
         eigen: JSON.parse(JSON.stringify(stateEigene)),
         notizen: erstgespraechNotes,
-        entwurf: appealDraft
+        entwurf: appealDraft,
+        // Der Test schreibt Probedateien; sein Nachweis darf nicht im echten stehen bleiben.
+        speicherungen: (() => { try { return localStorage.getItem(SPEICHER_PROTOKOLL); } catch (e) { return null; } })()
     };
 
     try {
@@ -1035,6 +1037,10 @@ async function selbsttest() {
             pruefeWahr('Fall speichern nutzt den Speichern-unter-Dialog',
                 saveCase.toString().includes('speichereDatei'));
             pruefe('Fall speichern: Dialog beginnt im Download-Ordner', dialogStart, 'downloads');
+            pruefeWahr('Speichern wird nachgewiesen',
+                leseSpeicherungen().some(e => e.name === 'Herr_Speicher_Test_Pflegegradassistent.json'));
+            pruefeWahr('Nachweis erscheint in der Auswertung',
+                speicherungenHtml().includes('Herr_Speicher_Test_Pflegegradassistent.json'));
             pruefeWahr('Word-Dokument behält den Dokumentenordner',
                 exportAppealWord.toString().indexOf("'downloads'") === -1);
             const d = json ? JSON.parse(json) : {};
@@ -1124,12 +1130,15 @@ async function selbsttest() {
                 return { name: 'Mein Dokument.doc',
                          createWritable: async () => ({ write: async b => { geschrieben = b; }, close: async () => {} }) };
             };
+            // Abwarten ist zwingend: sonst schreibt der Aufruf seinen Nachweis erst, nachdem
+            // der Test den ursprünglichen Stand längst wiederhergestellt hat.
             const p = speichereDatei(new Blob(['x'], { type: 'application/msword' }), 'Test.doc', 'pruefung', 'Hinweis');
             pruefeWahr('Speichern unter: liefert ein Versprechen', p && typeof p.then === 'function');
+            await p;
 
             // Weg 2: Browser kennt ihn nicht -> Rückfall auf Herunterladen
             window.showSaveFilePicker = undefined;
-            speichereDatei(new Blob(['x'], { type: 'application/msword' }), 'Rueckfall.doc', 'pruefung', 'Hinweis');
+            await speichereDatei(new Blob(['x'], { type: 'application/msword' }), 'Rueckfall.doc', 'pruefung', 'Hinweis');
             pruefe('Ohne Dateidialog wird heruntergeladen', heruntergeladen, 'Rueckfall.doc');
 
             HTMLAnchorElement.prototype.click = ok2; URL.createObjectURL = oc2;
@@ -1141,6 +1150,22 @@ async function selbsttest() {
                 speichereDatei.toString().includes('id: kennung'));
             pruefeWahr('Abbruch durch den Nutzer erzeugt keinen Fehler',
                 speichereDatei.toString().includes('AbortError'));
+
+            // Ein abgebrochener Dialog muss deutlich gemeldet werden und darf nichts nachweisen
+            const vorherNachweis = leseSpeicherungen().length;
+            let meldung = null;
+            const echtToast = window.showToast;
+            window.showToast = (t, a) => { meldung = { text: t, art: a }; };
+            const echterDialog3 = window.showSaveFilePicker;
+            window.showSaveFilePicker = async () => { const f = new Error('abgebrochen'); f.name = 'AbortError'; throw f; };
+            const ergebnis = await speichereDatei(new Blob(['x'], { type: 'application/json' }),
+                'Abbruch_Pflegegradassistent.json', 'pruefung-abbruch', 'Hinweis');
+            window.showToast = echtToast;
+            if (echterDialog3) window.showSaveFilePicker = echterDialog3; else delete window.showSaveFilePicker;
+            pruefe('Abbruch: nichts wird gespeichert', ergebnis, false);
+            pruefeWahr('Abbruch: wird deutlich gemeldet',
+                !!meldung && meldung.art === 'error' && /NICHT gespeichert/.test(meldung.text));
+            pruefe('Abbruch: erscheint nicht im Nachweis', leseSpeicherungen().length, vorherNachweis);
         }
 
     } catch (e) {
@@ -1151,6 +1176,11 @@ async function selbsttest() {
         stateEigene = sicherung.eigen;
         erstgespraechNotes = sicherung.notizen;
         appealDraft = sicherung.entwurf;
+        // Probedateien des Tests wieder aus dem Speicher-Nachweis entfernen
+        try {
+            if (sicherung.speicherungen === null) localStorage.removeItem(SPEICHER_PROTOKOLL);
+            else localStorage.setItem(SPEICHER_PROTOKOLL, sicherung.speicherungen);
+        } catch (e) {}
         try { fillTable('own'); calculate('own'); } catch (e) {}
     }
 
