@@ -983,6 +983,117 @@ async function selbsttest() {
             befundLaden(sichBef); erfassungLaden(sichErf); setzeModus(modusVor3);
         }
 
+        // ---------- 17b. Ganzen Fall speichern und wieder laden ----------
+        // Prüft den Weg, den der Berater tatsächlich geht: „Speichern" schreibt eine Datei,
+        // „Fall laden" liest sie zurück. Entscheidend sind die eigene Einschätzung und die
+        // geschriebene Stellungnahme einschliesslich eigener Ergänzungen.
+        if (typeof saveCase === 'function' && typeof loadCase === 'function') {
+            const k = nr => ITEMS.find(i => i.nr === nr);
+            const merkFelder = {};
+            document.querySelectorAll('[id^="stam-"], [id^="diag-"]').forEach(el => merkFelder[el.id] = el.value);
+            const merkBef = JSON.parse(JSON.stringify(befundSichern()));
+            const merkErf = JSON.parse(JSON.stringify(erfassungSichern()));
+            const merkModus = appModus;
+
+            leeren();
+            setzeModus('widerspruch');
+            setzeBewertung('orig', k('4.4.1').id, 1, 'import');
+            setzeBewertung('own',  k('4.4.1').id, 3, 'berater');
+            setzeBewertung('orig', k('4.5.1').id, { count: 0, period: 'W' }, 'import');
+            setzeBewertung('own',  k('4.5.1').id, { count: 3, period: 'D' }, 'berater');
+            stateEigene.special = 1;
+            document.getElementById('stam-betreffend').value = 'Herr Speicher Test';
+            document.getElementById('stam-kasse').value = 'Testkasse';
+            erstgespraechNotes = 'Notiz für die Speicherprobe.';
+            const notizFeld2 = document.getElementById('erstgespraech-notes');
+            if (notizFeld2) notizFeld2.value = erstgespraechNotes;
+            appealDraft = '<div class="stmt"><p>Erzeugte Stellungnahme</p><p>VON HAND ERGAENZT</p></div>';
+            const dokFeld = document.getElementById('appeal-document');
+            if (dokFeld) dokFeld.innerHTML = appealDraft;
+            psycheListe = []; psycheHinzu('4.3.9'); psycheSetzen(0, 'haeufigkeit', '3'); psycheSetzen(0, 'wertung', '2');
+
+            // „Speichern" abfangen, statt eine Datei herunterzuladen
+            let json = null;
+            const eBlob = window.Blob, eUrl = URL.createObjectURL, eClick = HTMLAnchorElement.prototype.click;
+            window.Blob = function (t, o) { json = t.join(''); return new eBlob(t, o); };
+            URL.createObjectURL = () => 'blob:selbsttest';
+            HTMLAnchorElement.prototype.click = function () {};
+            try { saveCase(); } finally {
+                window.Blob = eBlob; URL.createObjectURL = eUrl; HTMLAnchorElement.prototype.click = eClick;
+            }
+            const d = json ? JSON.parse(json) : {};
+            pruefeWahr('Fall speichern: Datei wird geschrieben', !!json);
+            pruefe('Fall speichern: eigene Einschätzung', d.stateEigene && d.stateEigene.values[k('4.4.1').id], 3);
+            pruefe('Fall speichern: Häufigkeit aus Modul 5',
+                d.stateEigene && d.stateEigene.values[k('4.5.1').id], { count: 3, period: 'D' });
+            pruefe('Fall speichern: Vorgutachten', d.stateOrig && d.stateOrig.values[k('4.4.1').id], 1);
+            pruefe('Fall speichern: Besondere Bedarfskonstellation', d.stateEigene && d.stateEigene.special, 1);
+            pruefeWahr('Fall speichern: Stellungnahme mit eigener Ergänzung',
+                (d.appealDraft || '').includes('VON HAND ERGAENZT'));
+            pruefe('Fall speichern: Notizen', d.erstgespraechNotes, 'Notiz für die Speicherprobe.');
+            pruefe('Fall speichern: Stammdaten', d.stammdaten && d.stammdaten['stam-kasse'], 'Testkasse');
+            pruefe('Fall speichern: psychische Problemlagen', (d.befund && d.befund.psyche || []).length, 1);
+
+            // Alles zerstören und aus der Datei wiederherstellen
+            leeren();
+            stateEigene.special = 0;
+            stateEigene.values[k('4.5.1').id] = { count: 0, period: 'W' };
+            erstgespraechNotes = ''; appealDraft = '';
+            psycheListe = [];
+            if (notizFeld2) notizFeld2.value = '';
+            if (dokFeld) dokFeld.innerHTML = '';
+            document.getElementById('stam-kasse').value = '';
+            await new Promise(r => {
+                loadCase({ target: { files: [new File([json], 'probe.json', { type: 'application/json' })], value: '' } });
+                setTimeout(r, 400);
+            });
+            pruefe('Fall laden: eigene Einschätzung zurück', stateEigene.values[k('4.4.1').id], 3);
+            pruefe('Fall laden: Häufigkeit aus Modul 5 zurück',
+                stateEigene.values[k('4.5.1').id], { count: 3, period: 'D' });
+            pruefe('Fall laden: Vorgutachten zurück', stateOrig.values[k('4.4.1').id], 1);
+            pruefe('Fall laden: Besondere Bedarfskonstellation zurück', stateEigene.special, 1);
+            pruefeWahr('Fall laden: Stellungnahme mit eigener Ergänzung zurück',
+                (appealDraft || '').includes('VON HAND ERGAENZT'));
+            pruefe('Fall laden: Notizen zurück', erstgespraechNotes, 'Notiz für die Speicherprobe.');
+            pruefe('Fall laden: Notizfeld wieder gefüllt',
+                document.getElementById('erstgespraech-notes').value, 'Notiz für die Speicherprobe.');
+            pruefe('Fall laden: Stammdaten zurück',
+                document.getElementById('stam-kasse').value, 'Testkasse');
+            pruefe('Fall laden: psychische Problemlagen zurück', psycheListe.length, 1);
+            // Punktzahl muss identisch sein – sonst stimmt die Wiederherstellung nur scheinbar
+            pruefe('Fall laden: Punktzahl unverändert', calculateInternal('own').total, 100);
+            // Die Stellungnahme muss auch wieder sichtbar werden
+            renderAuswertung();
+            pruefeWahr('Fall laden: Stellungnahme erscheint wieder im Feld',
+                (document.getElementById('appeal-document')?.innerHTML || '').includes('VON HAND ERGAENZT'));
+            pruefeWahr('Fall laden: Bereich der Stellungnahme wird eingeblendet',
+                document.getElementById('appeal-result-container').style.display === 'block');
+
+            // Ältere Falldateien (ohne Befund, Erfassung und Vorgangsart) müssen weiter laden
+            const altJson = JSON.stringify({
+                stateOrig: { special: 0, values: {} }, stateEigene: { special: 0, values: {} },
+                stammdaten: { 'stam-betreffend': 'Frau Alt' },
+                erstgespraechNotes: 'alte Notiz', appealDraft: '<p>Alter Text</p>'
+            });
+            await new Promise(r => {
+                loadCase({ target: { files: [new File([altJson], 'alt.json', { type: 'application/json' })], value: '' } });
+                setTimeout(r, 400);
+            });
+            pruefe('Ältere Falldatei: Stammdaten',
+                document.getElementById('stam-betreffend').value, 'Frau Alt');
+            pruefe('Ältere Falldatei: gilt als Widerspruch', appModus, 'widerspruch');
+            pruefeWahr('Ältere Falldatei: Stellungnahme zurück', (appealDraft || '').includes('Alter Text'));
+            pruefe('Ältere Falldatei: keine Problemlagen', psycheListe.length, 0);
+
+            // Ursprünglichen Stand wiederherstellen
+            befundLaden(merkBef); erfassungLaden(merkErf); setzeModus(merkModus);
+            Object.keys(merkFelder).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = merkFelder[id];
+            });
+            protokollLeeren();
+        }
+
         // ---------- 18. Speichern unter ----------
         if (typeof speichereDatei === 'function') {
             const echterDialog2 = window.showSaveFilePicker;
