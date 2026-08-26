@@ -1014,7 +1014,7 @@ async function selbsttest() {
 
             // „Speichern" abfangen, statt eine Datei zu schreiben. Der Dateidialog wird
             // nachgestellt – sonst öffnete der Test ein echtes Fenster.
-            let json = null, dialogName = null;
+            let json = null, dialogName = null, dialogStart = null;
             const eBlob = window.Blob, eUrl = URL.createObjectURL, eClick = HTMLAnchorElement.prototype.click;
             const eDialog = window.showSaveFilePicker;
             window.Blob = function (t, o) { json = t.join(''); return new eBlob(t, o); };
@@ -1022,6 +1022,7 @@ async function selbsttest() {
             HTMLAnchorElement.prototype.click = function () {};
             window.showSaveFilePicker = async (opt) => {
                 dialogName = opt && opt.suggestedName;
+                dialogStart = opt && opt.startIn;
                 return { name: opt.suggestedName,
                          createWritable: async () => ({ write: async () => {}, close: async () => {} }) };
             };
@@ -1033,6 +1034,9 @@ async function selbsttest() {
                 'Herr_Speicher_Test_Pflegegradassistent.json');
             pruefeWahr('Fall speichern nutzt den Speichern-unter-Dialog',
                 saveCase.toString().includes('speichereDatei'));
+            pruefe('Fall speichern: Dialog beginnt im Download-Ordner', dialogStart, 'downloads');
+            pruefeWahr('Word-Dokument behält den Dokumentenordner',
+                exportAppealWord.toString().indexOf("'downloads'") === -1);
             const d = json ? JSON.parse(json) : {};
             pruefeWahr('Fall speichern: Datei wird geschrieben', !!json);
             pruefe('Fall speichern: eigene Einschätzung', d.stateEigene && d.stateEigene.values[k('4.4.1').id], 3);
