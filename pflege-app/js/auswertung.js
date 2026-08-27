@@ -205,7 +205,7 @@ function renderAuswertung() {
     const stilEl = document.getElementById('stil-beispiele');
     if (stilEl) {
         let s = null;
-        try { s = localStorage.getItem(STIL_STORAGE); } catch (e) {}
+        try { s = localStorage.getItem(stilSchluessel()); } catch (e) {}
         stilEl.value = (s && s.trim()) ? s : STIL_BEISPIEL_DEFAULT;
     }
     if (appealDraft) {

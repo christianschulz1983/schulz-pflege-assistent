@@ -2,9 +2,12 @@
 // Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
 // Wählt die Vorlage nach Vorgangsart: Widerspruch wie bisher, sonst die Antragsvorlage.
 function baueDokument(notes, begruendungen, allgemeinText) {
-    // Die Anhörung bekommt eine eigene Vorlage (im Aufbau). Bis dahin wird KEIN Dokument
-    // erzeugt – ein Höherstufungsantrag wäre hier fachlich falsch.
-    if (typeof appModus !== 'undefined' && appModus === 'anhoerung') return null;
+    // Die Anhörung hat eine eigene Vorlage: zwei Gutachtenblöcke, drei Spalten,
+    // nur die strittig gebliebenen Kriterien.
+    if (typeof appModus !== 'undefined' && appModus === 'anhoerung') {
+        return (typeof buildAnhoerung === 'function')
+            ? buildAnhoerung(notes, begruendungen, allgemeinText) : null;
+    }
     if (typeof appModus !== 'undefined' && appModus !== 'widerspruch'
         && typeof buildHoeherstufung === 'function') {
         return buildHoeherstufung(notes, begruendungen, allgemeinText);
@@ -293,17 +296,19 @@ function setzeStellungnahme(html) {
 // Erzeugt die Stellungnahme im Familiara-Format (gefüllt aus den App-Daten, mit Rechtschreibkorrektur der Notizen).
 async function generateAppealText() {
     try {
-        if (typeof appModus !== 'undefined' && appModus === 'anhoerung') {
-            showToast('Die Vorlage für die Anhörung wird gerade gebaut. Erfassen und vergleichen '
-                + 'funktioniert bereits; das Schriftstück folgt im nächsten Schritt.', 'error');
+        if (typeof appModus !== 'undefined' && appModus === 'anhoerung' && !hatZweitgutachten()) {
+            showToast('Für die Anhörung fehlt noch das Anhörungsgutachten. Bitte zuerst auf Reiter 1 '
+                + 'den Widerspruchsfall laden und das Gutachten einlesen.', 'error');
             return;
         }
         injectStellungnahmeCss();
 
-        // Notizen einlesen und – falls vorhanden und API-Schlüssel gesetzt – Rechtschreibung/Grammatik korrigieren
-        const notesEl = document.getElementById('erstgespraech-notes');
-        if (notesEl) erstgespraechNotes = notesEl.value;
-        let notes = (erstgespraechNotes || '').trim();
+        // Im Anhoerungsverfahren zaehlen die Anmerkungen zum Zweitgutachten; im uebrigen
+        // die Mitschrift des Erstgespraechs.
+        const istAnh = (typeof appModus !== 'undefined' && appModus === 'anhoerung');
+        const notesEl = document.getElementById(istAnh ? 'anh-notizen' : 'erstgespraech-notes');
+        if (!istAnh && notesEl) erstgespraechNotes = notesEl.value;
+        let notes = (istAnh ? (notesEl ? notesEl.value : '') : (erstgespraechNotes || '')).trim();
 
         const keyPresent = ((document.getElementById('user-api-key')?.value || '').trim() || userApiKey.trim() || apiKey.trim());
         if (notes && keyPresent) {
@@ -312,7 +317,7 @@ async function generateAppealText() {
                 const corrected = await correctText(notes);
                 if (corrected) {
                     notes = corrected;
-                    erstgespraechNotes = corrected;
+                    if (!istAnh) erstgespraechNotes = corrected;
                     if (notesEl) notesEl.value = corrected; // korrigierte Fassung auch im Notizfeld übernehmen
                 }
             } catch (e) {
@@ -327,7 +332,10 @@ async function generateAppealText() {
         // Bereits vorhandene, unverändert bewertete Kriterien werden nicht erneut formuliert –
         // ihr (ggf. überarbeiteter) Text bleibt beim Zusammenführen ohnehin erhalten.
         let begruendungen = {};
-        const diffs = computeDiffs();
+        // Im Anhoerungsverfahren sind nur die strittig gebliebenen Kriterien zu begruenden.
+        const analyse = istAnh ? schwellenAnalyse() : null;
+        const diffs = istAnh ? analyse.strittig : computeDiffs();
+        const schluessel = d => istAnh ? lagenSchluessel(d) : (d.o + '|' + d.e);
         const vorhandenEl = document.getElementById('appeal-document');
         const vorhandenHtml = (vorhandenEl && vorhandenEl.innerHTML.trim()) ? vorhandenEl.innerHTML : (appealDraft || '');
         const bereitsDa = {};
@@ -335,14 +343,15 @@ async function generateAppealText() {
             const tmp = document.createElement('div'); tmp.innerHTML = vorhandenHtml;
             tmp.querySelectorAll('.crit[data-nr]').forEach(el => { bereitsDa[el.getAttribute('data-nr')] = el.getAttribute('data-vals'); });
         }
-        const zuErzeugen = diffs.filter(d => bereitsDa[d.nr] !== `${d.o}|${d.e}`);
+        const zuErzeugen = diffs.filter(d => bereitsDa[d.nr] !== schluessel(d));
         // „Allgemeine Angaben" nur neu verfassen, wenn sie fehlen oder sich Notizen/Abweichungen änderten
         let allgemeinText = '';
         let brauchtAllgemein = true;
         if (vorhandenHtml) {
             const tmp2 = document.createElement('div'); tmp2.innerHTML = vorhandenHtml;
             const n = tmp2.querySelector('#stmt-notes');
-            if (n && n.innerHTML.trim() && n.getAttribute('data-sig') === allgemeinSignature(notes, diffs)) brauchtAllgemein = false;
+            const sig = istAnh ? anhoerungSignatur(analyse, notes) : allgemeinSignature(notes, diffs);
+            if (n && n.innerHTML.trim() && n.getAttribute('data-sig') === sig) brauchtAllgemein = false;
         }
         if ((zuErzeugen.length || brauchtAllgemein) && keyPresent) {
             const was = [];
@@ -350,7 +359,9 @@ async function generateAppealText() {
             if (brauchtAllgemein) was.push('Allgemeine Angaben');
             showOverlay("Stellungnahme wird erstellt...", was.join(' und ') + ' werden verfasst');
             try {
-                const erg = await generateBegruendungen(zuErzeugen, brauchtAllgemein);
+                const erg = istAnh
+                    ? await generateBegruendungenAnhoerung(zuErzeugen, brauchtAllgemein, analyse)
+                    : await generateBegruendungen(zuErzeugen, brauchtAllgemein);
                 begruendungen = erg.map || {};
                 allgemeinText = erg.allgemein || '';
             } catch (e) {
