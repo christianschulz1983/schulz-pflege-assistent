@@ -13,6 +13,17 @@ async function selbsttest() {
         pruefungen.push({ name, ok: !!bedingung, ist: !!bedingung, soll: true, hinweis: hinweis || '' });
     };
 
+    // Wartet, bis eine Bedingung erfuellt ist. loadCase stellt die Stammfelder
+    // zeitversetzt wieder her; feste Wartezeiten sind dafuer unzuverlaessig.
+    const warteAuf = async (bedingung, maxMs) => {
+        const ende = Date.now() + (maxMs || 3000);
+        while (Date.now() < ende) {
+            try { if (bedingung()) return true; } catch (e) {}
+            await new Promise(r => setTimeout(r, 30));
+        }
+        return false;
+    };
+
     // Aktuellen Stand sichern, damit der Test keine Arbeit zerstört
     const sicherung = {
         orig: JSON.parse(JSON.stringify(stateOrig)),
@@ -273,8 +284,8 @@ async function selbsttest() {
                 document.getElementById('btn-tab-befund').style.display === 'none');
             pruefeWahr('Anhörung: erweiterte Erfassung bleibt verborgen',
                 document.getElementById('erfassung-bereich').style.display === 'none');
-            pruefe('Anhörung: Reiterbeschriftung wie im Widerspruch',
-                document.getElementById('btn-tab-3').innerText, '2. EINSCHÄTZUNG & VERGLEICH');
+            pruefe('Anhörung: Reiter werden neu nummeriert',
+                document.getElementById('btn-tab-3').innerText, '3. EINSCHÄTZUNG & VERGLEICH');
             ANHOERUNG_FELDER.forEach(f => pruefeWahr('Anhörung: Feld „' + f.l + '" vorhanden',
                 !!document.getElementById(f.id)));
             pruefeWahr('Anhörung: Feld für die Begründung der Kasse',
@@ -338,6 +349,131 @@ async function selbsttest() {
             });
             setzeModus(merkModusA);
             protokollLeeren();
+            leeren();
+        }
+
+        // ---------- 9b3. Dreiervergleich und Schwellenwertrechnung ----------
+        if (typeof vergleichsLagen === 'function') {
+            const k = nr => ITEMS.find(i => i.nr === nr);
+            const merkModusV = appModus, merkZweitV = JSON.parse(JSON.stringify(stateZweit));
+
+            // Was-wäre-wenn: calculateInternal muss auch einen übergebenen Stand rechnen
+            leeren();
+            const probe = { special: 0, values: {} };
+            ITEMS.forEach(i => { probe.values[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+            [k('4.4.1'), k('4.4.2'), k('4.4.3')].forEach(i => { probe.values[i.id] = 3; });
+            pruefe('Rechnung aus einem übergebenen Stand', calculateInternal(probe).weights[3], 20);
+            // Modul 4 mit 9 Einzelpunkten ergibt 20 gewichtete Punkte, also Pflegegrad 1 –
+            // eine mitgegebene Zusammenfassung (hier Pflegegrad 5) darf das nicht überstimmen.
+            probe.extracted = { raws: [0,0,0,0,0,0], weights: [0,0,0,0,0,0], total: 99, pg: 5 };
+            pruefe('Übergebener Stand ignoriert die Zusammenfassung', calculateInternal(probe).pg, 1);
+
+            // Vergleichbarer Zahlenwert
+            pruefe('Stufenwert: gewöhnliches Kriterium', stufenwert(k('4.4.1'), 2), 2);
+            pruefe('Stufenwert: Modul 5 rechnet auf den Tag um',
+                Math.round(stufenwert(k('4.5.1'), { count: 7, period: 'W' }) * 100) / 100, 1);
+
+            // Die vier Lagen
+            leeren();
+            stateZweit = { special: 0, values: {} };
+            ITEMS.forEach(i => { if (i.m && i.opts) stateZweit.values[i.id] = 0; });
+            // gefolgt: Erst 0, ich 2, Zweit 2
+            stateOrig.values[k('4.4.1').id] = 0; stateEigene.values[k('4.4.1').id] = 2; stateZweit.values[k('4.4.1').id] = 2;
+            // teilweise: Erst 0, ich 3, Zweit 1
+            stateOrig.values[k('4.4.2').id] = 0; stateEigene.values[k('4.4.2').id] = 3; stateZweit.values[k('4.4.2').id] = 1;
+            // nicht gefolgt: Erst 1, ich 3, Zweit 1
+            stateOrig.values[k('4.4.3').id] = 1; stateEigene.values[k('4.4.3').id] = 3; stateZweit.values[k('4.4.3').id] = 1;
+            // verschlechtert: Erst 2, ich 3, Zweit 1
+            stateOrig.values[k('4.4.4').id] = 2; stateEigene.values[k('4.4.4').id] = 3; stateZweit.values[k('4.4.4').id] = 1;
+            // ohne Abweichung im Widerspruch -> taucht gar nicht auf
+            stateOrig.values[k('4.4.5').id] = 1; stateEigene.values[k('4.4.5').id] = 1; stateZweit.values[k('4.4.5').id] = 3;
+
+            const lagen = vergleichsLagen();
+            const lageVon = nr => (lagen.find(l => l.nr === nr) || {}).lage;
+            pruefe('Lage: gefolgt', lageVon('4.4.1'), 'gefolgt');
+            pruefe('Lage: teilweise gefolgt', lageVon('4.4.2'), 'teilweise');
+            pruefe('Lage: nicht gefolgt', lageVon('4.4.3'), 'nicht');
+            pruefe('Lage: verschlechtert', lageVon('4.4.4'), 'verschlechtert');
+            pruefeWahr('Ohne eigene Abweichung keine Lage', lageVon('4.4.5') === undefined);
+            pruefe('Strittig sind drei Kriterien', strittigeLagen(lagen).length, 3);
+            pruefeWahr('Klartext der Bewertungen wird mitgeliefert',
+                lagen.every(l => l.eText && l.zText && l.bText));
+
+            // Schwellenwertrechnung an einem eigens gerechneten Fall.
+            // Nur Modul 4 ist belegt: 8 Einzelpunkte ergeben 20 gewichtete Punkte
+            // (Stufen: ab 3 -> 10, ab 8 -> 20, ab 19 -> 30). Gesamt 20 Punkte = Pflegegrad 1,
+            // nächste Schwelle 27, es fehlen also 7 Punkte.
+            const a = schwellenAnalyse();
+            pruefe('Anhörungsgutachten: Modul 4 aus den Kriterien', a.basis.raws[3], 8);
+            pruefe('Anhörungsgutachten: Pflegegrad', a.basis.pg, 1);
+            pruefe('Mit allen strittigen Punkten steigt Modul 4', a.gesamt.raws[3], 14);
+            pruefe('Nächste Schwelle', a.naechsteSchwelle, 27);
+            pruefe('Fehlende Punkte werden genannt', a.fehlendePunkte, 7);
+            pruefeWahr('Jede strittige Zeile hat eine Was-wäre-wenn-Rechnung',
+                a.strittig.every(l => typeof l.punkteMit === 'number' && typeof l.kipptAllein === 'boolean'));
+            // 4.4.3 allein: Modul 4 von 8 auf 10 – immer noch 20 gewichtete Punkte, kippt nicht
+            pruefe('Ein einzelnes Kriterium kippt hier nicht',
+                a.strittig.find(l => l.nr === '4.4.3').kipptAllein, false);
+
+            // Zweiter, eigens gerechneter Fall: Anhörungsgutachten knapp unter der Schwelle.
+            // Modul 4 hat dort 7 Einzelpunkte -> 10 gewichtete -> kein Pflegegrad (Schwelle 12,5).
+            // Ein einziges Kriterium von „überw. selbst." auf „unselbständig" ergibt 9 Einzelpunkte
+            // -> 20 gewichtete -> Pflegegrad 1. Genau das muss die App finden.
+            leeren();
+            stateZweit = { special: 0, values: {} };
+            ITEMS.forEach(i => {
+                if (i.m === 5 && i.group !== 'D') {
+                    stateOrig.values[i.id] = { count: 0, period: 'W' };
+                    stateEigene.values[i.id] = { count: 0, period: 'W' };
+                    stateZweit.values[i.id] = { count: 0, period: 'W' };
+                } else if (i.m) {
+                    stateZweit.values[i.id] = 0;
+                }
+            });
+            stateOrig.values[k('4.4.1').id] = 0; stateEigene.values[k('4.4.1').id] = 3; stateZweit.values[k('4.4.1').id] = 3;
+            stateOrig.values[k('4.4.2').id] = 0; stateEigene.values[k('4.4.2').id] = 3; stateZweit.values[k('4.4.2').id] = 3;
+            stateOrig.values[k('4.4.3').id] = 0; stateEigene.values[k('4.4.3').id] = 3; stateZweit.values[k('4.4.3').id] = 1;
+            const a2 = schwellenAnalyse();
+            pruefe('Knapper Fall: Anhörungsgutachten ohne Pflegegrad', a2.basis.pg, 0);
+            pruefe('Knapper Fall: ein strittiges Kriterium', a2.strittig.length, 1);
+            pruefe('Knapper Fall: zwei Punkte wurden übernommen', a2.gefolgt.length, 2);
+            pruefeWahr('Kippendes Kriterium wird erkannt',
+                a2.kipper.length === 1 && a2.kipper[0].nr === '4.4.3');
+            pruefe('Kippen bedeutet einen höheren Pflegegrad', a2.kipper[0].pgMit, 1);
+
+            // Erwiderungsmuster
+            const muster = erwiderungsMuster(a2.strittig[0], a2);
+            pruefeWahr('Muster C wird immer vorgeschlagen', muster.includes('C'));
+            pruefeWahr('Knappe Schwelle schlägt Muster E vor', muster.includes('E'));
+            pruefe('Sechs Muster sind hinterlegt', Object.keys(MUSTER_TEXTE).length, 6);
+
+            // Der Reiter
+            setzeModus('anhoerung');
+            pruefeWahr('Vergleichsreiter nur im Anhörungsverfahren sichtbar',
+                document.getElementById('btn-tab-vergleich').style.display !== 'none');
+            pruefe('Reiter werden neu nummeriert',
+                document.getElementById('btn-tab-3').innerText, '3. EINSCHÄTZUNG & VERGLEICH');
+            renderVergleich();
+            const inhalt = document.getElementById('tab-vergleich').innerText;
+            pruefeWahr('Übersicht nennt die drei Stände',
+                inhalt.includes('Erstgutachten') && inhalt.includes('Anhörungsgutachten')
+                && inhalt.includes('Meine Beurteilung'));
+            pruefeWahr('Übersicht nennt die fehlenden Punkte', inhalt.includes('fehlen'));
+            pruefeWahr('Übersicht trennt übernommen und strittig',
+                inhalt.includes('Übernommen') && inhalt.includes('Strittig geblieben'));
+            setzeModus('widerspruch');
+            pruefeWahr('Vergleichsreiter sonst verborgen',
+                document.getElementById('btn-tab-vergleich').style.display === 'none');
+
+            // Ohne Zweitgutachten eine Erklärung statt einer leeren Seite
+            stateZweit = { special: 0, values: {} };
+            setzeModus('anhoerung');
+            renderVergleich();
+            pruefeWahr('Ohne Anhörungsgutachten erscheint eine Erläuterung',
+                document.getElementById('tab-vergleich').innerText.includes('noch kein Anhörungsgutachten'));
+
+            stateZweit = merkZweitV;
+            setzeModus(merkModusV);
             leeren();
         }
 
@@ -1291,10 +1427,11 @@ async function selbsttest() {
             if (notizFeld2) notizFeld2.value = '';
             if (dokFeld) dokFeld.innerHTML = '';
             document.getElementById('stam-kasse').value = '';
-            await new Promise(r => {
-                loadCase({ target: { files: [new File([json], 'probe.json', { type: 'application/json' })], value: '' } });
-                setTimeout(r, 400);
-            });
+            // Feld vorher leeren: sonst koennte die Wartebedingung schon erfuellt sein,
+            // bevor das Laden ueberhaupt gewirkt hat (der Test liefe dann zu frueh weiter).
+            document.getElementById('stam-kasse').value = '';
+            loadCase({ target: { files: [new File([json], 'probe.json', { type: 'application/json' })], value: '' } });
+            await warteAuf(() => document.getElementById('stam-kasse').value === 'Testkasse');
             pruefe('Fall laden: eigene Einschätzung zurück', stateEigene.values[k('4.4.1').id], 3);
             pruefe('Fall laden: Häufigkeit aus Modul 5 zurück',
                 stateEigene.values[k('4.5.1').id], { count: 3, period: 'D' });
@@ -1327,12 +1464,14 @@ async function selbsttest() {
             const fallB = JSON.stringify({ stateOrig: { special: 0, values: {} }, stateEigene: { special: 0, values: {} },
                 stammdaten: { 'stam-betreffend': 'Herr BBB' }, erstgespraechNotes: 'B',
                 appealDraft: '<p>STELLUNGNAHME VON HERRN BBB</p>' });
-            const ladeFall = async (t) => { await new Promise(r => {
+            const ladeFall = async (t, erwarteterName) => {
+                document.getElementById('stam-betreffend').value = '';
                 loadCase({ target: { files: [new File([t], 'f.json', { type: 'application/json' })], value: '' } });
-                setTimeout(r, 400); }); };
-            await ladeFall(fallA);
+                await warteAuf(() => document.getElementById('stam-betreffend').value === erwarteterName);
+            };
+            await ladeFall(fallA, 'Frau AAA');
             renderAuswertung();                       // Fall A ansehen
-            await ladeFall(fallB);                    // Fall B laden, ohne Reiter 4 zu öffnen
+            await ladeFall(fallB, 'Herr BBB');         // Fall B laden, ohne Reiter 4 zu öffnen
             pruefeWahr('Fallwechsel: Anzeigefeld zeigt den neuen Fall',
                 (document.getElementById('appeal-document')?.innerHTML || '').includes('HERRN BBB'));
             let jsonB = null;
@@ -1368,10 +1507,9 @@ async function selbsttest() {
                 stammdaten: { 'stam-betreffend': 'Frau Alt' },
                 erstgespraechNotes: 'alte Notiz', appealDraft: '<p>Alter Text</p>'
             });
-            await new Promise(r => {
-                loadCase({ target: { files: [new File([altJson], 'alt.json', { type: 'application/json' })], value: '' } });
-                setTimeout(r, 400);
-            });
+            document.getElementById('stam-betreffend').value = '';
+            loadCase({ target: { files: [new File([altJson], 'alt.json', { type: 'application/json' })], value: '' } });
+            await warteAuf(() => document.getElementById('stam-betreffend').value === 'Frau Alt');
             pruefe('Ältere Falldatei: Stammdaten',
                 document.getElementById('stam-betreffend').value, 'Frau Alt');
             pruefe('Ältere Falldatei: gilt als Widerspruch', appModus, 'widerspruch');

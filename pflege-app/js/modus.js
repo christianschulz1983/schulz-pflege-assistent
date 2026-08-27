@@ -80,12 +80,18 @@ function setzeModus(key) {
         btn.style.display = mitBefund ? '' : 'none';
         btn.innerText = (key === 'erstantrag') ? '2. Befunderhebung' : '2. Befunderhebung';
     }
+    // Der Vergleichsreiter gehört ausschließlich zum Anhörungsverfahren.
+    const istAnh = (key === 'anhoerung');
+    const bv = document.getElementById('btn-tab-vergleich');
+    if (bv) bv.style.display = istAnh ? '' : 'none';
     // Nummerierung der übrigen Reiter anpassen
+    const zweiter = (mitBefund || istAnh);
     const b3 = document.getElementById('btn-tab-3'), b4 = document.getElementById('btn-tab-4');
-    if (b3) b3.innerText = (mitBefund ? '3.' : '2.') + ' Einschätzung & Vergleich';
-    if (b4) b4.innerText = (mitBefund ? '4.' : '3.') + ' Auswertung';
-    // Steht die Befunderhebung nicht zur Verfügung, nicht darauf stehen bleiben
+    if (b3) b3.innerText = (zweiter ? '3.' : '2.') + ' Einschätzung & Vergleich';
+    if (b4) b4.innerText = (zweiter ? '4.' : '3.') + ' Auswertung';
+    // Steht ein Reiter nicht zur Verfügung, nicht darauf stehen bleiben
     if (!mitBefund && document.getElementById('tab-befund')?.classList.contains('active')) switchTab(1);
+    if (!istAnh && document.getElementById('tab-vergleich')?.classList.contains('active')) switchTab(1);
     // Erweiterte Erfassung (Pflegepersonen, Aufenthalte, Versorgung) ebenfalls nur dort
     const erf = document.getElementById('erfassung-bereich');
     if (erf) {

@@ -231,6 +231,7 @@ function switchTab(id) {
     document.getElementById('btn-tab-'+id).classList.add('active');
     if (id === 4) renderAuswertung();
     if (id === 'befund' && typeof renderBefund === 'function') renderBefund();
+    if (id === 'vergleich' && typeof renderVergleich === 'function') renderVergleich();
 }
 
 function autoResize(t) {

@@ -12,12 +12,16 @@ function nbaEinzelpunkte(st, id) {
     return Number.isFinite(p) ? p : 0;
 }
 
+// pref ist entweder eine Spalte ('orig' | 'zweit' | 'own') oder – für Was-wäre-wenn-
+// Rechnungen – unmittelbar ein Bewertungsstand. Wird ein Stand übergeben, wird immer
+// aus den Kriterien gerechnet; eine Zusammenfassung aus dem Gutachten gilt dann nicht.
 function calculateInternal(pref) {
-    const st = zustandZu(pref);
+    const eigenerStand = (pref && typeof pref === 'object');
+    const st = eigenerStand ? pref : zustandZu(pref);
 
     // Liegt eine Zusammenfassung aus dem Gutachten vor, gilt sie – das betrifft
     // Vorgutachten und Anhörungsgutachten gleichermaßen, nie die eigene Einschätzung.
-    if ((pref === 'orig' || pref === 'zweit') && st.extracted) {
+    if (!eigenerStand && (pref === 'orig' || pref === 'zweit') && st.extracted) {
         return {
             raws: st.extracted.raws,
             weights: st.extracted.weights,

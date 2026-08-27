@@ -51,6 +51,7 @@
     <nav class="tabs">
         <button onclick="switchTab(1)" id="btn-tab-1" class="tab-btn active">1. Stammdaten &amp; Diagnosen</button>
         <button onclick="switchTab('befund')" id="btn-tab-befund" class="tab-btn" style="display:none">2. Befunderhebung</button>
+        <button onclick="switchTab('vergleich')" id="btn-tab-vergleich" class="tab-btn" style="display:none">2. Vergleich</button>
         <button onclick="switchTab(3)" id="btn-tab-3" class="tab-btn">2. Einschätzung &amp; Vergleich</button>
         <button onclick="switchTab(4)" id="btn-tab-4" class="tab-btn">3. Auswertung</button>
     </nav>
@@ -159,6 +160,7 @@
 
 
     <section id="tab-befund" class="tab-content space-y-6"></section>
+    <section id="tab-vergleich" class="tab-content space-y-6"></section>
 
     <section id="tab-3" class="tab-content"></section>
 
@@ -295,6 +297,7 @@ if (typeof pdfjsLib !== 'undefined') { try { pdfjsLib.GlobalWorkerOptions.worker
 <script src="js/erfassung.js"></script>
 <script src="js/hoeherstufung.js"></script>
 <script src="js/anhoerung.js"></script>
+<script src="js/vergleich.js"></script>
 <script src="js/arztberichte.js"></script>
 <script src="js/modus.js"></script>
 <script src="js/auswertung.js"></script>
