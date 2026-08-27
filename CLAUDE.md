@@ -24,6 +24,11 @@ pflege-app/
   js/berechnung.js    Punkte, Pflegegrad
   js/auswertung.js    Sidebar, Auswertung, Fall speichern/laden
   js/modus.js         Startauswahl: Verfasser und Vorgangsart
+  js/bewertung.js     Einzige Schreibstelle fuer Bewertungen, Protokoll
+  js/laenge.js        Laengengrenzen der erzeugten Texte
+  js/korrektur.js     Erfasste Daten nachtraeglich korrigieren
+  js/anhoerung.js     Anhoerungsverfahren: Erfassung und Vorlage
+  js/vergleich.js     Dreiervergleich und Schwellenwertrechnung
   js/befund.js        Befunderhebung (Erstantrag, Höherstufung)
   js/erfassung.js     Pflegepersonen, Aufenthalte, Versorgung, Übernahme in Modul 5
   js/hoeherstufung.js Dokumentvorlage der Anträge und Deckblatt
@@ -60,13 +65,20 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Schlusssatz enthalten. Die Grenzen werden nach der Erzeugung gemessen; bei Überschreitung
    läuft **ein** gezielter Kürzungsdurchgang, danach wird der Berater gewarnt. Niemals
    mechanisch abschneiden – das zerstört Zitate und den Ableitungssatz.
-9. **Korrigieren zerstört nichts** (`js/korrektur.js`): „Erfasste Daten korrigieren" öffnet
+9. **Anhörungsverfahren** (`js/anhoerung.js`, `js/vergleich.js`): Vierter Vorgang. Beginnt
+   mit „Fall laden" (Widerspruchsfall) – Erstgutachten und eigene Bewertung stehen damit
+   fest; neu eingelesen wird nur das Anhörungsgutachten in `stateZweit`. Vorlage: zwei
+   Gutachtenblöcke im Kopf, Einleitung mit **„aufrecht"**, neu verfasste Allgemeine Angaben,
+   **drei Spalten** in der Gegenüberstellung, nur die **strittig gebliebenen** Kriterien,
+   Fazit mit beiden Gutachten. Bis zu 8 Sätze je Begründung, eigene Stilvorlage
+   (`pflege_stilbeispiele_anhoerung`). Anhörungsschreiben bleiben Stilvorlage **nur** hier.
+10. **Korrigieren zerstört nichts** (`js/korrektur.js`): „Erfasste Daten korrigieren" öffnet
    die Prüfansicht erneut, setzt aber – anders als das Einlesen – nichts zurück. Notizen,
    Befund, Erfassung und die geschriebene Stellungnahme bleiben erhalten. Übernommen werden
    nur Kriterien, die in der Ansicht tatsächlich angefasst wurden (`reviewGeaendert`);
    korrigiert wird das Vorgutachten, die eigene Einschätzung zieht nur dort mit, wo sie
    bisher unverändert dem Vorgutachten entsprach.
-10. **Die App trägt niemals eigenmächtig Bewertungen ein.** Nach dem geprüften und
+11. **Die App trägt niemals eigenmächtig Bewertungen ein.** Nach dem geprüften und
    bestätigten Import ist die Bepunktung Sache des Beraters. Die KI darf ausschließlich
    vorschlagen; übernommen wird nur, was ausdrücklich angehakt wurde – Auswahllisten
    starten deshalb **ohne** gesetzte Haken. Jeder Schreibzugriff läuft über
@@ -94,9 +106,12 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
   KI-Texte, solange kein gültiger Google-Schlüssel vorliegt.
 
 ## Stand der Ausbaustufen
-Alle drei Vorgänge sind einsatzbereit: Widerspruch (unverändert), Erstantrag und
-Höherstufungsantrag mit Befundkatalog, erweiterter Erfassung, Übernahme in Modul 5,
-Arztbericht-Auslese und Deckblatt. Der Selbsttest umfasst 98 Prüfungen.
+Vier Vorgaenge sind einsatzbereit: Widerspruch (unveraendert), Erstantrag und
+Hoeherstufungsantrag mit Befundkatalog, erweiterter Erfassung, Uebernahme in Modul 5,
+Arztbericht-Auslese und Deckblatt sowie das Anhoerungsverfahren mit drittem
+Bewertungsstand, Vergleichsreiter und eigener Vorlage.
+Offen: Anlagen (Arztberichte, Verordnungen) mit Verzeichnis und Verweis im Dokument.
+Der Selbsttest umfasst 429 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

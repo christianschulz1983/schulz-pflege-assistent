@@ -457,6 +457,152 @@ async function haltenLaengenGrenzen(map, allgemein) {
     return { map: e.map, allgemein: e.allgemein };
 }
 
+/* Begründungen für das Anhörungsverfahren. Anders als im Widerspruch wird nicht das
+   Erstgutachten angegriffen, sondern das Zweitgutachten – vor dem Hintergrund, dass der
+   Medizinische Dienst in anderen Punkten bereits gefolgt ist. */
+async function generateBegruendungenAnhoerung(strittig, mitAllgemein, analyse) {
+    const cut = (s, n) => (s && s.length > n) ? s.slice(0, n) + ' …' : (s || '');
+    const anmerkungen = (document.getElementById('anh-notizen')?.value || '').trim();
+    const kassenbegruendung = (document.getElementById('anh-kassenbegruendung')?.value || '').trim();
+    const zweitArt = (document.getElementById('anh-art')?.value || '').trim();
+
+    const systemPrompt = `Du bist ein erfahrener Pflegeberater und Pflegesachverständiger. Du verfasst eine
+pflegefachliche Stellungnahme für den WIDERSPRUCHSAUSSCHUSS, nachdem der Widerspruch abgelehnt und
+vom Medizinischen Dienst ein Zweitgutachten (Anhörungsgutachten) erstellt wurde.
+
+Schreibe im Aufbau, Ton und in der Wortwahl exakt wie die folgenden Beispiele des Verfassers:
+
+=== STILBEISPIELE DES VERFASSERS ===
+${getStilBeispiele()}
+=== ENDE STILBEISPIELE ===
+
+DIE BESONDERE LAGE – darum geht es hier:
+Der Medizinische Dienst ist der pflegefachlichen Stellungnahme in mehreren Punkten GEFOLGT.
+Das belegt die Tragfähigkeit der dort erhobenen Befunde. In den entscheidenden Punkten ist er
+ihr aber NICHT gefolgt. Genau darauf zielt jede Begründung: Warum ist es nicht nachvollziehbar,
+dass hier an der alten Wertung festgehalten wurde, obwohl dieselbe Befundlage anderswo zur
+Korrektur geführt hat?
+
+${laengenVorgabeBegruendung()}
+Eine nummerierte Aufzählung (1., 2., 3.) ist hier zulässig, wenn sie die Argumentation schärft.
+
+DIE SECHS ERWIDERUNGSMUSTER. Zu jedem Kriterium ist angegeben, welche in Betracht kommen.
+Verwende nur die genannten und nur, soweit das Material sie trägt:
+A – Der Befund ist im Zweitgutachten bestätigt, die Wertung blieb dennoch unverändert.
+    Muster: „Das Anhörungsgutachten bestätigt im Befund: „…“. Es bleibt unklar, wie … wenn …“
+B – Die Wertung stützt sich auf die Selbsteinschätzung der versicherten Person statt auf den Befund.
+    Muster: „… wird lediglich mit dem Zusatz „wie kenntlich gemacht“ begründet – eine reine Übernahme
+    einer Selbsteinschätzung, die durch die objektive Befundlage widerlegt wird.“
+C – Das Zweitgutachten setzt sich mit der Stellungnahme nicht auseinander.
+    Muster: „… die in der pflegefachlichen Stellungnahme aufgeführten Einschränkungen kann das
+    Zweitgutachten nicht widerlegen.“
+D – Entscheidung nach Aktenlage ohne eigene Sachverhaltsaufklärung.
+    Muster: „Eine Entscheidung nach Aktenlage, die diesen vorgetragenen Sachverhalt ignoriert, wird
+    der Amtsermittlungspflicht nicht gerecht.“
+E – Die Schwelle zum nächsten Pflegegrad wurde knapp unterschritten. Nenne die Zahlen, die dir
+    unten mitgeteilt werden – erfinde keine.
+F – Die Wertung ist inkonsistent zu den Kriterien, in denen der Medizinische Dienst gefolgt ist.
+    Muster: „… wirkt fachlich inkonsistent zu den Heraufstufungen bei den übrigen … Kriterien.“
+
+ZWINGEND:
+- Beziehe dich auf die Wertung des ZWEITGUTACHTENS, nicht auf die des Erstgutachtens.
+- Erfinde keine Befunde, Zitate, Zahlen oder Vorkommnisse. Zitiere die BRi ausschließlich wörtlich
+  aus den mitgelieferten Texten; passt nichts wörtlich, gib es ohne Anführungszeichen sinngemäß wieder.
+- Verwende ausschließlich die je Kriterium angegebenen Stufenbezeichnungen.
+- Modul 5, Kriterien 4.5.1 bis 4.5.14: Ist keine Maßnahme festgestellt, lautet die Bewertung
+  „${M5_KEINE_WERTUNG}". Schreibe dafür niemals „0" oder „0x pro Woche".
+- Sachlich-fachlicher Gutachterstil in der dritten Person. Keine Unterstellungen ohne Beleg im Material.
+- Gib NUR den Begründungstext zurück.`;
+
+    let prompt = '';
+    const vName = (document.getElementById('stam-betreffend')?.value || '').trim();
+    if (vName) prompt += `VERSICHERTE PERSON: ${vName}\n`;
+    prompt += `DURCHFÜHRUNGSART DES ZWEITGUTACHTENS: ${zweitArt || 'nicht angegeben'}\n\n`;
+
+    prompt += `RECHENERGEBNIS (belastbar, nicht zu verändern):\n`
+        + `- Erstgutachten: ${calculateInternal('orig').total.toFixed(2).replace('.', ',')} Punkte\n`
+        + `- Anhörungsgutachten: ${analyse.basis.total.toFixed(2).replace('.', ',')} Punkte\n`
+        + `- Eigene Beurteilung: ${analyse.gesamt.total.toFixed(2).replace('.', ',')} Punkte\n`;
+    if (analyse.naechsteSchwelle !== null) {
+        prompt += `- Bis zur nächsten Schwelle (${String(analyse.naechsteSchwelle).replace('.', ',')} Punkte) fehlen dem `
+                + `Anhörungsgutachten ${String(analyse.fehlendePunkte).replace('.', ',')} Punkte.\n`;
+    }
+    if (analyse.gefolgt.length) {
+        prompt += `- GEFOLGT ist der Medizinische Dienst in: `
+                + analyse.gefolgt.map(l => l.nr + ' (' + l.zText + ')').join(', ') + '\n';
+    }
+    if (analyse.kipper.length) {
+        prompt += `- Allein die Korrektur folgender Kriterien würde den Pflegegrad ändern: `
+                + analyse.kipper.map(l => l.nr).join(', ') + '\n';
+    }
+    prompt += '\n';
+
+    if (anmerkungen) {
+        prompt += '==================== HAUPTQUELLE ====================\n'
+                + 'MEINE ANMERKUNGEN ZUM ANHÖRUNGSVERFAHREN\n'
+                + 'Sie sind der inhaltliche Kern. Stichpunkte zu Fließtext ausformen, ohne den Inhalt zu ändern:\n\n'
+                + cut(anmerkungen, 6000) + '\n=====================================================\n\n';
+    }
+    if (kassenbegruendung) {
+        prompt += 'BEGRÜNDUNG DER PFLEGEKASSE AUS DEM ANHÖRUNGSSCHREIBEN:\n' + cut(kassenbegruendung, 3000) + '\n\n';
+    }
+    const befund = (document.getElementById('stam-befund')?.value || '').trim();
+    if (befund) prompt += 'BEFUNDTEXT DES GUTACHTERS:\n' + cut(befund, 5000) + '\n\n';
+
+    prompt += 'STRITTIG GEBLIEBENE KRITERIEN (hierzu je eine Begründung):\n\n';
+    strittig.forEach(l => {
+        const b = briFor(l.nr);
+        prompt += `--- Kriterium ${l.nr}: ${l.titel} ---\n`;
+        prompt += `Erstgutachten: „${l.eText}"\nAnhörungsgutachten: „${l.zText}"\nMeine Beurteilung: „${l.bText}"\n`;
+        prompt += `Lage: ${VERGLEICH_LAGEN[l.lage].titel} – ${VERGLEICH_LAGEN[l.lage].text}\n`;
+        prompt += `Passende Erwiderungsmuster: ${erwiderungsMuster(l, analyse).join(', ')}\n`;
+        if (l.kipptAllein) prompt += `Bereits dieses eine Kriterium würde den Pflegegrad ändern.\n`;
+        prompt += `Stufenbezeichnungen: verwende ausschließlich „${l.zText}" und „${l.bText}".\n`;
+        if (b) prompt += `BRi-Definition: ${cut(b.definition, 1400)}\n`;
+        const lh = (typeof LAIEN_HINWEISE !== 'undefined') ? LAIEN_HINWEISE[l.nr] : null;
+        if (lh) {
+            if (lh.hilfsmittel) prompt += `HILFSMITTEL-REGEL (zwingend beachten): ${lh.hilfsmittel}\n`;
+            if (lh.wichtig) prompt += `WICHTIG / FEHLERQUELLE: ${lh.wichtig}\n`;
+        }
+        prompt += '\n';
+    });
+
+    if (mitAllgemein) {
+        prompt += 'ZUSÄTZLICHE AUFGABE – Abschnitt „Allgemeine Angaben":\n'
+                + laengenVorgabeAllgemein('Allgemeine Angaben') + '\n'
+                + 'Verfasse ihn NEU für das Anhörungsverfahren, in 3 bis 4 knappen Absätzen:\n'
+                + '- Nenne beide Gutachten mit Datum, Punktzahl und Pflegegrad.\n'
+                + '- Halte fest, in welchen Punkten der Medizinische Dienst gefolgt ist, und dass dies die\n'
+                + '  Tragfähigkeit der Stellungnahme bestätigt.\n'
+                + '- Arbeite heraus, dass er in den entscheidenden Punkten nicht gefolgt ist, und nenne den\n'
+                + '  Abstand zur Schwelle mit den oben genannten Zahlen.\n'
+                + '- Baue meine Anmerkungen zum Anhörungsverfahren vollständig ein.\n'
+                + 'Zähle die einzelnen Kriterien NICHT ab – das folgt im Abschnitt „Befund und Stellungnahme".\n\n';
+    }
+
+    const schema = {
+        type: "OBJECT",
+        properties: {
+            allgemein: { type: "STRING" },
+            begruendungen: { type: "ARRAY", items: { type: "OBJECT",
+                properties: { nr: { type: "STRING" }, text: { type: "STRING" } }, required: ["nr", "text"] } }
+        },
+        required: ["begruendungen"]
+    };
+    const res = await callGeminiWithFallback({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json", responseSchema: schema }
+    }, systemPrompt);
+    let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!txt) throw new Error("Keine Antwort der KI erhalten.");
+    const fence = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fence) txt = fence[1];
+    const data = JSON.parse(txt.trim());
+    const map = {};
+    (data.begruendungen || []).forEach(b => { if (b && b.nr && b.text) map[b.nr] = b.text.trim(); });
+    return await haltenLaengenGrenzen(map, (data.allgemein || '').trim());
+}
+
 // Erzeugt Begründungen je Abweichung und – auf Wunsch – den Abschnitt „Allgemeine Angaben"
 // im Stil des Nutzers. Ein einziger KI-Aufruf für alles.
 async function generateBegruendungen(diffs, mitAllgemein) {

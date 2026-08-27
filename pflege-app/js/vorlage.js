@@ -150,16 +150,22 @@ Gutachterliche Bewertung: „selbständig"
 Die selbständige Gestaltung des Alltags ist für die versicherte Person aufgrund der schweren depressiven Episode nicht mehr möglich. Die massive Antriebslosigkeit an mehreren Tagen in der Woche führt dazu, dass sie ohne Strukturierung von außen in Passivität verharrt. Nach den Richtlinien für das Modul 6 liegt eine Einschränkung vor, wenn die Person den Tag nicht ohne externe Motivation oder Planungshilfe gestalten kann. Die Pflegeperson muss den Tagesablauf maßgeblich strukturieren und die versicherte Person immer wieder überreden, das Haus zu verlassen oder Aktivitäten zu beginnen. Die reduzierte psychische Belastbarkeit verhindert eine eigenständige Anpassung an die täglichen Gegebenheiten. Eine Bewertung als völlig autonom widerspricht der gesicherten psychiatrischen Anamnese in jeder Hinsicht. Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „überwiegend selbständig" ableitbar.`;
 
 const STIL_STORAGE = 'pflege_stilbeispiele';
+// Das Anhoerungsverfahren hat eine eigene Stilvorlage. Anhoerungsschreiben sind ein
+// anderer Dokumenttyp und duerfen NICHT in den Widerspruch einfliessen.
+function stilSchluessel() {
+    return (typeof appModus !== 'undefined' && appModus === 'anhoerung')
+        ? STIL_STORAGE + '_anhoerung' : STIL_STORAGE;
+}
 function getStilBeispiele() {
     const el = document.getElementById('stil-beispiele');
     if (el && el.value.trim()) return el.value.trim();
-    try { const s = localStorage.getItem(STIL_STORAGE); if (s && s.trim()) return s.trim(); } catch (e) {}
+    try { const s = localStorage.getItem(stilSchluessel()); if (s && s.trim()) return s.trim(); } catch (e) {}
     return STIL_BEISPIEL_DEFAULT;
 }
 function saveStilBeispiele() {
     const el = document.getElementById('stil-beispiele');
     if (!el) return;
-    try { localStorage.setItem(STIL_STORAGE, el.value); } catch (e) {}
+    try { localStorage.setItem(stilSchluessel(), el.value); } catch (e) {}
 }
 function resetStilBeispiele() {
     const el = document.getElementById('stil-beispiele');

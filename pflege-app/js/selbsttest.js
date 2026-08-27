@@ -333,7 +333,8 @@ async function selbsttest() {
                 document.querySelectorAll('[id^="zweitref-own-"]').length === 64);
 
             // Kein falsches Dokument, solange die Vorlage fehlt
-            pruefe('Anhörung erzeugt noch kein Dokument', baueDokument('', {}, ''), null);
+            pruefeWahr('Anhörung erzeugt ihre eigene Vorlage',
+                (baueDokument('', {}, '') || '').includes('Zweitgutachten'));
             setzeModus('hoeherstufung');
             pruefeWahr('Höherstufung erzeugt weiterhin ihr Dokument', !!baueDokument('', {}, ''));
             setzeModus('widerspruch');
@@ -474,6 +475,130 @@ async function selbsttest() {
 
             stateZweit = merkZweitV;
             setzeModus(merkModusV);
+            leeren();
+        }
+
+        // ---------- 9b4. Vorlage des Anhörungsverfahrens ----------
+        if (typeof buildAnhoerung === 'function') {
+            const k = nr => ITEMS.find(i => i.nr === nr);
+            const merkModusB = appModus, merkZweitB = JSON.parse(JSON.stringify(stateZweit));
+            const merkFelderB = {};
+            document.querySelectorAll('[id^="stam-"], [id^="anh-"]').forEach(el => merkFelderB[el.id] = el.value);
+
+            leeren();
+            stateZweit = { special: 0, values: {} };
+            ITEMS.forEach(i => {
+                if (i.m === 5 && i.group !== 'D') {
+                    stateOrig.values[i.id] = { count: 0, period: 'W' };
+                    stateEigene.values[i.id] = { count: 0, period: 'W' };
+                    stateZweit.values[i.id] = { count: 0, period: 'W' };
+                } else if (i.m) { stateZweit.values[i.id] = 0; }
+            });
+            // gefolgt / teilweise / nicht gefolgt
+            stateOrig.values[k('4.4.1').id] = 0; stateEigene.values[k('4.4.1').id] = 3; stateZweit.values[k('4.4.1').id] = 3;
+            stateOrig.values[k('4.4.2').id] = 0; stateEigene.values[k('4.4.2').id] = 3; stateZweit.values[k('4.4.2').id] = 1;
+            stateOrig.values[k('4.4.3').id] = 0; stateEigene.values[k('4.4.3').id] = 2; stateZweit.values[k('4.4.3').id] = 0;
+            setzeModus('anhoerung');
+            renderAnhoerungBereich();
+            document.getElementById('stam-betreffend').value = 'Herr Mario Adams';
+            document.getElementById('stam-kasse').value = 'Debeka';
+            document.getElementById('stam-bescheid').value = '2026-02-04';
+            document.getElementById('stam-organisation').value = 'Medicproof GmbH';
+            document.getElementById('stam-begutachtung').value = '2026-01-29';
+            document.getElementById('anh-schreiben-datum').value = '2026-04-21';
+            document.getElementById('anh-gutachten-datum').value = '2026-04-08';
+            document.getElementById('anh-art').value = DURCHFUEHRUNGSARTEN[1];
+            document.getElementById('anh-pg').value = '1';
+            document.getElementById('anh-pts').value = '25,00';
+
+            const dok = buildAnhoerung('', {}, '');
+            const el = document.createElement('div'); el.innerHTML = dok;
+            const text = el.innerText.replace(/\s+/g, ' ');
+
+            pruefeWahr('Anhörung: Vorlage wird erzeugt', !!dok && dok.length > 500);
+            pruefeWahr('Anhörung: Einleitung mit „aufrecht"',
+                text.includes('erhält den Widerspruch gegen den Bescheid vom 04.02.2026 der Debeka aufrecht'));
+            pruefeWahr('Anhörung: Einleitung nennt beide Gutachten',
+                text.includes('die Gutachten des Medicproof GmbH vom 29.01.2026 und vom 08.04.2026'));
+            pruefeWahr('Anhörung: Kopf nennt das Datum des Anhörungsschreibens',
+                text.includes('Datum Anhörungsschreiben: 21.04.2026'));
+            pruefeWahr('Anhörung: Kopf nennt das Zweitgutachten',
+                text.includes('Datum Zweitgutachten: 08.04.2026'));
+            pruefeWahr('Anhörung: Kopf nennt den Pflegegrad des Zweitgutachtens',
+                text.includes('Pflegegrad: Pflegegrad 1'));
+            // Drei Spalten
+            const kopfzellen = Array.from(el.querySelectorAll('table.cmp thead th')).map(t => t.innerText.trim());
+            pruefe('Anhörung: drei Spalten in der Gegenüberstellung',
+                kopfzellen.slice(0, 4), ['Modul', 'Vorgutachten', 'Zweitgutachten', 'Beurteilung']);
+            pruefe('Anhörung: jede Modulzeile hat vier Zellen',
+                el.querySelectorAll('#stmt-cmp-body tr')[0].children.length, 4);
+            // Nur strittige Kriterien
+            const crits = Array.from(el.querySelectorAll('.crit[data-nr]')).map(c => c.getAttribute('data-nr'));
+            pruefe('Anhörung: nur strittige Kriterien', crits.sort(), ['4.4.2', '4.4.3']);
+            pruefeWahr('Anhörung: gefolgtes Kriterium fehlt zu Recht', crits.indexOf('4.4.1') === -1);
+            pruefeWahr('Anhörung: alle drei Stände je Kriterium',
+                /Erstgutachten: .{1,40} · Anhörungsgutachten: .{1,40} · Meine Beurteilung:/.test(text));
+            pruefeWahr('Anhörung: Fazit nennt beide Gutachten',
+                text.includes('Die vorliegenden Gutachten des Medicproof GmbH vom 29.01.2026'));
+            pruefeWahr('Anhörung: kein „Pflegegrad 0" im Dokument', !/Pflegegrad 0/.test(text));
+            pruefeWahr('Anhörung: richtiger Fall nach „führte zu"',
+                !/führte zu kein Pflegegrad/.test(text));
+
+            // Der Zusammenführungs-Schlüssel muss zur Vorlage passen
+            const l = schwellenAnalyse().strittig.find(x => x.nr === '4.4.2');
+            pruefe('Anhörung: Schlüssel der Begründung',
+                el.querySelector('.crit[data-nr="4.4.2"]').getAttribute('data-vals'), lagenSchluessel(l));
+
+            // Übergebene Begründungen werden eingesetzt
+            const mitText = buildAnhoerung('', { '4.4.2': 'Eine geprüfte Begründung.' }, '');
+            pruefeWahr('Anhörung: übergebene Begründung erscheint',
+                mitText.includes('Eine geprüfte Begründung.'));
+
+            // Kippendes Kriterium wird im Dokument benannt
+            const a = schwellenAnalyse();
+            if (a.kipper.length) {
+                pruefeWahr('Anhörung: kippendes Kriterium wird benannt',
+                    text.includes('Bereits die richtlinienkonforme Wertung dieses einen Kriteriums'));
+            } else {
+                pruefeWahr('Anhörung: ohne Kipper kein Kipper-Satz',
+                    !text.includes('Bereits die richtlinienkonforme Wertung dieses einen Kriteriums'));
+            }
+
+            // Baueweiche und Längengrenzen
+            pruefeWahr('Anhörung: baueDokument nutzt die eigene Vorlage',
+                baueDokument('', {}, '') === buildAnhoerung('', {}, ''));
+            pruefe('Anhörung: acht Sätze erlaubt', satzGrenze(), 8);
+            setzeModus('widerspruch');
+            pruefe('Widerspruch: weiterhin fünf Sätze', satzGrenze(), 5);
+            pruefeWahr('Widerspruch nutzt weiterhin seine Vorlage',
+                baueDokument('', {}, '') === buildStellungnahme('', {}, ''));
+
+            // Eigene Stilvorlage je Vorgangsart
+            const merkStil = { w: null, a: null };
+            try { merkStil.w = localStorage.getItem(STIL_STORAGE); merkStil.a = localStorage.getItem(STIL_STORAGE + '_anhoerung'); } catch (e) {}
+            pruefe('Stilvorlage: Widerspruch', stilSchluessel(), STIL_STORAGE);
+            setzeModus('anhoerung');
+            pruefe('Stilvorlage: Anhörung getrennt', stilSchluessel(), STIL_STORAGE + '_anhoerung');
+            try {
+                localStorage.setItem(STIL_STORAGE, 'WIDERSPRUCH-BEISPIEL');
+                localStorage.setItem(STIL_STORAGE + '_anhoerung', 'ANHOERUNG-BEISPIEL');
+                const feld = document.getElementById('stil-beispiele');
+                const merkFeld = feld ? feld.value : null;
+                if (feld) feld.value = '';
+                pruefe('Stilvorlage: Anhörung nutzt ihre eigene', getStilBeispiele(), 'ANHOERUNG-BEISPIEL');
+                setzeModus('widerspruch');
+                pruefe('Stilvorlage: Widerspruch bleibt unberührt', getStilBeispiele(), 'WIDERSPRUCH-BEISPIEL');
+                if (feld && merkFeld !== null) feld.value = merkFeld;
+            } finally {
+                try {
+                    if (merkStil.w === null) localStorage.removeItem(STIL_STORAGE); else localStorage.setItem(STIL_STORAGE, merkStil.w);
+                    if (merkStil.a === null) localStorage.removeItem(STIL_STORAGE + '_anhoerung'); else localStorage.setItem(STIL_STORAGE + '_anhoerung', merkStil.a);
+                } catch (e) {}
+            }
+
+            stateZweit = merkZweitB;
+            Object.keys(merkFelderB).forEach(id => { const e2 = document.getElementById(id); if (e2) e2.value = merkFelderB[id]; });
+            setzeModus(merkModusB);
             leeren();
         }
 

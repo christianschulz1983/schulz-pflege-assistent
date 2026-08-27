@@ -10,8 +10,21 @@ const LAENGE = {
     allgemeinZeichenMax: 2700,   // drei viertel A4-Seite
     allgemeinWoerterMax: 390,
     begruendungSaetzeMax: 5,
-    begruendungWoerterMax: 150
+    begruendungWoerterMax: 150,
+    // Anhoerungsverfahren: weniger Kriterien, dafuer tiefer begruendet.
+    begruendungSaetzeAnhoerung: 8,
+    begruendungWoerterAnhoerung: 230
 };
+
+// Grenzen je nach Vorgangsart
+function satzGrenze() {
+    return (typeof appModus !== 'undefined' && appModus === 'anhoerung')
+        ? LAENGE.begruendungSaetzeAnhoerung : LAENGE.begruendungSaetzeMax;
+}
+function wortGrenze() {
+    return (typeof appModus !== 'undefined' && appModus === 'anhoerung')
+        ? LAENGE.begruendungWoerterAnhoerung : LAENGE.begruendungWoerterMax;
+}
 
 // Abkürzungen und Nummern, an denen NICHT getrennt werden darf.
 const _KEIN_SATZENDE = [
@@ -52,9 +65,9 @@ function laengenVerstoesse(map, allgemein) {
     }
     Object.keys(map || {}).forEach(nr => {
         const s = zaehleSaetze(map[nr]), w = zaehleWoerter(map[nr]);
-        if (s > LAENGE.begruendungSaetzeMax || w > LAENGE.begruendungWoerterMax) {
+        if (s > satzGrenze() || w > wortGrenze()) {
             v.push({ art: 'begruendung', nr: nr, ist: s + ' Sätze / ' + w + ' Wörter',
-                     soll: 'höchstens ' + LAENGE.begruendungSaetzeMax + ' Sätze' });
+                     soll: 'höchstens ' + satzGrenze() + ' Sätze' });
         }
     });
     return v;
@@ -64,9 +77,10 @@ function laengenVerstoesse(map, allgemein) {
 // Grenzen nur an einer Stelle gepflegt werden.
 function laengenVorgabeBegruendung() {
     return `LÄNGE – HARTE OBERGRENZE, WICHTIGER ALS JEDE ANDERE FORMVORGABE:
-Jede Begründung besteht aus HÖCHSTENS ${LAENGE.begruendungSaetzeMax} Sätzen und höchstens
-${LAENGE.begruendungWoerterMax} Wörtern. Nicht mehr – lieber weniger. Die fünf Bestandteile
-des Aufbaus sind je EIN Satz; fasse zusammen, statt aufzuzählen. Jeder Satz muss tragen:
+Jede Begründung besteht aus HÖCHSTENS ${satzGrenze()} Sätzen und höchstens
+${wortGrenze()} Wörtern. Nicht mehr – lieber weniger. ${satzGrenze() <= 5
+    ? 'Die fünf Bestandteile des Aufbaus sind je EIN Satz; fasse zusammen, statt aufzuzählen.'
+    : 'Nutze den Raum für die Argumentation, nicht für Ausschmückung.'} Jeder Satz muss tragen:
 keine Einleitungsfloskeln, keine Wiederholung der Kriteriumsbezeichnung, keine
 Zusammenfassung des bereits Gesagten. Streiche zuerst Füllwörter und Nebensätze, die
 nichts beweisen – niemals aber meine Feststellungen aus den Notizen, das BRi-Zitat oder
@@ -90,8 +104,8 @@ async function kuerzeUeberlaenge(map, allgemein, einleitTitel) {
 Kürze AUSSCHLIESSLICH – formuliere nicht neu, ergänze nichts, ändere keine Aussage und keine Zahl.
 
 Vorgaben:
-- Abschnitte mit einer Kriteriumsnummer: höchstens ${LAENGE.begruendungSaetzeMax} Sätze und
-  ${LAENGE.begruendungWoerterMax} Wörter.
+- Abschnitte mit einer Kriteriumsnummer: höchstens ${satzGrenze()} Sätze und
+  ${wortGrenze()} Wörter.
 - Der Abschnitt „__allgemein__" (Überschrift „${einleitTitel || 'Allgemeine Angaben'}"):
   höchstens ${LAENGE.allgemeinWoerterMax} Wörter in 3 bis 4 Absätzen.
 

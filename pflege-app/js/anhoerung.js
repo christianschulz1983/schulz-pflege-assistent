@@ -149,3 +149,215 @@ function uebernehmeAnhoerung(rev) {
     fillTable('own'); calculate('own'); calculate('zweit'); syncSpecialUI();
     aktualisiereAnhoerungStatus();
 }
+
+// ==================================================================================
+// Vorlage für die Stellungnahme im Anhörungsverfahren.
+// Aufbau nach den Vorlagen des Verfassers (Deckner, Nebeling, Reitz, Adams):
+// zwei Gutachtenblöcke im Kopf, Einleitung mit „aufrecht", neu verfasste Allgemeine
+// Angaben, DREI Spalten in der Gegenüberstellung und nur die strittig gebliebenen
+// Kriterien unter „Befund und Stellungnahme".
+// ==================================================================================
+
+function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
+    const g = id => (document.getElementById(id)?.value || '').trim();
+    const esc = escapeHtml;
+    const f2 = n => Number(n).toFixed(2).replace('.', ',');
+    const df = (key, val) => `<span data-f="${key}">${esc(val == null ? '' : String(val))}</span>`;
+
+    let name = g('stam-betreffend');
+    const cm = name.match(/^([^,]+),\s*(.+)$/);
+    if (cm && !/^(herr|frau)/i.test(name)) name = (cm[2] + ' ' + cm[1]).trim();
+    if (!name) name = 'Herr/ Frau';
+    const geb = formatDE(g('stam-geboren'));
+    const kasse = g('stam-kasse');
+    const versnr = g('stam-versnr');
+    const bescheid = formatDE(g('stam-bescheid'));
+    const org = g('stam-organisation') || 'Medizinischer Dienst';
+    const begut = formatDE(g('stam-begutachtung'));
+    const art = g('stam-art');
+    const antrag = formatDE(g('stam-antrag')) || '__.__.____';
+    const verf = getVerfasser();
+
+    // Angaben des Anhörungsverfahrens
+    const anhSchreiben = formatDE(g('anh-schreiben-datum'));
+    const zweitDatum = formatDE(g('anh-gutachten-datum'));
+    const zweitArt = g('anh-art');
+    const notizenAnh = (typeof notesOverride === 'string' && notesOverride.trim())
+        ? notesOverride.trim() : g('anh-notizen');
+
+    const rO = calculateInternal('orig');
+    const rZ = calculateInternal('zweit');
+    const rE = calculateInternal('own');
+    const istKeinPG = v => { const s = String(v == null ? '' : v).trim(); return s === '' || s === '0' || /^kein/i.test(s); };
+    const pgWert = v => istKeinPG(v) ? 'kein Pflegegrad'
+        : (/^pflegegrad/i.test(String(v).trim()) ? String(v).trim() : 'Pflegegrad ' + String(v).trim());
+    const pgSatz = pgWert;
+
+    const origPG = g('stam-pg-manual') || String(rO.pg);
+    const origPts = g('stam-pts-manual') || f2(rO.total);
+    const zweitPG = g('anh-pg') || String(rZ.pg);
+    const zweitPts = g('anh-pts') || f2(rZ.total);
+
+    const analyse = schwellenAnalyse();
+    const strittig = analyse.strittig;
+
+    // Gegenüberstellung mit drei Spalten
+    const row = (label, o, z, e, bold) => `<tr><td${bold ? ' style="font-weight:bold"' : ''}>${esc(label)}</td>`
+        + `<td class="num">${o}</td><td class="num">${z}</td><td class="num">${e}</td></tr>`;
+    const tableRows = [
+        row('4.1 Mobilität', f2(rO.weights[0]), f2(rZ.weights[0]), f2(rE.weights[0])),
+        row('4.2 Kognitive und kommunikative Fähigkeiten', f2(rO.weights[1]), f2(rZ.weights[1]), f2(rE.weights[1])),
+        row('4.3 Verhaltensweisen und psychische Problemlagen', f2(rO.weights[2]), f2(rZ.weights[2]), f2(rE.weights[2])),
+        row('Höchster Wert aus Modul 2 und Modul 3',
+            f2(Math.max(rO.weights[1], rO.weights[2])), f2(Math.max(rZ.weights[1], rZ.weights[2])),
+            f2(Math.max(rE.weights[1], rE.weights[2])), true),
+        row('4.4 Selbstversorgung', f2(rO.weights[3]), f2(rZ.weights[3]), f2(rE.weights[3])),
+        row('4.5 Krankheits- und therapiebedingten Anforderungen', f2(rO.weights[4]), f2(rZ.weights[4]), f2(rE.weights[4])),
+        row('4.6 Gestaltung des Alltagslebens und sozialer Kontakte', f2(rO.weights[5]), f2(rZ.weights[5]), f2(rE.weights[5])),
+        row('Summe der gewichteten Punkte', f2(rO.total), f2(rZ.total), f2(rE.total), true),
+        row('Pflegegrad', esc(pgWert(origPG)), esc(pgWert(zweitPG)), esc(pgWert(rE.pg)), true)
+    ].join('');
+
+    // Nur die strittig gebliebenen Kriterien. Angegeben werden ALLE DREI Stände,
+    // damit der Ausschuss die Entwicklung auf einen Blick sieht.
+    const bg = begruendungen || {};
+    const critHtml = strittig.length
+        ? strittig.map(l => {
+            const txt = (bg[l.nr] || '').trim();
+            let body = txt
+                ? txt.split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
+                : `<div>Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „${esc(l.bText)}“ ableitbar.</div>`;
+            if (txt) {
+                const offen = unbelegteZitate(l.nr, txt);
+                if (offen.length) {
+                    body += `<div class="zitat-warnung" data-warn="1">⚠ Bitte prüfen: Folgende Passage${offen.length > 1 ? 'n sind' : ' ist'} `
+                          + `nicht wörtlich im BRi-Text zu ${esc(l.nr)} belegt – vor dem Versand streichen oder korrigieren: `
+                          + offen.map(z => `„${esc(z)}“`).join(' · ') + `</div>`;
+                }
+            }
+            const kipp = l.kipptAllein
+                ? `<div>Bereits die richtlinienkonforme Wertung dieses einen Kriteriums ergäbe ${esc(pgSatz(l.pgMit))}.</div>` : '';
+            return `<div class="crit" data-nr="${esc(l.nr)}" data-vals="${esc(lagenSchluessel(l))}">`
+                 + `<div class="ct">${esc(l.nr)}: ${esc(l.titel)}</div>`
+                 + `<div>Erstgutachten: „${esc(l.eText)}“ · Anhörungsgutachten: „${esc(l.zText)}“ · Meine Beurteilung: „${esc(l.bText)}“</div>`
+                 + body + kipp + `</div>`;
+        }).join('')
+        : `<p>Nach dem Anhörungsgutachten sind keine Einzelkriterien strittig geblieben.</p>`;
+
+    const allgemein = (allgemeinText && allgemeinText.trim())
+        ? allgemeinText.trim().split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
+        : anhoerungAllgemeinStandard(analyse, org, begut, zweitDatum, origPts, zweitPts, pgSatz, origPG, zweitPG, notizenAnh);
+
+    const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}</span><span>: ${esc(v || '')}</span></div>`;
+
+    return `<div class="stmt">
+    <div class="stmt-head">
+      <img class="stmt-logo" src="${FAMILIARA_LOGO}" alt="Familiara">
+      <div class="stmt-address">Familiara GmbH<br>Wiesbadener Straße 3<br>12161 Berlin<br><br>Telefon 030 577 015 900<br>Fax 030 577 015 901<br><br>Geschäftsführer: Dr. med. Jörg A. Zimmermann<br><br>HRB 184522 B<br>Amtsgericht Berlin-Charlottenburg<br>Umsatzsteuer-ID: DE311459777<br><br>www.familiara.de<br>kontakt@familiara.de</div>
+    </div>
+
+    <div class="stmt-top">
+      <div class="left">
+        <div>${esc(verf.name)}</div>
+        ${verf.zeilen.map(z => `<div>${esc(z)}</div>`).join('')}
+      </div>
+    </div>
+
+    <h1>Pflegefachliche Stellungnahme</h1>
+    <p>auf Grundlage der Richtlinien des Medizinischen Dienstes Bund zur Feststellung der Pflegebedürftigkeit nach dem SGB XI vom 21. Dezember 2023</p>
+
+    <div class="data-block" id="stmt-data">
+      ${dataRow('Betreffend', name)}
+      ${dataRow('geboren am', geb)}
+      ${dataRow('Kasse', kasse)}
+      ${dataRow('Versicherungs-Nr.', versnr)}
+      ${dataRow('Antragsdatum', antrag !== '__.__.____' ? antrag : '')}
+      ${dataRow('Bescheiddatum', bescheid)}
+      ${dataRow('Datum Anhörungsschreiben', anhSchreiben)}
+      ${dataRow('Gutachtenorganisation', org)}
+      ${dataRow('Begutachtungsdatum', begut)}
+      ${dataRow('Durchführungsart', art)}
+      ${dataRow('Pflegegrad', pgWert(origPG))}
+      ${dataRow('Gesamtpunkte', origPts)}
+      ${dataRow('Datum Zweitgutachten', zweitDatum)}
+      ${dataRow('Durchführungsart', zweitArt)}
+      ${dataRow('Pflegegrad', pgWert(zweitPG))}
+      ${dataRow('Gesamtpunkte', zweitPts)}
+    </div>
+
+    <p>${df('name', name)} erhält den Widerspruch gegen den Bescheid vom ${df('bescheid', bescheid || '—')} der ${df('kasse', kasse || 'Kasse')} aufrecht. Diese pflegefachliche Stellungnahme dient der Unterstützung des Rechtsbeistands von ${df('name', name)} bei der Präzisierung der Begründung des Widerspruchs. Dazu habe ich die Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} und vom ${df('zweitdatum', zweitDatum || '—')} gewürdigt.</p>
+
+    <hr>
+
+    <h2>Allgemeine Angaben</h2>
+    <div id="stmt-notes" data-sig="${esc(anhoerungSignatur(analyse, notizenAnh))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${allgemein}</div>
+    <p>Die nachfolgende Übersicht stellt die Ergebnisse des Erstgutachtens, des Anhörungsgutachtens und meiner Beurteilung einander gegenüber:</p>
+
+    <h2>Gegenüberstellung des Gutachtens und der abweichenden Bepunktung</h2>
+    <table class="cmp">
+      <thead>
+        <tr><th rowspan="2">Modul</th><th>Vorgutachten</th><th>Zweitgutachten</th><th>Beurteilung</th></tr>
+        <tr><th>Gewichtete Punkte</th><th>Gewichtete Punkte</th><th>Gewichtete Punkte</th></tr>
+      </thead>
+      <tbody id="stmt-cmp-body">${tableRows}</tbody>
+    </table>
+
+    <h2>Befund und Stellungnahme</h2>
+    <div id="stmt-crit">${critHtml}</div>
+
+    <hr>
+
+    <h2>Fazit</h2>
+    <p>Die vorliegenden Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} mit ${df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten sowie vom ${df('zweitdatum', zweitDatum || '—')} mit ${df('zpgfazit', pgSatz(zweitPG))} und ${df('zpts', zweitPts)} Punkten berücksichtigen die tatsächlichen Einschränkungen von ${df('name', name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
+  </div>`;
+}
+
+// Kennung für den Abschnitt „Allgemeine Angaben": ändert sich, sobald sich die Lagen,
+// die Punktstände oder die eigenen Anmerkungen ändern. Nur dann wird er neu verfasst.
+function anhoerungSignatur(analyse, notizen) {
+    const basis = (notizen || '').trim() + '||'
+        + analyse.lagen.map(l => l.nr + ':' + l.lage).sort().join(',') + '||'
+        + analyse.basis.total + '|' + analyse.gesamt.total;
+    let h = 5381;
+    for (let i = 0; i < basis.length; i++) { h = ((h * 33) ^ basis.charCodeAt(i)) >>> 0; }
+    return 'h' + h.toString(36);
+}
+
+// Ohne KI: ein sachlicher Standardtext, der ausschließlich die Rechnung wiedergibt.
+function anhoerungAllgemeinStandard(a, org, begut, zweitDatum, origPts, zweitPts, pgSatz, origPG, zweitPG, notizen) {
+    const esc = escapeHtml;
+    const f2 = n => Number(n).toFixed(2).replace('.', ',');
+    // Die genannten Zahlen sind dieselben wie in der Gegenüberstellung – sonst stünde im
+    // Text etwas anderes als in der Tabelle.
+    // „führte zu kein Pflegegrad" wäre falsch – im Dativ heißt es „zu keinem Pflegegrad".
+    const dativ = v => { const s = pgSatz(v); return /^kein/i.test(s) ? 'keinem Pflegegrad' : s; };
+    let p = `<p>Das Gutachten des ${esc(org)} vom ${esc(begut || '—')} führte zu ${esc(dativ(origPG))} `
+          + `bei ${esc(origPts)} gewichteten Punkten. Das im Anhörungsverfahren erstellte Gutachten vom `
+          + `${esc(zweitDatum || '—')} kommt zu ${esc(dativ(zweitPG))} bei ${esc(zweitPts)} gewichteten Punkten.</p>`;
+    if (a.gefolgt.length) {
+        p += `<p>In ${a.gefolgt.length} Kriterium/Kriterien ist der Medizinische Dienst den Ausführungen der `
+           + `pflegefachlichen Stellungnahme gefolgt (${esc(a.gefolgt.map(l => l.nr).join(', '))}). `
+           + `Dies bestätigt die Tragfähigkeit der dort erhobenen Befunde.</p>`;
+    }
+    if (a.strittig.length) {
+        p += `<p>In ${a.strittig.length} Kriterium/Kriterien blieb es bei der bisherigen Wertung `
+           + `(${esc(a.strittig.map(l => l.nr).join(', '))}), obwohl sich die Befundlage nicht geändert hat.</p>`;
+    }
+    // Der Abstand zur Schwelle wird nur genannt, wenn die Angabe des Gutachtens zu seinen
+    // eigenen Kriterien passt. Sonst wäre die Aussage nicht belastbar.
+    if (a.naechsteSchwelle !== null && !a.abweichung) {
+        p += `<p>Das Anhörungsgutachten bleibt mit ${esc(f2(a.basis.total))} gewichteten Punkten um `
+           + `${esc(f2(a.fehlendePunkte))} Punkte unter der für den nächsten Pflegegrad maßgeblichen Schwelle `
+           + `von ${esc(f2(a.naechsteSchwelle))} Punkten.`;
+        if (a.kipper.length) {
+            p += ` Bereits die richtlinienkonforme Wertung eines einzelnen der strittigen Kriterien `
+               + `(${esc(a.kipper.map(l => l.nr).join(', '))}) würde diese Schwelle überschreiten.`;
+        }
+        p += `</p>`;
+    }
+    if ((notizen || '').trim()) {
+        p += (notizen || '').trim().split(/\r?\n\s*\r?\n/)
+            .map(t => `<p>${esc(t.trim()).replace(/\n/g, '<br>')}</p>`).join('');
+    }
+    return p;
+}

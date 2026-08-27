@@ -70,6 +70,12 @@ function vergleichsLagen() {
     return lagen;
 }
 
+// Kennung einer Lage im Schriftstück (data-vals). Ändert sich einer der drei Werte,
+// wird die Begründung neu verfasst – sonst bleibt der vorhandene Text stehen.
+function lagenSchluessel(l) {
+    return l.eText + '|' + l.zText + '|' + l.bText;
+}
+
 // Noch strittig ist alles, dem der MD nicht oder nur teilweise gefolgt ist.
 function strittigeLagen(lagen) {
     return (lagen || vergleichsLagen()).filter(l => l.lage !== 'gefolgt');
@@ -98,9 +104,17 @@ function schwellenAnalyse() {
     strittig.forEach(l => { alle.values[l.item.id] = JSON.parse(JSON.stringify(stateEigene.values[l.item.id])); });
     const gesamt = calculateInternal(alle);
 
+    // Das AUSGEWIESENE Ergebnis des Anhörungsgutachtens: die Angabe aus dem Gutachten,
+    // sofern vorhanden. Sie kann von der Summe der Kriterien abweichen – dann stimmt
+    // eines von beidem nicht, und das muss auffallen statt unbemerkt zu bleiben.
+    const angezeigt = calculateInternal('zweit');
+    const abweichung = Math.abs(angezeigt.total - basis.total) > 0.01 || angezeigt.pg !== basis.pg;
+
     const naechste = [12.5, 27, 47.5, 70, 90].find(t => t > basis.total);
     return {
         basis: basis,
+        angezeigt: angezeigt,
+        abweichung: abweichung,
         gesamt: gesamt,
         lagen: lagen,
         strittig: strittig,
@@ -173,6 +187,18 @@ function renderVergleich() {
                 ${kachel('Punkte', z2(a.gesamt.total), 'var(--text-primary)')}
             </div>
         </div>`;
+
+    // Weicht die Angabe im Gutachten von der Summe seiner Kriterien ab, ist die
+    // Schwellenwertrechnung nur so verlässlich wie die erfassten Kriterien.
+    if (a.abweichung) {
+        html += `<div class="card"><div class="card-header"><div class="dot" style="background:var(--red)"></div>Bitte prüfen</div>
+            <div style="padding:16px 20px"><div class="hinweis-warnung">
+                <b>Das Anhörungsgutachten weist ${z2(a.angezeigt.total)} Punkte aus, seine erfassten Kriterien
+                ergeben aber ${z2(a.basis.total)} Punkte.</b> Die folgende Rechnung stützt sich auf die Kriterien.
+                Bitte ergänzen Sie fehlende Kriterien über „Erfasste Daten korrigieren“, sonst tragen die
+                Aussagen zur Schwelle nicht.
+            </div></div></div>`;
+    }
 
     // Schwellenwert-Aussage
     if (a.naechsteSchwelle !== null) {
