@@ -346,7 +346,15 @@ function normalizeImport(data) {
 }
 
 // Bearbeitungs-Handler (mutieren reviewData)
-function rvStam(k, v) { reviewData.stam[k] = v; }
+function rvStam(k, v) {
+    reviewData.stam[k] = v;
+    // Pflegegrad und Punkte auch in die Modul-Zusammenfassung spiegeln (siehe rvExtract)
+    if (reviewData.extracted) {
+        if (k === 'pg')  { reviewData.extracted.pg = parseInt(v, 10) || 0; rvSpiegel('rev-extract-pg', reviewData.extracted.pg); }
+        if (k === 'pts') { reviewData.extracted.total = rvZahl(v); rvSpiegel('rev-extract-total', reviewData.extracted.total); }
+    }
+    if (k === 'pg' || k === 'pts') rvPruefePlausibel();
+}
 function rvDiag(idx, field, v) { if (!reviewData.diagnoses[idx]) reviewData.diagnoses[idx] = { icd: '', text: '' }; reviewData.diagnoses[idx][field] = v; }
 // Weitere Diagnosezeile in der Prüfansicht anhängen
 function rvAddDiagRow() {
@@ -360,11 +368,61 @@ function rvAddDiagRow() {
     box.appendChild(div);
 }
 function rvText(k, v) { reviewData[k] = v; }
+
+/* Pflegegrad und Gesamtpunkte des Gutachtens stehen an ZWEI Stellen der Prüfansicht:
+   oben unter „Stammdaten" und unten unter „Modul-Ergebnisse laut Gutachten". Bisher
+   waren sie voneinander unabhängig – wer unten korrigierte, änderte oben nichts, und
+   in die Stellungnahme ging der unkorrigierte Wert von oben ein. Beide werden jetzt
+   gespiegelt, gleich welche Stelle der Berater anfasst. */
+function rvSpiegel(id, wert) {
+    const el = document.getElementById(id);
+    if (el && String(el.value) !== String(wert)) el.value = wert;
+}
+
+function rvZahl(v) {
+    const n = parseFloat(String(v == null ? '' : v).replace(',', '.'));
+    return Number.isFinite(n) ? n : 0;
+}
+
 function rvExtract(kind, idx, v) {
     if (!reviewData || !reviewData.extracted) return;
-    if (kind === 'total') reviewData.extracted.total = parseFloat(v) || 0;
-    else if (kind === 'pg') reviewData.extracted.pg = parseInt(v) || 0;
-    else reviewData.extracted[kind][idx] = parseFloat(v) || 0;
+    if (kind === 'total') {
+        reviewData.extracted.total = rvZahl(v);
+        reviewData.stam.pts = String(reviewData.extracted.total).replace('.', ',');
+        rvSpiegel('rev-stam-pts', reviewData.stam.pts);
+    } else if (kind === 'pg') {
+        reviewData.extracted.pg = parseInt(v, 10) || 0;
+        // Nie „0" ausweisen – im ganzen Programm heisst das „kein Pflegegrad".
+        reviewData.stam.pg = reviewData.extracted.pg > 0
+            ? String(reviewData.extracted.pg) : 'kein Pflegegrad';
+        rvSpiegel('rev-stam-pg', reviewData.stam.pg);
+    } else {
+        reviewData.extracted[kind][idx] = rvZahl(v);
+    }
+    rvPruefePlausibel();
+}
+
+/* Warnt, wenn der angegebene Pflegegrad nicht zu den angegebenen Punkten passt.
+   Schwellen nach SGB XI: 12,5 / 27 / 47,5 / 70 / 90. */
+function pgAusPunkten(punkte) {
+    const p = rvZahl(punkte);
+    return p >= 90 ? 5 : p >= 70 ? 4 : p >= 47.5 ? 3 : p >= 27 ? 2 : p >= 12.5 ? 1 : 0;
+}
+
+function rvPruefePlausibel() {
+    const box = document.getElementById('rev-plausibel');
+    if (!box || !reviewData) return;
+    const pg = parseInt(reviewData.stam.pg, 10);
+    const pts = reviewData.stam.pts;
+    if (!reviewData.stam.pg && !pts) { box.innerHTML = ''; return; }
+    const erwartet = pgAusPunkten(pts);
+    if ((Number.isFinite(pg) ? pg : 0) === erwartet) { box.innerHTML = ''; return; }
+    const txt = e => e > 0 ? 'Pflegegrad ' + e : 'kein Pflegegrad';
+    box.innerHTML = '<div class="hinweis-warnung"><b>Bitte prüfen:</b> '
+        + 'Angegeben sind ' + escapeHtml(String(pts || '0')) + ' Punkte und '
+        + escapeHtml(Number.isFinite(pg) && pg > 0 ? 'Pflegegrad ' + pg : 'kein Pflegegrad') + '. '
+        + 'Zu dieser Punktzahl gehört nach den Schwellenwerten des SGB XI '
+        + escapeHtml(txt(erwartet)) + '. Eines von beidem ist falsch eingelesen.</div>';
 }
 // Merkt sich, welche Kriterien in der Prüfansicht tatsächlich angefasst wurden. Beim
 // Korrigieren wird ausschliesslich das übernommen – nicht angerührte Kriterien bleiben,
@@ -446,6 +504,7 @@ function openImportReview(file, data, mimeType) {
         renderPdfPreview(file, content);
     }
     document.getElementById('review-form').innerHTML = buildReviewForm(reviewData);
+    rvPruefePlausibel();
     document.getElementById('review-overlay').classList.add('active');
 }
 
@@ -530,7 +589,7 @@ function buildReviewForm(rev) {
     const modNames = ["Mobilität", "Kognitive Fähigkeiten", "Verhaltensweisen", "Selbstversorgung", "Krankheitsbed. Anforderungen", "Alltagsgestaltung"];
     let html = '';
 
-    const tf = (label, k, type) => `<label class="rev-field"><span>${label}</span><input type="${type || 'text'}" value="${esc(rev.stam[k] || '')}" oninput="rvStam('${k}',this.value)"></label>`;
+    const tf = (label, k, type) => `<label class="rev-field"><span>${label}</span><input type="${type || 'text'}" id="rev-stam-${k}" value="${esc(rev.stam[k] || '')}" oninput="rvStam('${k}',this.value)"></label>`;
     html += `<div class="rev-section"><div class="rev-sec-title">Stammdaten</div><div class="rev-grid">`;
     html += tf('Betreffend', 'betreffend');
     html += tf('Geboren am', 'geboren', 'date');
@@ -543,7 +602,7 @@ function buildReviewForm(rev) {
     html += `<label class="rev-field"><span>Durchführungsart</span><select onchange="rvStam('art',this.value)">${DURCHFUEHRUNGSARTEN.map(o => `<option ${rev.stam.art === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select></label>`;
     html += tf('Pflegegrad (Gutachten)', 'pg');
     html += tf('Gesamtpunkte (Gutachten)', 'pts');
-    html += `</div></div>`;
+    html += `</div><div id="rev-plausibel" style="margin-top:10px"></div></div>`;
 
     html += `<div class="rev-section"><label class="rev-field rev-inline"><input type="checkbox" ${rev.special == 1 ? 'checked' : ''} onchange="reviewData.special=this.checked?1:0; specialGeaendert=true;"> <span>Besondere Bedarfskonstellation (§ 15 Abs. 4) – Gebrauchsunfähigkeit beider Arme und Beine</span></label></div>`;
 
@@ -563,7 +622,7 @@ function buildReviewForm(rev) {
         for (let m = 0; m < 6; m++) {
             html += `<div>${m + 1}. ${modNames[m]}</div><div><input type="number" step="1" value="${rev.extracted.raws[m]}" oninput="rvExtract('raws',${m},this.value)"></div><div><input type="number" step="0.01" value="${rev.extracted.weights[m]}" oninput="rvExtract('weights',${m},this.value)"></div>`;
         }
-        html += `<div><b>Gesamt / PG</b></div><div><input type="number" step="1" value="${rev.extracted.pg}" oninput="rvExtract('pg',0,this.value)" title="Pflegegrad"></div><div><input type="number" step="0.01" value="${rev.extracted.total}" oninput="rvExtract('total',0,this.value)" title="Gesamtpunkte"></div>`;
+        html += `<div><b>Gesamt / PG</b></div><div><input type="number" step="1" id="rev-extract-pg" value="${rev.extracted.pg}" oninput="rvExtract('pg',0,this.value)" title="Pflegegrad"></div><div><input type="number" step="0.01" id="rev-extract-total" value="${rev.extracted.total}" oninput="rvExtract('total',0,this.value)" title="Gesamtpunkte"></div>`;
         html += `</div></div>`;
     }
 

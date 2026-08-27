@@ -109,6 +109,7 @@ function oeffneKorrektur() {
     reviewData = reviewAusAktuellemStand();
     zeigeKorrekturDokument(0);
     document.getElementById('review-form').innerHTML = buildReviewForm(reviewData);
+    rvPruefePlausibel();
     const titel = document.getElementById('review-titel');
     if (titel) titel.innerText = 'Erfasste Daten korrigieren';
     const abbrechen = document.getElementById('review-abbrechen');

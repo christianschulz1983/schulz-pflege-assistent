@@ -195,6 +195,80 @@ async function selbsttest() {
             document.querySelectorAll('#verf-name-sel').length === 1 &&
             document.querySelectorAll('#verf-qual-sel').length === 1);
 
+        // ---------- 9c. Pflegegrad und Punkte des Gutachtens dürfen nicht auseinanderlaufen ----------
+        // Beide stehen an zwei Stellen der Prüfansicht. Wurde nur eine korrigiert, behauptete
+        // die Stellungnahme zuvor etwa „0 Punkte, woraus sich Pflegegrad 1 ergeben hat".
+        if (typeof rvExtract === 'function') {
+            const merkReview = reviewData;
+            const merkFelder2 = {};
+            document.querySelectorAll('[id^="stam-"]').forEach(el => merkFelder2[el.id] = el.value);
+
+            reviewData = normalizeImport({
+                stam_pg_manual: 1, stam_pts_manual: 0, pflegegrad: 1, total_weight: 0,
+                stam_betreffend: 'Frau Probe', values_orig: [], diagnoses: []
+            });
+            pruefe('Einlesen: Pflegegrad steht in beiden Feldern',
+                [reviewData.stam.pg, reviewData.extracted.pg], ['1', 1]);
+
+            // Unten korrigieren -> oben muss mitgehen
+            rvExtract('pg', 0, '0');
+            pruefe('Korrektur der Modul-Zusammenfassung wirkt auf die Stammdaten',
+                reviewData.stam.pg, 'kein Pflegegrad');
+            rvExtract('total', 0, '31,5');
+            pruefe('Korrektur der Punkte wirkt auf die Stammdaten', reviewData.stam.pts, '31,5');
+
+            // Oben korrigieren -> unten muss mitgehen
+            rvStam('pg', '2');
+            pruefe('Korrektur der Stammdaten wirkt auf die Modul-Zusammenfassung',
+                reviewData.extracted.pg, 2);
+            rvStam('pts', '48,25');
+            pruefe('Punktkorrektur oben wirkt unten', reviewData.extracted.total, 48.25);
+
+            // Plausibilität: Schwellenwerte des SGB XI
+            pruefe('Punkte zu Pflegegrad: 0', pgAusPunkten(0), 0);
+            pruefe('Punkte zu Pflegegrad: 12,5', pgAusPunkten('12,5'), 1);
+            pruefe('Punkte zu Pflegegrad: 27', pgAusPunkten(27), 2);
+            pruefe('Punkte zu Pflegegrad: 47,5', pgAusPunkten('47,5'), 3);
+            pruefe('Punkte zu Pflegegrad: 70', pgAusPunkten(70), 4);
+            pruefe('Punkte zu Pflegegrad: 90', pgAusPunkten(90), 5);
+            pruefe('Punkte zu Pflegegrad: knapp darunter', pgAusPunkten(26.99), 1);
+
+            // Der widersprüchliche Fall muss gemeldet werden
+            // Die Prüfansicht bringt dieses Element selbst mit, sobald sie einmal
+            // aufgebaut wurde – dann dieses verwenden, sonst ein eigenes anlegen.
+            let box = document.getElementById('rev-plausibel');
+            const boxEigen = !box;
+            if (boxEigen) { box = document.createElement('div'); box.id = 'rev-plausibel'; document.body.appendChild(box); }
+            reviewData.stam.pg = '1'; reviewData.stam.pts = '0';
+            rvPruefePlausibel();
+            pruefeWahr('Widerspruch Punkte/Pflegegrad wird gemeldet',
+                box.innerHTML.includes('Bitte prüfen') && box.innerHTML.includes('kein Pflegegrad'));
+            reviewData.stam.pg = '2'; reviewData.stam.pts = '31,5';
+            rvPruefePlausibel();
+            pruefe('Stimmiger Fall wird nicht gemeldet', box.innerHTML, '');
+            if (boxEigen) box.remove(); else box.innerHTML = '';
+
+            // Und die Stellungnahme darf den Widerspruch nicht mehr schreiben
+            reviewData = normalizeImport({
+                stam_pg_manual: 1, stam_pts_manual: 0, pflegegrad: 1, total_weight: 0,
+                stam_betreffend: 'Frau Probe', values_orig: [], diagnoses: []
+            });
+            rvExtract('pg', 0, '0');
+            applyImportedData(reviewData);
+            pruefe('Nach der Übernahme steht kein Pflegegrad im Feld',
+                document.getElementById('stam-pg-manual').value, 'kein Pflegegrad');
+            const satzHtml = buildStellungnahme('', {}, '');
+            pruefeWahr('Stellungnahme nennt keinen Pflegegrad bei 0 Punkten',
+                satzHtml.includes('kein Pflegegrad') && !/0 gewichteten Punkten, woraus sich ein/.test(satzHtml));
+
+            reviewData = merkReview;
+            Object.keys(merkFelder2).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = merkFelder2[id];
+            });
+            leeren();
+        }
+
         // ---------- 10a. Modul 5: keine „0" als Wertung im Schriftstück ----------
         {
             const k = nr => ITEMS.find(i => i.nr === nr);
