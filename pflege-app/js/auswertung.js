@@ -223,7 +223,8 @@ function renderAuswertung() {
 // landet die Datei wie bisher im Download-Ordner.
 async function saveCase() {
     const stammdaten={};
-    document.querySelectorAll('[id^="stam-"], [id^="diag-"]').forEach(el=>stammdaten[el.id]=el.value);
+    // Auch die Felder des Anhoerungsverfahrens ("anh-") gehoeren in die Falldatei.
+    document.querySelectorAll('[id^="stam-"], [id^="diag-"], [id^="anh-"]').forEach(el=>stammdaten[el.id]=el.value);
     const notesEl = document.getElementById('erstgespraech-notes');
     if (notesEl) erstgespraechNotes = notesEl.value;
     // Aktuellen (ggf. editierten) Stand der generierten Stellungnahme mitspeichern
@@ -272,7 +273,10 @@ function loadCase(e) {
                 titel: 'Bewertungen aus der gespeicherten Datei', alt: 'leer', neu: 'geladen',
                 quelle: BEWERTUNG_QUELLEN.laden });
             erstgespraechNotes = data.erstgespraechNotes || "";
-            appealDraft = data.appealDraft || "";
+            // Auch das Anzeigefeld setzen – sonst wandert der Text des vorherigen Falls
+            // beim nächsten Speichern in die Datei dieses Falls.
+            if (typeof setzeStellungnahme === 'function') setzeStellungnahme(data.appealDraft || "");
+            else appealDraft = data.appealDraft || "";
             setzeModus(data.appModus || 'widerspruch');   // ältere Fälle sind immer Widersprüche
             if (typeof befundLaden === 'function') befundLaden(data.befund);
             if (typeof erfassungLaden === 'function') erfassungLaden(data.erfassung);

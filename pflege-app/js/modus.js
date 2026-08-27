@@ -23,6 +23,14 @@ const MODI = {
         text: 'Vorgutachten liegt vor, der Zustand hat sich verschlechtert. Befund erheben und die Verschlechterung begründen.',
         fertig: true,
         geplant: ''
+    },
+    anhoerung: {
+        titel: 'Anhörung',
+        zeichen: '🔁',
+        text: 'Der Widerspruch wurde abgelehnt, ein Zweitgutachten liegt vor. Erstgutachten, eigene Stellungnahme '
+            + 'und Anhörungsgutachten vergleichen und die Begründung für den Widerspruchsausschuss erstellen.',
+        fertig: true,
+        geplant: ''
     }
 };
 
@@ -83,6 +91,16 @@ function setzeModus(key) {
     if (erf) {
         erf.style.display = mitBefund ? '' : 'none';
         if (mitBefund && typeof renderErfassung === 'function') renderErfassung();
+    }
+    // Bereich für das Anhörungsverfahren nur dort
+    const anh = document.getElementById('anhoerung-bereich');
+    if (anh) {
+        const istAnhoerung = (key === 'anhoerung');
+        anh.style.display = istAnhoerung ? '' : 'none';
+        if (istAnhoerung && typeof renderAnhoerungBereich === 'function') {
+            renderAnhoerungBereich();
+            aktualisiereAnhoerungStatus();
+        }
     }
 }
 

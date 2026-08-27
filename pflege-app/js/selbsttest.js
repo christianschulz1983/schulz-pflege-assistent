@@ -176,7 +176,7 @@ async function selbsttest() {
 
         // ---------- 11. Startauswahl und Vorgangsart ----------
         const modusVorher = appModus;
-        pruefe('Drei Vorgangsarten vorhanden', Object.keys(MODI).length, 3);
+        pruefe('Vier Vorgangsarten vorhanden', Object.keys(MODI).length, 4);
         pruefeWahr('Widerspruch ist einsatzbereit', MODI.widerspruch.fertig === true);
         pruefeWahr('Erstantrag ist einsatzbereit', MODI.erstantrag.fertig === true);
         pruefeWahr('Höherstufungsantrag ist einsatzbereit', MODI.hoeherstufung.fertig === true);
@@ -250,6 +250,93 @@ async function selbsttest() {
                 applyImportedData.toString().includes('stateZweit = { special: 0, values: {} }'));
 
             stateZweit = merkZweit;
+            protokollLeeren();
+            leeren();
+        }
+
+        // ---------- 9b2. Vorgang „Anhörung" ----------
+        if (typeof uebernehmeAnhoerung === 'function') {
+            const k = nr => ITEMS.find(i => i.nr === nr);
+            const merkModusA = appModus;
+            const merkZweitA = JSON.parse(JSON.stringify(stateZweit));
+            const merkFelderA = {};
+            document.querySelectorAll('[id^="anh-"]').forEach(el => merkFelderA[el.id] = el.value);
+
+            pruefeWahr('Anhörung ist als vierter Vorgang eingetragen',
+                !!MODI.anhoerung && MODI.anhoerung.fertig === true);
+            pruefe('Startseite zeigt vier Vorgänge', Object.keys(MODI).length, 4);
+
+            setzeModus('anhoerung');
+            pruefeWahr('Anhörung: Bereich auf Reiter 1 ist sichtbar',
+                document.getElementById('anhoerung-bereich').style.display !== 'none');
+            pruefeWahr('Anhörung: Befunderhebung bleibt verborgen',
+                document.getElementById('btn-tab-befund').style.display === 'none');
+            pruefeWahr('Anhörung: erweiterte Erfassung bleibt verborgen',
+                document.getElementById('erfassung-bereich').style.display === 'none');
+            pruefe('Anhörung: Reiterbeschriftung wie im Widerspruch',
+                document.getElementById('btn-tab-3').innerText, '2. EINSCHÄTZUNG & VERGLEICH');
+            ANHOERUNG_FELDER.forEach(f => pruefeWahr('Anhörung: Feld „' + f.l + '" vorhanden',
+                !!document.getElementById(f.id)));
+            pruefeWahr('Anhörung: Feld für die Begründung der Kasse',
+                !!document.getElementById('anh-kassenbegruendung'));
+            pruefeWahr('Anhörung: eigenes Notizfeld', !!document.getElementById('anh-notizen'));
+
+            // Übernahme des Anhörungsgutachtens: dritte Spalte füllen, nichts anderes anfassen
+            leeren();
+            stateZweit = { special: 0, values: {} };
+            stateOrig.values[k('4.4.1').id] = 1;
+            stateEigene.values[k('4.4.1').id] = 3;
+            erstgespraechNotes = 'Notiz aus dem Widerspruch.';
+            appealDraft = '<p>Stellungnahme aus dem Widerspruch</p>';
+            document.getElementById('stam-betreffend').value = 'Herr Anhörung Test';
+            const vm = {};
+            ITEMS.forEach(i => { vm[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+            vm[k('4.4.1').id] = 2;
+            uebernehmeAnhoerung({
+                stam: { pg: '1', pts: '25,00', begutachtung: '2026-04-08', art: DURCHFUEHRUNGSARTEN[1] },
+                anh: { schreiben: '2026-04-21', frist: 'zwei Wochen', kassenbegruendung: 'Kein höherer Grad.',
+                       gutachten: '2026-04-08', art: DURCHFUEHRUNGSARTEN[1] },
+                valuesMap: vm, special: 0,
+                extracted: { raws: [0,0,0,3,0,0], weights: [0,0,0,10,0,0], total: 25, pg: 1 }
+            });
+            pruefe('Anhörungsgutachten steht in der dritten Spalte', stateZweit.values[k('4.4.1').id], 2);
+            pruefe('Erstgutachten unverändert', stateOrig.values[k('4.4.1').id], 1);
+            pruefe('Eigene Bewertung unverändert', stateEigene.values[k('4.4.1').id], 3);
+            pruefe('Notizen des Widerspruchs bleiben', erstgespraechNotes, 'Notiz aus dem Widerspruch.');
+            pruefeWahr('Stellungnahme des Widerspruchs bleibt',
+                (appealDraft || '').includes('Stellungnahme aus dem Widerspruch'));
+            pruefe('Betreffende Person bleibt stehen',
+                document.getElementById('stam-betreffend').value, 'Herr Anhörung Test');
+            pruefe('Kopffeld: Datum Anhörungsschreiben',
+                document.getElementById('anh-schreiben-datum').value, '2026-04-21');
+            pruefe('Kopffeld: Datum Zweitgutachten',
+                document.getElementById('anh-gutachten-datum').value, '2026-04-08');
+            pruefe('Kopffeld: Pflegegrad des Zweitgutachtens',
+                document.getElementById('anh-pg').value, '1');
+            pruefeWahr('Begründung der Kasse übernommen',
+                document.getElementById('anh-kassenbegruendung').value.includes('Kein höherer Grad'));
+            pruefe('Zusammenfassung des Zweitgutachtens gilt', calculateInternal('zweit').pg, 1);
+            pruefeWahr('Übernahme steht im Protokoll',
+                bewertungsProtokoll.some(e => e.spalte === SPALTEN_NAMEN.zweit));
+            pruefeWahr('Dritter Balken erscheint jetzt',
+                document.querySelectorAll('[id^="zweitref-own-"]').length === 64);
+
+            // Kein falsches Dokument, solange die Vorlage fehlt
+            pruefe('Anhörung erzeugt noch kein Dokument', baueDokument('', {}, ''), null);
+            setzeModus('hoeherstufung');
+            pruefeWahr('Höherstufung erzeugt weiterhin ihr Dokument', !!baueDokument('', {}, ''));
+            setzeModus('widerspruch');
+            pruefeWahr('Widerspruch erzeugt weiterhin sein Dokument', !!baueDokument('', {}, ''));
+
+            // Die Felder gehören in die Falldatei
+            pruefeWahr('Anhörungsfelder werden mitgespeichert',
+                saveCase.toString().includes('[id^="anh-"]'));
+
+            stateZweit = merkZweitA;
+            Object.keys(merkFelderA).forEach(id => {
+                const el = document.getElementById(id); if (el) el.value = merkFelderA[id];
+            });
+            setzeModus(merkModusA);
             protokollLeeren();
             leeren();
         }
@@ -1230,6 +1317,50 @@ async function selbsttest() {
                 (document.getElementById('appeal-document')?.innerHTML || '').includes('VON HAND ERGAENZT'));
             pruefeWahr('Fall laden: Bereich der Stellungnahme wird eingeblendet',
                 document.getElementById('appeal-result-container').style.display === 'block');
+
+            // Fallwechsel: die Stellungnahme darf NIEMALS von einem Fall in den nächsten
+            // übergehen. Das Anzeigefeld muss beim Laden mitgesetzt werden, weil „Speichern"
+            // von dort liest.
+            const fallA = JSON.stringify({ stateOrig: { special: 0, values: {} }, stateEigene: { special: 0, values: {} },
+                stammdaten: { 'stam-betreffend': 'Frau AAA' }, erstgespraechNotes: 'A',
+                appealDraft: '<p>STELLUNGNAHME VON FRAU AAA</p>' });
+            const fallB = JSON.stringify({ stateOrig: { special: 0, values: {} }, stateEigene: { special: 0, values: {} },
+                stammdaten: { 'stam-betreffend': 'Herr BBB' }, erstgespraechNotes: 'B',
+                appealDraft: '<p>STELLUNGNAHME VON HERRN BBB</p>' });
+            const ladeFall = async (t) => { await new Promise(r => {
+                loadCase({ target: { files: [new File([t], 'f.json', { type: 'application/json' })], value: '' } });
+                setTimeout(r, 400); }); };
+            await ladeFall(fallA);
+            renderAuswertung();                       // Fall A ansehen
+            await ladeFall(fallB);                    // Fall B laden, ohne Reiter 4 zu öffnen
+            pruefeWahr('Fallwechsel: Anzeigefeld zeigt den neuen Fall',
+                (document.getElementById('appeal-document')?.innerHTML || '').includes('HERRN BBB'));
+            let jsonB = null;
+            const bBlob = window.Blob, bUrl = URL.createObjectURL, bClick = HTMLAnchorElement.prototype.click;
+            const bDialog = window.showSaveFilePicker;
+            window.Blob = function (t, o) { jsonB = t.join(''); return new bBlob(t, o); };
+            URL.createObjectURL = () => 'blob:selbsttest';
+            HTMLAnchorElement.prototype.click = function () {};
+            window.showSaveFilePicker = async (o) => ({ name: o.suggestedName,
+                createWritable: async () => ({ write: async () => {}, close: async () => {} }) });
+            try { await saveCase(); } finally {
+                window.Blob = bBlob; URL.createObjectURL = bUrl; HTMLAnchorElement.prototype.click = bClick;
+                if (bDialog) window.showSaveFilePicker = bDialog; else delete window.showSaveFilePicker;
+            }
+            const dB = jsonB ? JSON.parse(jsonB) : {};
+            pruefe('Fallwechsel: gespeicherter Fall ist der richtige',
+                dB.stammdaten && dB.stammdaten['stam-betreffend'], 'Herr BBB');
+            pruefeWahr('Fallwechsel: KEINE fremde Stellungnahme in der Datei',
+                !(dB.appealDraft || '').includes('AAA'));
+            pruefeWahr('Fallwechsel: die eigene Stellungnahme ist drin',
+                (dB.appealDraft || '').includes('HERRN BBB'));
+            // Dasselbe beim Einlesen eines neuen Gutachtens
+            const vmLeer = {};
+            ITEMS.forEach(i => { vmLeer[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+            applyImportedData({ stam: {}, diagnoses: [], anamnese: '', befund: '', special: 0,
+                                valuesMap: vmLeer, provided: new Set() });
+            pruefeWahr('Neues Gutachten leert das Anzeigefeld der Stellungnahme',
+                !(document.getElementById('appeal-document')?.innerHTML || '').trim());
 
             // Ältere Falldateien (ohne Befund, Erfassung und Vorgangsart) müssen weiter laden
             const altJson = JSON.stringify({
