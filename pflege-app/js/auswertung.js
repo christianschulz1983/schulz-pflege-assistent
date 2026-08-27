@@ -232,7 +232,8 @@ async function saveCase() {
     if (appealEl) appealDraft = appealEl.innerHTML;
     const data={stateOrig,stateEigene,stateZweit,stammdaten,erstgespraechNotes,appealDraft,appModus,
                 befund: (typeof befundSichern === 'function') ? befundSichern() : null,
-                erfassung: (typeof erfassungSichern === 'function') ? erfassungSichern() : null};
+                erfassung: (typeof erfassungSichern === 'function') ? erfassungSichern() : null,
+                anlagen: (typeof anlagenSichern === 'function') ? anlagenSichern() : null};
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
     const name=(document.getElementById('stam-betreffend').value||'Fall').replace(/\s/g,'_');
     const dateiname=`${name}_Pflegegradassistent.json`;
@@ -280,6 +281,7 @@ function loadCase(e) {
             setzeModus(data.appModus || 'widerspruch');   // ältere Fälle sind immer Widersprüche
             if (typeof befundLaden === 'function') befundLaden(data.befund);
             if (typeof erfassungLaden === 'function') erfassungLaden(data.erfassung);
+            if (typeof anlagenLaden === 'function') anlagenLaden(data.anlagen);
             init();
             setTimeout(() => {
                 // Erst genügend Diagnosezeilen anlegen, sonst gehen Einträge ab Zeile 7 verloren

@@ -29,6 +29,7 @@ pflege-app/
   js/korrektur.js     Erfasste Daten nachtraeglich korrigieren
   js/anhoerung.js     Anhoerungsverfahren: Erfassung und Vorlage
   js/vergleich.js     Dreiervergleich und Schwellenwertrechnung
+  js/anlagen.js       Anlagen: Zuordnung zum Kriterium, Verzeichnis im Dokument
   js/befund.js        Befunderhebung (Erstantrag, Höherstufung)
   js/erfassung.js     Pflegepersonen, Aufenthalte, Versorgung, Übernahme in Modul 5
   js/hoeherstufung.js Dokumentvorlage der Anträge und Deckblatt
@@ -110,8 +111,10 @@ Vier Vorgaenge sind einsatzbereit: Widerspruch (unveraendert), Erstantrag und
 Hoeherstufungsantrag mit Befundkatalog, erweiterter Erfassung, Uebernahme in Modul 5,
 Arztbericht-Auslese und Deckblatt sowie das Anhoerungsverfahren mit drittem
 Bewertungsstand, Vergleichsreiter und eigener Vorlage.
-Offen: Anlagen (Arztberichte, Verordnungen) mit Verzeichnis und Verweis im Dokument.
-Der Selbsttest umfasst 429 Pruefungen.
+Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kriterium
+zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
+Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
+sie beim Versand bei. Der Selbsttest umfasst 452 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
