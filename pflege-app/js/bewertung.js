@@ -37,14 +37,14 @@ function setzeBewertung(spalte, id, wert, quelle) {
         console.error('Bewertung abgewiesen – unzulässiger Ursprung:', quelle, 'Kriterium', id);
         return false;
     }
-    const zustand = (spalte === 'orig') ? stateOrig : stateEigene;
+    const zustand = zustandZu(spalte);
     const item = ITEMS.find(i => i.id === id);
     const alt = zustand.values[id];
     if (JSON.stringify(alt) === JSON.stringify(wert)) return false;   // nichts geändert
     zustand.values[id] = wert;
     bewertungsProtokoll.push({
         zeit: new Date().toLocaleTimeString('de-DE'),
-        spalte: (spalte === 'orig') ? 'Vorgutachten' : 'Eigene Einschätzung',
+        spalte: SPALTEN_NAMEN[spalte] || SPALTEN_NAMEN.own,
         nr: item ? item.nr : String(id),
         titel: item ? item.title : '',
         alt: bewertungLesbar(item, alt),

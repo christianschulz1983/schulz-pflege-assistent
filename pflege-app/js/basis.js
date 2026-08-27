@@ -151,6 +151,29 @@ const ITEMS = [
 
 let stateOrig = { special:0, values:{} };
 let stateEigene = { special:0, values:{} };
+// Dritter Bewertungsstand: das Zweitgutachten aus dem Anhörungsverfahren. Bleibt in allen
+// anderen Vorgangsarten leer und wirkt sich dort nirgends aus.
+let stateZweit = { special:0, values:{} };
+
+// Zentraler Zugriff auf die drei Bewertungsstände. „orig" = Vorgutachten,
+// „zweit" = Anhörungsgutachten, alles Übrige = eigene Einschätzung.
+function zustandZu(spalte) {
+    if (spalte === 'orig') return stateOrig;
+    if (spalte === 'zweit') return stateZweit;
+    return stateEigene;
+}
+
+// Bezeichnung der Spalte im Klartext – für Protokoll und Anzeige.
+const SPALTEN_NAMEN = {
+    orig:  'Vorgutachten',
+    zweit: 'Anhörungsgutachten',
+    own:   'Eigene Einschätzung'
+};
+
+// Liegt überhaupt ein Zweitgutachten vor? Steuert, ob die dritte Spalte erscheint.
+function hatZweitgutachten() {
+    return Object.keys(stateZweit.values || {}).length > 0;
+}
 
 // Mitschrift des Erstgesprächs (Reiter "Auswertung"). Wird in die KI-Begründung eingearbeitet.
 let erstgespraechNotes = "";

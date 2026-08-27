@@ -195,6 +195,65 @@ async function selbsttest() {
             document.querySelectorAll('#verf-name-sel').length === 1 &&
             document.querySelectorAll('#verf-qual-sel').length === 1);
 
+        // ---------- 9b. Dritter Bewertungsstand: das Anhörungsgutachten ----------
+        // Phase 1 des Anhörungsvorgangs. Der dritte Stand darf sich auf die bestehenden
+        // Vorgangsarten in keiner Weise auswirken.
+        {
+            const k = nr => ITEMS.find(i => i.nr === nr);
+            const merkZweit = JSON.parse(JSON.stringify(stateZweit));
+            leeren();
+            stateZweit = { special: 0, values: {} };
+
+            pruefe('Drei Spalten sind benannt',
+                [SPALTEN_NAMEN.orig, SPALTEN_NAMEN.zweit, SPALTEN_NAMEN.own],
+                ['Vorgutachten', 'Anhörungsgutachten', 'Eigene Einschätzung']);
+            pruefeWahr('Zugriff je Spalte trifft den richtigen Stand',
+                zustandZu('orig') === stateOrig && zustandZu('zweit') === stateZweit
+                && zustandZu('own') === stateEigene);
+            pruefe('Ohne Zweitgutachten meldet die App das auch', hatZweitgutachten(), false);
+
+            // Schreiben in die dritte Spalte
+            pruefe('Schreiben ins Anhörungsgutachten wird angenommen',
+                setzeBewertung('zweit', k('4.4.1').id, 2, 'import'), true);
+            pruefe('Wert steht im Anhörungsgutachten', stateZweit.values[k('4.4.1').id], 2);
+            pruefe('Vorgutachten bleibt unberührt', stateOrig.values[k('4.4.1').id], 0);
+            pruefe('Eigene Einschätzung bleibt unberührt', stateEigene.values[k('4.4.1').id], 0);
+            pruefe('Protokoll nennt die richtige Spalte',
+                bewertungsProtokoll[bewertungsProtokoll.length - 1].spalte, 'Anhörungsgutachten');
+            pruefe('Jetzt liegt ein Zweitgutachten vor', hatZweitgutachten(), true);
+
+            // Rechnen für alle drei Stände getrennt
+            ITEMS.filter(i => i.m === 4).forEach(i => { stateZweit.values[i.id] = 0; });
+            [k('4.4.1'), k('4.4.2'), k('4.4.3')].forEach(i => { stateZweit.values[i.id] = 3; });
+            ITEMS.filter(i => i.m === 5).forEach(i => {
+                stateZweit.values[i.id] = (i.group !== 'D') ? { count: 0, period: 'W' } : 0;
+            });
+            const rZ = calculateInternal('zweit');
+            pruefe('Modul 4 des Anhörungsgutachtens wird gerechnet', rZ.raws[3], 9);
+            pruefe('Gewichtete Punkte des Anhörungsgutachtens', rZ.weights[3], 20);
+            pruefe('Vorgutachten rechnet unverändert weiter', calculateInternal('orig').total, 0);
+            pruefe('Eigene Einschätzung rechnet unverändert weiter', calculateInternal('own').total, 0);
+
+            // Zusammenfassung aus dem Gutachten gilt auch für die dritte Spalte
+            stateZweit.extracted = { raws: [0,0,0,0,0,0], weights: [0,0,0,0,0,0], total: 31.25, pg: 2 };
+            pruefe('Zusammenfassung des Anhörungsgutachtens hat Vorrang', calculateInternal('zweit').pg, 2);
+            delete stateZweit.extracted;
+            pruefeWahr('Ohne Zusammenfassung wieder aus den Kriterien',
+                calculateInternal('zweit').total === 20);
+            // Eine Handkorrektur verwirft die Zusammenfassung
+            stateZweit.extracted = { raws: [0,0,0,0,0,0], weights: [0,0,0,0,0,0], total: 31.25, pg: 2 };
+            updateValue('zweit', k('4.4.1').id, 1);
+            pruefeWahr('Handkorrektur verwirft die Zusammenfassung', !stateZweit.extracted);
+
+            // Ein neu eingelesenes Erstgutachten setzt die dritte Spalte zurück
+            pruefeWahr('Neues Erstgutachten leert das Anhörungsgutachten',
+                applyImportedData.toString().includes('stateZweit = { special: 0, values: {} }'));
+
+            stateZweit = merkZweit;
+            protokollLeeren();
+            leeren();
+        }
+
         // ---------- 9c. Pflegegrad und Punkte des Gutachtens dürfen nicht auseinanderlaufen ----------
         // Beide stehen an zwei Stellen der Prüfansicht. Wurde nur eine korrigiert, behauptete
         // die Stellungnahme zuvor etwa „0 Punkte, woraus sich Pflegegrad 1 ergeben hat".
@@ -1078,6 +1137,9 @@ async function selbsttest() {
             setzeBewertung('orig', k('4.5.1').id, { count: 0, period: 'W' }, 'import');
             setzeBewertung('own',  k('4.5.1').id, { count: 3, period: 'D' }, 'berater');
             stateEigene.special = 1;
+            // Dritter Stand muss ebenfalls mitgespeichert werden
+            stateZweit = { special: 0, values: {} };
+            setzeBewertung('zweit', k('4.4.1').id, 2, 'import');
             document.getElementById('stam-betreffend').value = 'Herr Speicher Test';
             document.getElementById('stam-kasse').value = 'Testkasse';
             erstgespraechNotes = 'Notiz für die Speicherprobe.';
@@ -1129,6 +1191,8 @@ async function selbsttest() {
             pruefe('Fall speichern: Notizen', d.erstgespraechNotes, 'Notiz für die Speicherprobe.');
             pruefe('Fall speichern: Stammdaten', d.stammdaten && d.stammdaten['stam-kasse'], 'Testkasse');
             pruefe('Fall speichern: psychische Problemlagen', (d.befund && d.befund.psyche || []).length, 1);
+            pruefe('Fall speichern: Anhörungsgutachten',
+                d.stateZweit && d.stateZweit.values[k('4.4.1').id], 2);
 
             // Alles zerstören und aus der Datei wiederherstellen
             leeren();
@@ -1136,6 +1200,7 @@ async function selbsttest() {
             stateEigene.values[k('4.5.1').id] = { count: 0, period: 'W' };
             erstgespraechNotes = ''; appealDraft = '';
             psycheListe = [];
+            stateZweit = { special: 0, values: {} };
             if (notizFeld2) notizFeld2.value = '';
             if (dokFeld) dokFeld.innerHTML = '';
             document.getElementById('stam-kasse').value = '';
@@ -1156,6 +1221,7 @@ async function selbsttest() {
             pruefe('Fall laden: Stammdaten zurück',
                 document.getElementById('stam-kasse').value, 'Testkasse');
             pruefe('Fall laden: psychische Problemlagen zurück', psycheListe.length, 1);
+            pruefe('Fall laden: Anhörungsgutachten zurück', stateZweit.values[k('4.4.1').id], 2);
             // Punktzahl muss identisch sein – sonst stimmt die Wiederherstellung nur scheinbar
             pruefe('Fall laden: Punktzahl unverändert', calculateInternal('own').total, 100);
             // Die Stellungnahme muss auch wieder sichtbar werden
@@ -1180,6 +1246,8 @@ async function selbsttest() {
             pruefe('Ältere Falldatei: gilt als Widerspruch', appModus, 'widerspruch');
             pruefeWahr('Ältere Falldatei: Stellungnahme zurück', (appealDraft || '').includes('Alter Text'));
             pruefe('Ältere Falldatei: keine Problemlagen', psycheListe.length, 0);
+            pruefe('Ältere Falldatei: leerer dritter Bewertungsstand',
+                Object.keys(stateZweit.values).length, 0);
 
             // Ursprünglichen Stand wiederherstellen
             befundLaden(merkBef); erfassungLaden(merkErf); setzeModus(merkModus);

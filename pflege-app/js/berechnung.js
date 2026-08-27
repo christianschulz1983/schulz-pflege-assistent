@@ -13,14 +13,16 @@ function nbaEinzelpunkte(st, id) {
 }
 
 function calculateInternal(pref) {
-    const st = pref==='orig' ? stateOrig : stateEigene;
+    const st = zustandZu(pref);
 
-    if (pref === 'orig' && stateOrig.extracted) {
+    // Liegt eine Zusammenfassung aus dem Gutachten vor, gilt sie – das betrifft
+    // Vorgutachten und Anhörungsgutachten gleichermaßen, nie die eigene Einschätzung.
+    if ((pref === 'orig' || pref === 'zweit') && st.extracted) {
         return {
-            raws: stateOrig.extracted.raws,
-            weights: stateOrig.extracted.weights,
-            total: stateOrig.extracted.total,
-            pg: stateOrig.extracted.pg
+            raws: st.extracted.raws,
+            weights: st.extracted.weights,
+            total: st.extracted.total,
+            pg: st.extracted.pg
         };
     }
 
@@ -61,7 +63,7 @@ function calculateInternal(pref) {
 }
 
 function calculate(pref) {
-    const st = pref==='orig' ? stateOrig : stateEigene;
+    const st = zustandZu(pref);
     const res = calculateInternal(pref);
     const {raws:[s1,s2,s3,s4,ptsM5,s6], weights:[w1,p2,p3,w4,w5,w6], total, pg} = res;
 
