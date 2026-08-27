@@ -596,6 +596,77 @@ async function selbsttest() {
                 } catch (e) {}
             }
 
+            // ---------- Anlagen ----------
+            setzeModus('anhoerung');
+            const merkAnlagen = JSON.parse(JSON.stringify(anlagen));
+            anlagen = [];
+            renderAnlagen();
+            pruefe('Anlagen: Liste beginnt leer', anlagen.length, 0);
+            pruefeWahr('Anlagen: Hinweis auf leere Liste',
+                document.getElementById('anlagen-liste').innerText.includes('Noch keine Anlagen'));
+
+            anlagen.push({ bezeichnung: 'Verordnung Physiotherapie', art: 'Verordnung',
+                           datum: '2026-03-12', kriterium: '4.4.2',
+                           bemerkung: 'belegt den dauerhaften Bedarf', dateiname: 'VO_Physio.pdf' });
+            anlagen.push({ bezeichnung: 'Bericht Orthopädie', art: 'Arztbericht',
+                           datum: '', kriterium: '', bemerkung: '', dateiname: 'Ortho.pdf' });
+            renderAnlagen();
+            pruefe('Anlagen: beide Zeilen erscheinen',
+                document.querySelectorAll('#anlagen-liste .befund-zeile').length, 2);
+            pruefeWahr('Anlagen: fehlende Zuordnung wird gemeldet',
+                document.getElementById('anlagen-hinweis').innerText.includes('1 ohne Zuordnung'));
+
+            pruefe('Anlagen: Bezeichnung im Schriftstück', anlageText(anlagen[0], 0),
+                'Anlage 1: Verordnung – Verordnung Physiotherapie vom 12.03.2026');
+            pruefe('Anlagen: ohne Datum ohne Datumszusatz', anlageText(anlagen[1], 1),
+                'Anlage 2: Arztbericht – Bericht Orthopädie');
+            pruefe('Anlagen: Zuordnung greift', anlagenZuKriterium('4.4.2').length, 1);
+            pruefe('Anlagen: nicht zugeordnete zählen nicht mit', anlagenZuKriterium('4.4.3').length, 0);
+            pruefeWahr('Anlagen: Verweis nennt die Bemerkung',
+                anlagenVerweisHtml('4.4.2').includes('belegt den dauerhaften Bedarf'));
+            pruefe('Anlagen: kein Verweis ohne Zuordnung', anlagenVerweisHtml('4.6.1'), '');
+
+            // Im Dokument
+            const dokA = buildAnhoerung('', {}, '');
+            const elA = document.createElement('div'); elA.innerHTML = dokA;
+            const textA = elA.innerText.replace(/\s+/g, ' ');
+            pruefeWahr('Anlagen: Verzeichnis erscheint im Dokument', !!elA.querySelector('#stmt-anlagen'));
+            pruefeWahr('Anlagen: Verzeichnis nennt beide',
+                textA.includes('Anlage 1: Verordnung') && textA.includes('Anlage 2: Arztbericht'));
+            pruefeWahr('Anlagen: Verzeichnis nennt das Kriterium',
+                textA.includes('zu Kriterium 4.4.2'));
+            pruefeWahr('Anlagen: Verweis steht bei der Begründung',
+                (elA.querySelector('.crit[data-nr="4.4.2"]')?.innerText || '').includes('Beigefügt: Anlage 1'));
+            pruefeWahr('Anlagen: KI erhält die Zuordnung',
+                anlagenFuerPrompt('4.4.2').includes('Anlage 1'));
+            pruefe('Anlagen: KI erhält nichts ohne Zuordnung', anlagenFuerPrompt('4.6.1'), '');
+
+            // Entfernen und Numerierung
+            anlageEntfernen(0);
+            pruefe('Anlagen: entfernen wirkt', anlagen.length, 1);
+            pruefe('Anlagen: Nummern rücken nach', anlageText(anlagen[0], 0),
+                'Anlage 1: Arztbericht – Bericht Orthopädie');
+
+            // Ohne Anlagen kein Verzeichnis
+            anlagen = [];
+            pruefe('Ohne Anlagen kein Verzeichnis', anlagenVerzeichnisHtml(), '');
+            pruefeWahr('Ohne Anlagen kein Abschnitt im Dokument',
+                !buildAnhoerung('', {}, '').includes('stmt-anlagen'));
+
+            // Speichern und Laden
+            anlagen = [{ bezeichnung: 'Probe', art: 'Verordnung', datum: '', kriterium: '4.4.2',
+                         bemerkung: '', dateiname: 'p.pdf' }];
+            const gesichertA = JSON.parse(JSON.stringify(anlagenSichern()));
+            anlagen = [];
+            anlagenLaden(gesichertA);
+            pruefe('Anlagen: übersteht Sichern und Laden', anlagen.length, 1);
+            pruefe('Anlagen: Zuordnung bleibt erhalten', anlagen[0].kriterium, '4.4.2');
+            anlagenLaden(undefined);
+            pruefe('Ältere Falldatei ohne Anlagen', anlagen.length, 0);
+
+            anlagen = merkAnlagen;
+            renderAnlagen();
+
             stateZweit = merkZweitB;
             Object.keys(merkFelderB).forEach(id => { const e2 = document.getElementById(id); if (e2) e2.value = merkFelderB[id]; });
             setzeModus(merkModusB);

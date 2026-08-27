@@ -557,6 +557,7 @@ ZWINGEND:
         prompt += `Lage: ${VERGLEICH_LAGEN[l.lage].titel} – ${VERGLEICH_LAGEN[l.lage].text}\n`;
         prompt += `Passende Erwiderungsmuster: ${erwiderungsMuster(l, analyse).join(', ')}\n`;
         if (l.kipptAllein) prompt += `Bereits dieses eine Kriterium würde den Pflegegrad ändern.\n`;
+        if (typeof anlagenFuerPrompt === 'function') prompt += anlagenFuerPrompt(l.nr);
         prompt += `Stufenbezeichnungen: verwende ausschließlich „${l.zText}" und „${l.bText}".\n`;
         if (b) prompt += `BRi-Definition: ${cut(b.definition, 1400)}\n`;
         const lh = (typeof LAIEN_HINWEISE !== 'undefined') ? LAIEN_HINWEISE[l.nr] : null;

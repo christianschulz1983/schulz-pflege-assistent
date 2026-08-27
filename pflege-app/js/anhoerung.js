@@ -62,6 +62,22 @@ function renderAnhoerungBereich() {
                 </div>
 
                 <div class="field-group" style="margin-top:14px">
+                    <label class="field-label">Anlagen (Arztberichte, Verordnungen, Befundberichte)</label>
+                    <p style="font-size:11px;color:var(--text-muted);line-height:1.55;margin-bottom:10px">
+                        Ordnen Sie jede Anlage dem strittigen Kriterium zu, das sie belegt – etwa eine
+                        Verordnung Physiotherapie zu 4.5.14. Im Schriftstück erscheint dann ein Verweis
+                        und am Ende ein Anlagenverzeichnis. Die Dateien selbst legen Sie beim Versand bei;
+                        in ein Word-Dokument lassen sie sich nicht einbetten.
+                    </p>
+                    <button class="btn btn-secondary" onclick="document.getElementById('anlagenFiles').click()">
+                        + Anlagen hinzufügen</button>
+                    <input type="file" id="anlagenFiles" accept=".pdf,image/*" multiple
+                           onchange="anlagenHinzufuegen(event)" style="display:none">
+                    <span id="anlagen-hinweis" style="font-size:11px;color:var(--text-muted);margin-left:10px"></span>
+                    <div id="anlagen-liste" style="margin-top:12px"></div>
+                </div>
+
+                <div class="field-group" style="margin-top:14px">
                     <label class="field-label">Eigene Anmerkungen zum Anhörungsverfahren</label>
                     <textarea id="anh-notizen" class="field-input"
                               style="min-height:110px;font-size:12px;line-height:1.6;padding:12px"
@@ -71,6 +87,7 @@ function renderAnhoerungBereich() {
             </div>
         </div>`;
     ziel.dataset.gebaut = '1';
+    if (typeof renderAnlagen === 'function') renderAnlagen();
     aktualisiereAnhoerungStatus();
 }
 
@@ -237,10 +254,11 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
             }
             const kipp = l.kipptAllein
                 ? `<div>Bereits die richtlinienkonforme Wertung dieses einen Kriteriums ergäbe ${esc(pgSatz(l.pgMit))}.</div>` : '';
+            const anl = (typeof anlagenVerweisHtml === 'function') ? anlagenVerweisHtml(l.nr) : '';
             return `<div class="crit" data-nr="${esc(l.nr)}" data-vals="${esc(lagenSchluessel(l))}">`
                  + `<div class="ct">${esc(l.nr)}: ${esc(l.titel)}</div>`
                  + `<div>Erstgutachten: „${esc(l.eText)}“ · Anhörungsgutachten: „${esc(l.zText)}“ · Meine Beurteilung: „${esc(l.bText)}“</div>`
-                 + body + kipp + `</div>`;
+                 + body + kipp + anl + `</div>`;
         }).join('')
         : `<p>Nach dem Anhörungsgutachten sind keine Einzelkriterien strittig geblieben.</p>`;
 
@@ -309,6 +327,7 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
 
     <h2>Fazit</h2>
     <p>Die vorliegenden Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} mit ${df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten sowie vom ${df('zweitdatum', zweitDatum || '—')} mit ${df('zpgfazit', pgSatz(zweitPG))} und ${df('zpts', zweitPts)} Punkten berücksichtigen die tatsächlichen Einschränkungen von ${df('name', name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
+    ${(typeof anlagenVerzeichnisHtml === 'function') ? anlagenVerzeichnisHtml() : ''}
   </div>`;
 }
 
