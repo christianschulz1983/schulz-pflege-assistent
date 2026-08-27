@@ -229,7 +229,7 @@ async function saveCase() {
     // Aktuellen (ggf. editierten) Stand der generierten Stellungnahme mitspeichern
     const appealEl = document.getElementById('appeal-document');
     if (appealEl) appealDraft = appealEl.innerHTML;
-    const data={stateOrig,stateEigene,stammdaten,erstgespraechNotes,appealDraft,appModus,
+    const data={stateOrig,stateEigene,stateZweit,stammdaten,erstgespraechNotes,appealDraft,appModus,
                 befund: (typeof befundSichern === 'function') ? befundSichern() : null,
                 erfassung: (typeof erfassungSichern === 'function') ? erfassungSichern() : null};
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
@@ -261,6 +261,8 @@ function loadCase(e) {
             if (!data.stateOrig || !data.stateEigene) throw new Error('Ungueltiges Format');
             stateOrig = data.stateOrig;
             stateEigene = data.stateEigene;
+            // Ältere Falldateien kennen das Zweitgutachten nicht – dann bleibt es leer.
+            stateZweit = data.stateZweit || { special: 0, values: {} };
             // Dateien lassen sich nicht mitspeichern; die Prüfansicht zeigt dann nur die Werte.
             if (typeof letzteProvided !== 'undefined') letzteProvided = null;
             if (typeof stellungnahmeVeraltet !== 'undefined') stellungnahmeVeraltet = false;

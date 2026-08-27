@@ -441,6 +441,11 @@
             margin-bottom: 8px;
             --c: #b45309; --cbg: rgba(245,158,11,0.12); --cbd: rgba(245,158,11,0.40);
         }
+        /* Anhörungsgutachten (Zweitgutachten): BLAU – steht zwischen Vorgutachten
+           und eigener Einschätzung und erscheint nur im Anhörungsverfahren. */
+        .vorg-box.zweit-box {
+            --c: #1d4ed8; --cbg: rgba(37,99,235,0.10); --cbd: rgba(37,99,235,0.38);
+        }
         /* Vorgutachten: ROT + auf halbe Größe verkleinert, sobald die eigene Einschätzung höher ist */
         .vorg-box.vorg-higher {
             --c: #dc2626; --cbg: rgba(220,38,38,0.10); --cbd: rgba(220,38,38,0.45);

@@ -545,6 +545,9 @@ function applyImportedData(rev) {
 
     stateOrig = { special: rev.special || 0, values: {} };
     stateEigene = { special: rev.special || 0, values: {} };
+    // Ein neu eingelesenes Erstgutachten beginnt einen neuen Fall – ein etwaiges
+    // Zweitgutachten aus einem früheren Anhörungsverfahren gehört nicht dazu.
+    stateZweit = { special: 0, values: {} };
     appealDraft = "";
     erstgespraechNotes = "";
     // extracted nur setzen, wenn es eine KI-Zusammenfassung gibt; sonst wird das

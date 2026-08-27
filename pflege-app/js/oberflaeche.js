@@ -178,7 +178,7 @@ function fillTable(pref) {
     if(!table) return;
     table.innerHTML='';
     const modNames = ["Mobilität","Kognitive Fähigkeiten","Verhaltensweisen","Selbstversorgung","Krankheitsbedingte Anforderungen","Alltagsgestaltung"];
-    const st = pref === 'orig' ? stateOrig : stateEigene;
+    const st = zustandZu(pref);
     for(let m=1;m<=6;m++){
         table.innerHTML += `<tr class="module-header-row"><td colspan="5">${m}. ${modNames[m-1]}</td></tr>`;
         ITEMS.filter(i=>i.m===m).forEach(i=>{
@@ -202,9 +202,12 @@ function fillTable(pref) {
 }
 
 function renderRow(i, pref) {
-    const st = pref === 'orig' ? stateOrig : stateEigene;
+    const st = zustandZu(pref);
     // Prominenter Vorgutachten-Balken ÜBER der eigenen Einschätzung (nur Reiter "own").
-    const vorgBox = pref === 'own' ? `<div class="vorg-box" id="origref-own-${i.id}">${getOriginalRef(i.id)}</div>` : '';
+    // Liegt ein Anhörungsgutachten vor, steht dessen Balken dazwischen.
+    const vorgBox = pref === 'own' ? `<div class="vorg-box" id="origref-own-${i.id}">${getOriginalRef(i.id)}</div>`
+        + (hatZweitgutachten() ? `<div class="vorg-box zweit-box" id="zweitref-own-${i.id}">${getVergleichsRef('zweit', i.id)}</div>` : '')
+        : '';
     const hasInfo = hatErlaeuterung(i);
 
     if(i.m===5 && i.group!=='D'){
@@ -251,11 +254,12 @@ function renderRow(i, pref) {
     </tr>`;
 }
 
-// Inhalt des Vorgutachten-Balkens: Wert groß + visuelle Punkte-Skala (markierte Stufe).
-function getOriginalRef(itemId) {
+// Inhalt eines Vergleichsbalkens (Vorgutachten oder Anhörungsgutachten):
+// Wert groß + visuelle Punkte-Skala mit markierter Stufe.
+function getVergleichsRef(spalte, itemId) {
     const item = ITEMS.find(it=>it.id===itemId);
-    const val = stateOrig.values[itemId];
-    const tag = '<span class="vorg-tag">Vorgutachten</span>';
+    const val = zustandZu(spalte).values[itemId];
+    const tag = `<span class="vorg-tag">${SPALTEN_NAMEN[spalte] || ''}</span>`;
     if(val===undefined || val===null) {
         return tag + '<div class="vorg-content"><span class="vorg-val vorg-empty">—</span></div>';
     }
@@ -272,10 +276,15 @@ function getOriginalRef(itemId) {
     return tag + `<div class="vorg-content"><span class="vorg-val">${escapeHtml(label)}</span><span class="vorg-scale">${dots}</span></div>`;
 }
 
+// Bisheriger Name – der Vorgutachten-Balken ist der Regelfall.
+function getOriginalRef(itemId) { return getVergleichsRef('orig', itemId); }
+
 // Aktualisiert nur die "Vorgutachten:"-Anzeige einer einzelnen Zeile (statt der ganzen Tabelle).
 function refreshOrigRef(id) {
     const el = document.getElementById('origref-own-' + id);
     if (el) el.innerHTML = getOriginalRef(id);
+    const z = document.getElementById('zweitref-own-' + id);
+    if (z) z.innerHTML = getVergleichsRef('zweit', id);
     applyVorgHighlight(id);
 }
 
@@ -302,8 +311,10 @@ function applyVorgHighlight(id) {
 }
 
 function updateValue(pref, id, idx) {
-    const st = pref==='orig' ? stateOrig : stateEigene;
-    if (pref === 'orig') { delete stateOrig.extracted; }
+    const st = zustandZu(pref);
+    // Wird ein Gutachtenwert von Hand geaendert, gilt die Zusammenfassung aus dem
+    // Gutachten nicht mehr – sonst blieben Punktzahl und Kriterien auseinander.
+    if (pref === 'orig' || pref === 'zweit') { delete zustandZu(pref).extracted; }
     setzeBewertung(pref, id, parseInt(idx), 'berater');
     const labelEl = document.getElementById('label-'+pref+'-'+id);
     if(labelEl) labelEl.innerText = ITEMS.find(it=>it.id===id).opts[idx];
@@ -311,8 +322,10 @@ function updateValue(pref, id, idx) {
     if(pref==='orig'){ refreshOrigRef(id); calculate('own'); updateLiveCompRows(); }
 }
 function updateM5Count(pref, id, val) {
-    const st = pref==='orig' ? stateOrig : stateEigene;
-    if (pref === 'orig') { delete stateOrig.extracted; }
+    const st = zustandZu(pref);
+    // Wird ein Gutachtenwert von Hand geaendert, gilt die Zusammenfassung aus dem
+    // Gutachten nicht mehr – sonst blieben Punktzahl und Kriterien auseinander.
+    if (pref === 'orig' || pref === 'zweit') { delete zustandZu(pref).extracted; }
     const a = st.values[id] || {count:0,period:'W'};
     setzeBewertung(pref, id, {count:Number(val), period:a.period||'W'}, 'berater');
     const disp = document.getElementById('m5-disp-'+pref+'-'+id);
@@ -321,16 +334,20 @@ function updateM5Count(pref, id, val) {
     if(pref==='orig'){ refreshOrigRef(id); calculate('own'); updateLiveCompRows(); }
 }
 function updateM5Period(pref, id, p) {
-    const st = pref==='orig' ? stateOrig : stateEigene;
-    if (pref === 'orig') { delete stateOrig.extracted; }
+    const st = zustandZu(pref);
+    // Wird ein Gutachtenwert von Hand geaendert, gilt die Zusammenfassung aus dem
+    // Gutachten nicht mehr – sonst blieben Punktzahl und Kriterien auseinander.
+    if (pref === 'orig' || pref === 'zweit') { delete zustandZu(pref).extracted; }
     const b = st.values[id] || {count:0,period:'W'};
     setzeBewertung(pref, id, {count:Number(b.count)||0, period:p}, 'berater');
     fillTable(pref); calculate(pref);
     if(pref==='orig'){ refreshOrigRef(id); calculate('own'); updateLiveCompRows(); }
 }
 function updateSpecial(pref, val) {
-    const st = pref==='orig' ? stateOrig : stateEigene;
-    if (pref === 'orig') { delete stateOrig.extracted; }
+    const st = zustandZu(pref);
+    // Wird ein Gutachtenwert von Hand geaendert, gilt die Zusammenfassung aus dem
+    // Gutachten nicht mehr – sonst blieben Punktzahl und Kriterien auseinander.
+    if (pref === 'orig' || pref === 'zweit') { delete zustandZu(pref).extracted; }
     st.special = parseInt(val);
     document.getElementById('special-label-'+pref).innerText = val==1 ? 'Ja' : 'Nein';
     calculate(pref);
