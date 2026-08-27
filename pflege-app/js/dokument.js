@@ -2,6 +2,9 @@
 // Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
 // Wählt die Vorlage nach Vorgangsart: Widerspruch wie bisher, sonst die Antragsvorlage.
 function baueDokument(notes, begruendungen, allgemeinText) {
+    // Die Anhörung bekommt eine eigene Vorlage (im Aufbau). Bis dahin wird KEIN Dokument
+    // erzeugt – ein Höherstufungsantrag wäre hier fachlich falsch.
+    if (typeof appModus !== 'undefined' && appModus === 'anhoerung') return null;
     if (typeof appModus !== 'undefined' && appModus !== 'widerspruch'
         && typeof buildHoeherstufung === 'function') {
         return buildHoeherstufung(notes, begruendungen, allgemeinText);
@@ -272,9 +275,29 @@ function mergeStellungnahme(existingHtml, freshHtml) {
     return cur.innerHTML;
 }
 
+/* Setzt die geschriebene Stellungnahme an EINER Stelle: Zustand und Anzeige zugleich.
+   Beim Fallwechsel ist das entscheidend. „Speichern" liest den Text aus dem Anzeigefeld,
+   weil dort die Änderungen von Hand stehen. Blieb beim Laden eines anderen Falls der alte
+   Text im Feld stehen, wanderte er in die Datei des neuen Falls – also die Stellungnahme
+   einer fremden Person. */
+function setzeStellungnahme(html) {
+    appealDraft = html || '';
+    const el = document.getElementById('appeal-document');
+    if (el) el.innerHTML = appealDraft;
+    const cont = document.getElementById('appeal-result-container');
+    if (cont) cont.style.display = appealDraft.trim() ? 'block' : 'none';
+    const warn = document.getElementById('appeal-veraltet');
+    if (warn) warn.innerHTML = '';
+}
+
 // Erzeugt die Stellungnahme im Familiara-Format (gefüllt aus den App-Daten, mit Rechtschreibkorrektur der Notizen).
 async function generateAppealText() {
     try {
+        if (typeof appModus !== 'undefined' && appModus === 'anhoerung') {
+            showToast('Die Vorlage für die Anhörung wird gerade gebaut. Erfassen und vergleichen '
+                + 'funktioniert bereits; das Schriftstück folgt im nächsten Schritt.', 'error');
+            return;
+        }
         injectStellungnahmeCss();
 
         // Notizen einlesen und – falls vorhanden und API-Schlüssel gesetzt – Rechtschreibung/Grammatik korrigieren

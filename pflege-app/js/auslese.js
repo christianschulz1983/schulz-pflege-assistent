@@ -84,11 +84,18 @@ function isOnlineHosted() {
     return (location.protocol === 'http:' || location.protocol === 'https:') && h !== '127.0.0.1' && h !== 'localhost';
 }
 
-async function aiReadGutachten(event) {
+// Ziel des naechsten Imports: 'orig' = Vorgutachten (Regelfall),
+// 'zweit' = Anhoerungsgutachten aus dem Anhoerungsverfahren.
+let importZiel = 'orig';
+
+async function aiReadGutachten(event, ziel) {
     const file = event.target.files[0];
     if (!file) return;
+    importZiel = (ziel === 'zweit') ? 'zweit' : 'orig';
+    const istZweit = (importZiel === 'zweit');
 
-    showOverlay("KI liest Gutachten aus...", "Datei wird vorbereitet");
+    showOverlay(istZweit ? "KI liest das Anhoerungsgutachten aus..." : "KI liest Gutachten aus...",
+                "Datei wird vorbereitet");
 
     const reader = new FileReader();
     reader.onerror = () => {
@@ -151,7 +158,24 @@ async function aiReadGutachten(event) {
             - Modul 5: 4.5.16 (Diät) ist KEINE Häufigkeit, sondern selbständig..unselbständig -> val_num 0..3.
             Verwechsle Spalten niemals: die horizontale Ausrichtung im Text entscheidet. Erfinde keine Werte; wenn eine Zeile leer/entfällt ist, gib 0 bzw. count 0 an.
 
-            Liefere alle Ergebnisse strictly als valides JSON-Objekt zurück.`;
+            Liefere alle Ergebnisse strictly als valides JSON-Objekt zurück.`
+            + (istZweit ? `
+
+            BESONDERHEIT – ANHÖRUNGSVERFAHREN:
+            Das übermittelte Material stammt aus einem Anhörungsverfahren. Es kann aus zwei Teilen
+            bestehen, die auch in EINER Datei stehen können:
+            (a) dem Anhörungsschreiben der Pflegekasse und
+            (b) dem beigefügten Zweitgutachten (auch "Anhörungsgutachten" genannt).
+            Die oben beschriebenen Stammdaten, Diagnosen und Modulbewertungen liest du AUS DEM
+            ZWEITGUTACHTEN – nicht aus einem etwaigen älteren Gutachten, das darin zitiert wird.
+            Zusätzlich extrahierst du aus dem Anhörungsschreiben:
+            - anh_schreiben_datum: Datum des Anhörungsschreibens (tt.mm.jjjj)
+            - anh_frist: genannte Frist zur Stellungnahme (Datum tt.mm.jjjj oder Angabe wie "zwei Wochen"); sonst leer
+            - anh_kassenbegruendung: die Begründung der Pflegekasse, warum dem Widerspruch nicht
+              abgeholfen wird, möglichst wörtlich und vollständig; sonst leer
+            - anh_gutachten_datum: Erstellungsdatum des Zweitgutachtens (tt.mm.jjjj)
+            - anh_art: Durchführungsart des Zweitgutachtens, wörtlich wie im Dokument
+            Erfinde nichts. Findest du eine Angabe nicht, gib einen leeren String zurück.` : '');
 
             const responseSchema = {
                 type: "OBJECT",
@@ -212,6 +236,13 @@ async function aiReadGutachten(event) {
                 },
                 required: ["diagnoses", "values_orig"]
             };
+            if (istZweit) {
+                responseSchema.properties.anh_schreiben_datum = { type: "STRING" };
+                responseSchema.properties.anh_frist = { type: "STRING" };
+                responseSchema.properties.anh_kassenbegruendung = { type: "STRING" };
+                responseSchema.properties.anh_gutachten_datum = { type: "STRING" };
+                responseSchema.properties.anh_art = { type: "STRING" };
+            }
 
             // Stufe 2 (lokaler Server / Alternative B): falls erreichbar, Text lokal extrahieren
             // (inkl. OCR) und nur den Text an Gemini schicken. Die Einzelkriterien liefert der
@@ -328,6 +359,14 @@ function normalizeImport(data) {
             art: normalizeArt(data.stam_art),
             pg: data.stam_pg_manual !== undefined && data.stam_pg_manual !== null ? String(data.stam_pg_manual) : '',
             pts: data.stam_pts_manual !== undefined && data.stam_pts_manual !== null ? String(data.stam_pts_manual) : ''
+        },
+        // Angaben aus dem Anhörungsverfahren (nur beim Zweitgutachten gefüllt)
+        anh: {
+            schreiben: formatToYYYYMMDD(data.anh_schreiben_datum) || '',
+            frist: data.anh_frist || '',
+            kassenbegruendung: data.anh_kassenbegruendung || '',
+            gutachten: formatToYYYYMMDD(data.anh_gutachten_datum) || '',
+            art: normalizeArt(data.anh_art) || ''
         },
         diagnoses: (Array.isArray(data.diagnoses) ? data.diagnoses : []).map(d => ({ icd: d.icd || '', text: d.text || '' })),
         anamnese: data.anamnese || '',
@@ -548,7 +587,9 @@ function applyImportedData(rev) {
     // Ein neu eingelesenes Erstgutachten beginnt einen neuen Fall – ein etwaiges
     // Zweitgutachten aus einem früheren Anhörungsverfahren gehört nicht dazu.
     stateZweit = { special: 0, values: {} };
-    appealDraft = "";
+    // Auch das Anzeigefeld leeren – sonst gehörte die Stellungnahme des vorigen Falls
+    // beim nächsten Speichern zu diesem hier.
+    if (typeof setzeStellungnahme === 'function') setzeStellungnahme(""); else appealDraft = "";
     erstgespraechNotes = "";
     // extracted nur setzen, wenn es eine KI-Zusammenfassung gibt; sonst wird das
     // Vorgutachten aus den (präzisen) Einzelkriterien berechnet.
@@ -581,6 +622,15 @@ function applyImportedData(rev) {
 }
 
 function applyReviewedImport() {
+    // Beim Anhörungsverfahren gehen die Werte in die dritte Spalte; der bestehende Fall
+    // (Erstgutachten, eigene Bewertung, Notizen, Stellungnahme) bleibt unangetastet.
+    if (importZiel === 'zweit' && typeof uebernehmeAnhoerung === 'function') {
+        uebernehmeAnhoerung(reviewData);
+        closeReview();
+        switchTab(1);
+        showToast("Anhörungsgutachten übernommen. Ihr Widerspruchsfall bleibt unverändert.", "success");
+        return;
+    }
     applyImportedData(reviewData);
     closeReview();
     switchTab(1);
