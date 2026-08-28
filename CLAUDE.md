@@ -115,6 +115,19 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Absicherung: `modulGegenprobe()` in `js/auslese.js` rechnet die eingelesenen Kriterien
    je Modul nach und vergleicht sie mit „Summe der Einzelpunkte" aus dem Gutachten. Jede
    Abweichung wird in der Prüfansicht angezeigt. Diese Gegenprobe niemals entfernen.
+13. **Gescannte Gutachten: Text ist Lesehilfe, das Bild ist maßgeblich.**
+   `textDecktDokumentAb()` in `js/auslese.js` entscheidet, ob der lokal ausgelesene Text
+   das Dokument ersetzen darf. Er darf es **nur** bei einer echten Text-PDF: keine leere
+   Seite, keine Seite über Texterkennung, mindestens 20 Kriteriumsnummern im Text.
+   Sonst gehen **Text und Dokument gemeinsam** an die KI, mit dem ausdrücklichen Hinweis,
+   dass die Ankreuzungen aus dem Bild zu lesen sind. Grund: In erkanntem Text wird aus
+   einer Zeile „Umsetzen [0X] O1 O2 O3", andere zerfallen ganz. Für Namen und Fließtext
+   taugt er, für die Bewertungstabellen nicht.
+   Der Pfad zur Sprachdatei geht über die Umgebungsvariable `TESSDATA_PREFIX`, **nie**
+   über `--tessdata-dir`: pytesseract zerlegt den Konfigurationstext mit shlex, und daran
+   zerbrach der Pfad am Leerzeichen in „Pflegegradassistent für Berater". Beim Start
+   führt der Server einmal eine echte Texterkennung aus – nur wenn die gelingt, meldet
+   er `ocrAvailable`. Fehler bei einzelnen Seiten werden nie stillschweigend übergangen.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -144,7 +157,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen. Der Selbsttest umfasst 500 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 516 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

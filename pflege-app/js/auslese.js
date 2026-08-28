@@ -36,6 +36,30 @@ async function tryLocalExtract(base64Data, mimeType) {
     }
 }
 
+// Deckt der lokal ausgelesene Text das GANZE Dokument ab?
+//
+// Anlass: Ein Medicproof-Gutachten kam als Bescheid mit getipptem Deckblatt und
+// gescanntem Gutachten dahinter. Der lokale Server lieferte 4.380 Zeichen – alle
+// vom Deckblatt, keine einzige Bewertungstabelle. Weil "Text vorhanden" damals
+// genügte, wurde nur dieser Text an die KI geschickt und das Gutachten selbst
+// nie gelesen. Ergebnis: Es wurde nichts ausgelesen und nichts eingetragen.
+//
+// Der Text ersetzt das Dokument deshalb nur, wenn alles drei stimmt:
+//   1. Keine Seite blieb ohne Text.
+//   2. Keine Seite musste ueber die Texterkennung gelesen werden. In erkanntem Text
+//      sind die ANKREUZUNGEN unzuverlaessig: Aus einer Zeile wird "Umsetzen [0X] O1
+//      O2 O3", eine andere zerfaellt ganz ("5.1.4 Fortb halb d / Alt fochgusgen mern
+//      es oo"). Fuer Namen und Fliesstext taugt der Text, fuer die Bewertungstabellen
+//      nicht - die sind nur im Bild sicher zu lesen.
+//   3. Die Kriteriumsnummern stehen wirklich darin. Ein Gutachten hat 65; unter 20
+//      ist es kein Gutachtentext, sondern bestenfalls ein Deckblatt.
+function textDecktDokumentAb(local) {
+    if (!local || !local.ok || !local.text || local.text.trim().length <= 40) return false;
+    if ((local.emptyPageCount || 0) > 0) return false;
+    if ((local.ocrPageCount || 0) > 0) return false;
+    return (local.text.match(/\b[45]\.[1-6]\.\d{1,2}\b/g) || []).length >= 20;
+}
+
 // Lokal ausgelesene Stammdaten/Diagnosen/Texte (vom Server) ins Datenformat der App bringen.
 function localMetaToData(local) {
     const m = (local && local.meta) ? local.meta : {};
@@ -305,12 +329,39 @@ async function aiReadGutachten(event, ziel) {
             const haveLocalText = !!(local && local.ok && local.text && local.text.trim().length > 40);
             const haveLocalValues = !!(local && local.values && Object.keys(local.values).length);
 
+            // Vorhandener Text heisst nicht, dass er das GANZE Dokument abdeckt.
+            const leereSeiten = (local && local.emptyPageCount) || 0;
+            const kriterienImText = haveLocalText
+                ? (local.text.match(/\b[45]\.[1-6]\.\d{1,2}\b/g) || []).length : 0;
+            const textVollstaendig = textDecktDokumentAb(local);
+            if (haveLocalText && !textVollstaendig) {
+                console.info('Lokaler Text deckt das Dokument nicht ab – '
+                    + leereSeiten + ' Seite(n) ohne Text, ' + kriterienImText
+                    + ' Kriteriumsnummern gefunden. Das Dokument wird zusätzlich mitgeschickt.');
+            }
+
             // Google liest Stammdaten/Diagnosen/Anamnese/Befund (genau). Bei vorhandenem lokalem
             // Text wird nur dieser kleine Text geschickt (statt großes Bild) -> deutlich weniger 429.
             let userParts;
-            if (haveLocalText) {
+            if (textVollstaendig) {
                 userParts = [{ text: "Lies aus folgendem Gutachten-Text die Stammdaten, Diagnosen, Anamnese und Befund vollständig aus.\n\n=== GUTACHTEN-TEXT ===\n" + local.text }];
                 updateOverlay("Stammdaten/Diagnosen werden gelesen...", 55);
+            } else if (haveLocalText) {
+                // Gescanntes Dokument: BEIDES schicken. Der Text hilft bei Namen, Daten und
+                // Fließtext; die Ankreuzungen sind darin aber unzuverlässig und nur im Bild
+                // sicher zu lesen. Deshalb ist das Dokument die maßgebliche Quelle.
+                userParts = [
+                    { text: "Zu diesem Dokument liegt ein maschinell gelesener Text vor. Er ist "
+                        + "UNVOLLSTÄNDIG UND STELLENWEISE FEHLERHAFT: Seiten können fehlen, und "
+                        + "Ankreuzungen sind darin oft verstümmelt (etwa „[0X] O1 O2 O3\") oder "
+                        + "ganze Zeilen zerfallen. Nutze ihn als Lesehilfe für Namen, Daten, "
+                        + "Diagnosen und Fließtext. MAßGEBLICH FÜR ALLE BEWERTUNGEN IST AUSSCHLIEßLICH "
+                        + "DAS BEIGEFÜGTE DOKUMENT: Welches Feld angekreuzt ist, entnimmst du dem Bild, "
+                        + "niemals dem Text.\n\n=== MASCHINELL GELESENER TEXT (Lesehilfe) ===\n" + local.text },
+                    { text: "Hier das vollständige Dokument. Extrahiere alle Daten lückenlos." },
+                    { inlineData: { mimeType: mimeType, data: base64Data } }
+                ];
+                updateOverlay("KI analysiert die gescannten Seiten...", 60);
             } else {
                 userParts = [
                     { text: "Hier ist das Gutachten zur Analyse. Extrahiere alle Daten lückenlos." },
@@ -341,11 +392,22 @@ async function aiReadGutachten(event, ziel) {
 
             updateOverlay("Ergebnisse aufbereiten...", 85);
 
+            // Hinweis auf gescannte Seiten – der Berater muss wissen, welche Seiten
+            // keine Textebene hatten und deshalb nur bildlich gelesen wurden.
+            const ocrSeiten = (local && local.ocrPageCount) || 0;
+            const scanInfo = (local && local.ok && (leereSeiten > 0 || ocrSeiten > 0))
+                ? { seiten: local.emptyPages || [], anzahl: leereSeiten,
+                    ocrSeiten: local.ocrPages || [], ocrAnzahl: ocrSeiten,
+                    gesamt: local.pageCount || 0, ocrVerfuegbar: !!local.ocrAvailable,
+                    ocrFehler: local.ocrError || '' }
+                : null;
+
             if (data) {
                 // Google erfolgreich -> präzise lokale Kriterien (Text-PDFs) haben Vorrang
                 if (haveLocalValues) { data.values_orig = serverValuesToValuesOrig(local.values); data._localValues = true; }
                 // Den ausgelesenen Text mitgeben: daran wird die Schreibweise des Namens geprüft.
                 if (haveLocalText) data._text = local.text;
+                if (scanInfo) data._scan = scanInfo;
                 openImportReview(file, data, mimeType);
                 showToast("Gutachten gelesen ✓ – bitte prüfen und übernehmen.", "success");
             } else {
@@ -353,6 +415,7 @@ async function aiReadGutachten(event, ziel) {
                 const fb = (local && local.ok) ? localMetaToData(local) : {};
                 if (haveLocalValues) { fb.values_orig = serverValuesToValuesOrig(local.values); }
                 if (haveLocalText) fb._text = local.text;
+                if (scanInfo) fb._scan = scanInfo;
                 fb._localValues = true;
                 openImportReview(file, fb, mimeType);
                 const online = isOnlineHosted();
@@ -424,6 +487,8 @@ function normalizeImport(data) {
         diagnoses: (Array.isArray(data.diagnoses) ? data.diagnoses : []).map(d => ({ icd: d.icd || '', text: d.text || '' })),
         // Volltext des Dokuments, soweit lokal ausgelesen – Grundlage der Namensprüfung
         text: data._text || '',
+        // Welche Seiten waren Scans ohne Textebene? Daran haengt der Warnhinweis.
+        scan: data._scan || null,
         anamnese: data.anamnese || '',
         befund: data.befund || '',
         special: data.special_orig || 0,
@@ -548,6 +613,46 @@ function rvZeigeModulGegenprobe() {
         + 'Spaltenposition verwechselt (etwa bei 4.4.8 Essen mit den Werten 0, 3, 6, 9).</div>';
 }
 
+// Seitenliste kurz schreiben: aus 4,5,6,7,9 wird "4–7, 9".
+function seitenListe(seiten) {
+    const s = (seiten || []).slice().sort((a, b) => a - b);
+    if (!s.length) return '';
+    const teile = [];
+    let von = s[0], bis = s[0];
+    for (let i = 1; i <= s.length; i++) {
+        if (i < s.length && s[i] === bis + 1) { bis = s[i]; continue; }
+        teile.push(von === bis ? String(von) : von + '–' + bis);
+        von = bis = s[i];
+    }
+    return teile.join(', ');
+}
+
+// Warnt, wenn Seiten des Dokuments keine Textebene hatten. Genau daran ist ein
+// gescanntes Gutachten hinter einem getippten Bescheid-Deckblatt zu erkennen.
+function rvZeigeScanHinweis() {
+    const box = document.getElementById('rev-scan-hinweis');
+    if (!box) return;
+    const s = reviewData && reviewData.scan;
+    if (!s || (!s.anzahl && !s.ocrAnzahl)) { box.innerHTML = ''; return; }
+    let t = '';
+    if (s.ocrAnzahl) {
+        t += 'Seite ' + escapeHtml(seitenListe(s.ocrSeiten)) + ' von ' + escapeHtml(String(s.gesamt))
+            + ' ist ein Scan und wurde per Texterkennung gelesen. Das ist fehleranfälliger '
+            + 'als eine Text-PDF – Zahlen und Kreuze bitte besonders genau abgleichen.';
+    }
+    // Seiten, die gar nicht gelesen werden konnten, sind der ernstere Fall.
+    if (s.anzahl && !s.ocrVerfuegbar) {
+        if (t) t += '<br>';
+        t += 'Seite ' + escapeHtml(seitenListe(s.seiten)) + ' konnte <b>gar nicht</b> gelesen werden: '
+            + 'Die Texterkennung läuft auf diesem Rechner nicht'
+            + (s.ocrFehler ? ' (' + escapeHtml(s.ocrFehler) + ')' : '')
+            + '. Diese Seiten hat allein Google aus dem Bild gelesen.';
+    }
+    if (!t) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="hinweis-warnung"><b>Gescannte Seiten – bitte besonders genau prüfen:</b><br>'
+        + t + '<br>Gleichen Sie die Werte mit der PDF links ab, bevor Sie übernehmen.</div>';
+}
+
 function rvPruefePlausibel() {
     const box = document.getElementById('rev-plausibel');
     if (!box || !reviewData) return;
@@ -645,6 +750,7 @@ function openImportReview(file, data, mimeType) {
         renderPdfPreview(file, content);
     }
     document.getElementById('review-form').innerHTML = buildReviewForm(reviewData);
+    rvZeigeScanHinweis();
     rvPruefePlausibel();
     rvZeigeModulGegenprobe();
     if (typeof nameHinweisAnzeigen === 'function') nameHinweisAnzeigen();
@@ -745,6 +851,7 @@ function buildReviewForm(rev) {
     const esc = escapeHtml;
     const modNames = ["Mobilität", "Kognitive Fähigkeiten", "Verhaltensweisen", "Selbstversorgung", "Krankheitsbed. Anforderungen", "Alltagsgestaltung"];
     let html = '';
+    html += '<div id="rev-scan-hinweis"></div>';
 
     const tf = (label, k, type) => `<label class="rev-field"><span>${label}</span><input type="${type || 'text'}" id="rev-stam-${k}" value="${esc(rev.stam[k] || '')}" oninput="rvStam('${k}',this.value)"></label>`;
     html += `<div class="rev-section"><div class="rev-sec-title">Stammdaten</div><div class="rev-grid">`;

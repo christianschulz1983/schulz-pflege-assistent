@@ -48,8 +48,19 @@ TESSERACT_CANDIDATES = [
     os.path.join(os.environ.get("LOCALAPPDATA", ""), r"Programs\Tesseract-OCR\tesseract.exe"),
 ]
 TESSDATA_DIR = os.path.join(BASE_DIR, "tessdata")
-OCR_CONFIG = ("--tessdata-dir " + TESSDATA_DIR) if os.path.isdir(TESSDATA_DIR) else ""
 OCR_LANG = "deu" if os.path.isfile(os.path.join(TESSDATA_DIR, "deu.traineddata")) else "eng"
+
+# Der Ordner der Sprachdatei wird ueber die Umgebungsvariable uebergeben, NICHT ueber
+# "--tessdata-dir". Grund: pytesseract zerlegt den Konfigurationstext mit shlex, und das
+# zerbricht an Leerzeichen und Backslashes im Pfad. Der Projektordner heisst
+# "Pflegegradassistent fuer Berater" - aus dem Pfad wurde dabei
+# "C:UsersJudithDesktopProjektePflegegradassistent", und die Texterkennung schlug bei
+# JEDER gescannten Seite fehl. Ueber die Umgebungsvariable gibt es dieses Problem nicht.
+OCR_CONFIG = ""
+if os.path.isdir(TESSDATA_DIR):
+    os.environ["TESSDATA_PREFIX"] = TESSDATA_DIR
+
+OCR_ERROR = ""   # Klartext, warum die Texterkennung nicht laeuft (fuer /ping und die App)
 
 try:
     import pytesseract
@@ -58,11 +69,17 @@ try:
         if os.path.isfile(_cand):
             pytesseract.pytesseract.tesseract_cmd = _cand
             break
-    # Prueft, ob die Tesseract-Engine tatsaechlich erreichbar ist
     pytesseract.get_tesseract_version()
+    # Nicht nur fragen, ob das Programm da ist, sondern es EINMAL ARBEITEN LASSEN.
+    # Nur wenn die Sprachdatei wirklich geladen wird, ist die Texterkennung einsatzbereit.
+    # Frueher genuegte die Versionsabfrage - deshalb meldete der Server "Texterkennung
+    # vorhanden", waehrend in Wahrheit jede Seite leer zurueckkam.
+    _probe = Image.new("RGB", (60, 30), "white")
+    pytesseract.image_to_string(_probe, lang=OCR_LANG, config=OCR_CONFIG)
     HAVE_OCR = True
-except Exception:
+except Exception as _e:
     HAVE_OCR = False
+    OCR_ERROR = "%s: %s" % (type(_e).__name__, str(_e)[:400])
 
 # Seiten gelten als pflegerelevant, wenn sie eines dieser Muster enthalten.
 MARKER_RE = re.compile(
@@ -135,8 +152,13 @@ def extract_pages(file_bytes, mime):
                 img = Image.open(io.BytesIO(pix.tobytes("png")))
                 txt = pytesseract.image_to_string(img, lang=OCR_LANG, config=OCR_CONFIG).strip()
                 used_ocr = True
-            except Exception:
-                pass
+            except Exception as e:
+                # Nicht stillschweigend uebergehen. Genau dieses Verschlucken hat dazu
+                # gefuehrt, dass ein gescanntes Gutachten wortlos leer blieb.
+                global OCR_ERROR
+                if not OCR_ERROR:
+                    OCR_ERROR = "%s: %s" % (type(e).__name__, str(e)[:400])
+                print("[OCR] Seite %d fehlgeschlagen: %s" % (i + 1, str(e)[:200]))
         pages.append({"index": i, "text": txt, "ocr": used_ocr})
     doc.close()
     return pages, None
@@ -438,6 +460,15 @@ def build_payload(file_bytes, mime):
                 p["index"] + 1, " (OCR)" if p["ocr"] else "", p["text"].strip()))
     text = "\n\n".join(chunks)
     ocr_used = any(p["ocr"] for p in kept)
+    # Seiten, die ueberhaupt keinen Text hergaben (Scan ohne verfuegbare Texterkennung).
+    # Das ist entscheidend: Ein gescanntes Gutachten mit getipptem Deckblatt liefert
+    # Text NUR vom Deckblatt. Dieser Text sieht brauchbar aus, enthaelt aber keine
+    # einzige Bewertungstabelle. Die App darf ihn dann nicht fuer das ganze Dokument
+    # halten, sonst liest niemand das Gutachten.
+    leere = [p["index"] + 1 for p in pages if not (p["text"] or "").strip()]
+    # Seiten, die nur ueber die Texterkennung lesbar waren. Sie sind fehleranfaelliger
+    # als eine Text-PDF; der Berater soll sie in der Pruefansicht genannt bekommen.
+    ocr_seiten = [p["index"] + 1 for p in pages if p["ocr"] and (p["text"] or "").strip()]
 
     values = extract_values(file_bytes, mime)
     meta = extract_meta(text)
@@ -449,6 +480,11 @@ def build_payload(file_bytes, mime):
         "keptPages": len(kept),
         "ocrUsed": ocr_used,
         "ocrAvailable": HAVE_OCR,
+        "ocrError": OCR_ERROR,
+        "emptyPages": leere,
+        "emptyPageCount": len(leere),
+        "ocrPages": ocr_seiten,
+        "ocrPageCount": len(ocr_seiten),
         "fitz": HAVE_FITZ,
         "chars": len(text),
         "values": values,

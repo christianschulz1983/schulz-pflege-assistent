@@ -267,6 +267,86 @@ async function selbsttest() {
 
         }
 
+        // ---------- 9b. Gescanntes Gutachten hinter getipptem Deckblatt ----------
+        // Anlass: Ein Medicproof-Gutachten wurde gar nicht ausgelesen. Der lokale Server
+        // lieferte 4.380 Zeichen – aber alle vom getippten Bescheid-Deckblatt (Seite 1
+        // und 3); die 19 Gutachtenseiten waren Scans ohne Textebene. Weil „Text
+        // vorhanden" genügte, ging nur dieser Text an die KI und das Gutachten selbst
+        // wurde nie gelesen.
+        if (typeof textDecktDokumentAb === 'function') {
+            const mitKriterien = n => Array.from({ length: n }, (_, i) => '4.1.' + (i + 1)).join(' ');
+
+            pruefeWahr('Text-PDF: lokaler Text ersetzt das Dokument',
+                textDecktDokumentAb({ ok: true, emptyPageCount: 0, pageCount: 20,
+                    ocrPageCount: 0, text: 'Gutachten ' + mitKriterien(30) }));
+
+            // Der gemeldete Fall mit den echten Zahlen: 22 Seiten, 20 davon Scans ohne
+            // Textebene, 4.380 Zeichen vom Deckblatt, keine einzige Kriteriumsnummer.
+            pruefeWahr('Scan hinter Deckblatt: Dokument wird mitgeschickt',
+                !textDecktDokumentAb({ ok: true, emptyPageCount: 20, pageCount: 22,
+                    text: 'Postbeamtenkrankenkasse Bescheid '.repeat(133) }));
+
+            // Auch ohne leere Seiten: fehlen die Kriteriumsnummern, ist es kein Gutachtentext.
+            pruefeWahr('Text ohne Kriteriumsnummern reicht nicht',
+                !textDecktDokumentAb({ ok: true, emptyPageCount: 0, pageCount: 22,
+                    text: 'Bescheid über Ihren Antrag. '.repeat(200) }));
+
+            // Dieselbe Datei nach der OCR-Reparatur: 63 Kriteriumsnummern erkannt. Trotzdem
+            // muss das Bild mit – im erkannten Text sind die Ankreuzungen unzuverlässig
+            // („Umsetzen [0X] O1 O2 O3"), und eine Zeile war ganz zerfallen.
+            pruefeWahr('Auch nach Texterkennung geht das Bild mit',
+                !textDecktDokumentAb({ ok: true, emptyPageCount: 0, pageCount: 22,
+                    ocrPageCount: 20, text: 'Gutachten ' + mitKriterien(63) }));
+
+            pruefeWahr('Kein Server erreicht: Dokument wird geschickt',
+                !textDecktDokumentAb(null));
+            pruefeWahr('Leerer Servertext: Dokument wird geschickt',
+                !textDecktDokumentAb({ ok: true, emptyPageCount: 0, text: '   ' }));
+
+            // Beim Mitschicken des Bildes muss unmissverständlich dabeistehen, dass die
+            // Ankreuzungen aus dem BILD kommen – sonst glaubt die KI dem fehlerhaften Text.
+            const lese = aiReadGutachten.toString();
+            pruefeWahr('Bei Scans ist das Dokument maßgeblich',
+                lese.includes('MAßGEBLICH FÜR ALLE BEWERTUNGEN IST AUSSCHLIEßLICH'));
+            pruefeWahr('Bei Scans wird vor dem Text gewarnt',
+                lese.includes('UNVOLLSTÄNDIG UND STELLENWEISE FEHLERHAFT'));
+
+            // Seitenliste kurz und lesbar
+            pruefe('Seitenliste fasst zusammen', seitenListe([4, 5, 6, 7, 9, 22]), '4–7, 9, 22');
+            pruefe('Seitenliste: eine Seite', seitenListe([3]), '3');
+            pruefe('Seitenliste: leer', seitenListe([]), '');
+
+            // Der Warnhinweis muss die Seiten nennen und sagen, was zu tun ist.
+            const merk = reviewData;
+            let box = document.getElementById('rev-scan-hinweis');
+            const selbstAngelegt = !box;
+            if (selbstAngelegt) { box = document.createElement('div'); box.id = 'rev-scan-hinweis'; document.body.appendChild(box); }
+            // Fall A: Texterkennung lief – Seiten nennen, zum Abgleich auffordern.
+            reviewData = { scan: { seiten: [], anzahl: 0, ocrSeiten: [4, 5, 6, 7], ocrAnzahl: 4,
+                gesamt: 22, ocrVerfuegbar: true, ocrFehler: '' } };
+            rvZeigeScanHinweis();
+            let warn = box.innerHTML;
+            pruefeWahr('Scan-Hinweis nennt die erkannten Seiten',
+                warn.includes('4–7') && warn.includes('22'));
+            pruefeWahr('Scan-Hinweis fordert zum Abgleich auf', warn.includes('bevor Sie übernehmen'));
+
+            // Fall B: Texterkennung lief NICHT – das ist der ernstere Fall und muss
+            // den Grund nennen, sonst sucht man den Fehler wieder wochenlang woanders.
+            reviewData = { scan: { seiten: [4, 5, 6], anzahl: 3, ocrSeiten: [], ocrAnzahl: 0,
+                gesamt: 22, ocrVerfuegbar: false, ocrFehler: 'TesseractError: Failed loading language' } };
+            rvZeigeScanHinweis();
+            warn = box.innerHTML;
+            pruefeWahr('Ohne Texterkennung: deutliche Warnung', warn.includes('gar nicht'));
+            pruefeWahr('Ohne Texterkennung: Grund wird genannt',
+                warn.includes('Failed loading language'));
+
+            reviewData = { scan: null };
+            rvZeigeScanHinweis();
+            pruefe('Ohne Scans kein Hinweis', box.innerHTML, '');
+            if (selbstAngelegt) box.remove();
+            reviewData = merk;
+        }
+
         // ---------- 9a. Namensprüfung gegen den Dokumenttext ----------
         // Anlass: Aus „Beate Eul" wurde beim Einlesen „Beate Eui".
         if (typeof pruefeName === 'function') {
