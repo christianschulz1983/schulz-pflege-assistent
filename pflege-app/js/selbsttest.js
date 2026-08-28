@@ -871,10 +871,13 @@ async function selbsttest() {
             pruefeWahr('Zu lange Einleitung wird beanstandet',
                 laengenVerstoesse({}, langerAllgemein).some(x => x.art === 'allgemein'));
             pruefe('Einleitung innerhalb der Grenze ist zulässig',
-                laengenVerstoesse({}, 'Wort '.repeat(200)).length, 0);
-            // Die Grenze entspricht einer halben bis drei viertel A4-Seite
-            pruefeWahr('Grenze passt zu drei viertel A4-Seite',
-                LAENGE.allgemeinZeichenMax >= 2400 && LAENGE.allgemeinZeichenMax <= 3000);
+                laengenVerstoesse({}, 'Wort '.repeat(150)).length, 0);
+            pruefeWahr('Frühere Länge von 300 Wörtern gilt nicht mehr',
+                laengenVerstoesse({}, 'Wort '.repeat(300)).length > 0);
+            // Die Grenze entspricht einer HALBEN A4-Seite (rund 3.600 Zeichen je voller Seite)
+            pruefeWahr('Grenze passt zu einer halben A4-Seite',
+                LAENGE.allgemeinZeichenMax >= 1600 && LAENGE.allgemeinZeichenMax <= 2000);
+            pruefe('Wortgrenze der Einleitung', LAENGE.allgemeinWoerterMax, 260);
 
             // Die Vorgaben stehen tatsächlich in den Anweisungen an die KI
             pruefeWahr('Vorgabe nennt die Satzgrenze',
@@ -883,6 +886,34 @@ async function selbsttest() {
                 laengenVorgabeAllgemein('Anamnese').includes(String(LAENGE.allgemeinWoerterMax)));
             pruefeWahr('Vorgabe nennt den richtigen Abschnittstitel',
                 laengenVorgabeAllgemein('Anamnese').includes('Anamnese'));
+
+            // Zweck der Einleitung je Vorgangsart
+            const aufgabeW = allgemeinAufgabe('widerspruch');
+            const aufgabeE = allgemeinAufgabe('erstantrag');
+            const aufgabeH = allgemeinAufgabe('hoeherstufung');
+            pruefeWahr('Widerspruch: Lücken und Widersprüche aufzeigen',
+                aufgabeW.includes('AUFZEIGEN VON LÜCKEN UND WIDERSPRÜCHEN'));
+            pruefeWahr('Erstantrag: aktuelle Pflegesituation darstellen',
+                aufgabeE.includes('DARSTELLUNG DER AKTUELLEN PFLEGESITUATION'));
+            pruefeWahr('Höherstufung: aktuelle Pflegesituation darstellen',
+                aufgabeH.includes('DARSTELLUNG DER AKTUELLEN PFLEGESITUATION'));
+            pruefeWahr('Höherstufung fragt zusätzlich nach der Verschlechterung',
+                aufgabeH.includes('verschlechtert hat'));
+            pruefeWahr('Erstantrag fragt nicht nach einer Verschlechterung',
+                !aufgabeE.includes('verschlechtert hat'));
+            pruefe('Widerspruch überschreibt „Allgemeine Angaben"',
+                aufgabeW.includes('„Allgemeine Angaben"'), true);
+            pruefe('Antrag überschreibt „Anamnese"', aufgabeE.includes('„Anamnese"'), true);
+            // Die Begründung gehört NICHT in die Einleitung
+            [['Widerspruch', aufgabeW], ['Erstantrag', aufgabeE], ['Höherstufung', aufgabeH]].forEach(([n, a]) => {
+                pruefeWahr(n + ': Begründung ist in der Einleitung untersagt',
+                    a.includes('STRENG VERBOTEN'));
+                pruefeWahr(n + ': Richtlinienbezug ist untersagt',
+                    a.includes('Begutachtungs-Richtlinien'));
+                pruefeWahr(n + ': zwei bis drei Absätze', a.includes('2 bis 3'));
+            });
+            pruefeWahr('Einleitung baut weiterhin auf den Notizen auf',
+                aufgabeW.includes('MEINEN NOTIZEN'));
 
             // Nachkürzen: zu lange Abschnitte werden ersetzt, unbrauchbare Antworten verworfen
             const echterAufruf = window.callGeminiWithFallback;

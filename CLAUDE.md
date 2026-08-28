@@ -66,12 +66,18 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    greift nur, wenn der lokale Server Text geliefert hat – online steht er nicht zur
    Verfügung, dort bleibt die Sichtprüfung.
 8. **Längenvorgaben für erzeugte Texte** (`js/laenge.js`, Grenzen nur dort pflegen):
-   Einleitung („Allgemeine Angaben" bzw. „Anamnese") höchstens 390 Wörter / 2.700 Zeichen –
-   das ist eine halbe bis drei viertel A4-Seite bei Calibri 11 pt. Jede Begründung zu einem
+   Einleitung („Allgemeine Angaben" bzw. „Anamnese") höchstens 260 Wörter / 1.800 Zeichen –
+   das ist eine **halbe** A4-Seite bei Calibri 11 pt. Jede Begründung zu einem
    Modulpunkt höchstens **5 Sätze** / 150 Wörter, dabei aber Notizen, BRi-Bezug und
    Schlusssatz enthalten. Die Grenzen werden nach der Erzeugung gemessen; bei Überschreitung
    läuft **ein** gezielter Kürzungsdurchgang, danach wird der Berater gewarnt. Niemals
    mechanisch abschneiden – das zerstört Zitate und den Ableitungssatz.
+8a. **Zweck der Einleitung** (`allgemeinAufgabe()` in `js/vorschlaege.js`): Sie begründet
+   NICHTS. Kein Richtlinienbezug, kein Zitat, keine Stufenbezeichnung, kein Ableitungssatz,
+   kein Abzählen von Kriterien – das gehört ausschließlich in „Befund und Stellungnahme".
+   Bei **Widerspruch und Anhörung** zeigt sie **Lücken und Widersprüche** des Gutachtens auf,
+   bei **Erstantrag und Höherstufung** stellt sie die **aktuelle Pflegesituation** dar
+   (Höherstufung zusätzlich: was hat sich verschlechtert). Sie baut immer auf den Notizen auf.
 9. **Anhörungsverfahren** (`js/anhoerung.js`, `js/vergleich.js`): Vierter Vorgang. Beginnt
    mit „Fall laden" (Widerspruchsfall) – Erstgutachten und eigene Bewertung stehen damit
    fest; neu eingelesen wird nur das Anhörungsgutachten in `stateZweit`. Vorlage: zwei
@@ -120,7 +126,7 @@ Bewertungsstand, Vergleichsreiter und eigener Vorlage.
 Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kriterium
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
-sie beim Versand bei. Der Selbsttest umfasst 467 Pruefungen.
+sie beim Versand bei. Der Selbsttest umfasst 486 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

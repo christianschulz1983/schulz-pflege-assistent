@@ -6,9 +6,8 @@
 // Eine halbe Seite sind demnach etwa 1.800, drei viertel Seiten etwa 2.700 Zeichen.
 
 const LAENGE = {
-    allgemeinZeichenMin: 1500,   // darunter wirkt der Abschnitt dünn (nur Hinweis, kein Verstoß)
-    allgemeinZeichenMax: 2700,   // drei viertel A4-Seite
-    allgemeinWoerterMax: 390,
+    allgemeinZeichenMax: 1800,   // halbe A4-Seite
+    allgemeinWoerterMax: 260,
     begruendungSaetzeMax: 5,
     begruendungWoerterMax: 150,
     // Anhoerungsverfahren: weniger Kriterien, dafuer tiefer begruendet.
@@ -60,7 +59,7 @@ function laengenVerstoesse(map, allgemein) {
         const z = zaehleZeichen(allgemein), w = zaehleWoerter(allgemein);
         if (z > LAENGE.allgemeinZeichenMax || w > LAENGE.allgemeinWoerterMax) {
             v.push({ art: 'allgemein', nr: null, ist: w + ' Wörter / ' + z + ' Zeichen',
-                     soll: 'höchstens ' + LAENGE.allgemeinWoerterMax + ' Wörter (drei viertel A4-Seite)' });
+                     soll: 'höchstens ' + LAENGE.allgemeinWoerterMax + ' Wörter (halbe A4-Seite)' });
         }
     }
     Object.keys(map || {}).forEach(nr => {
@@ -107,7 +106,7 @@ Vorgaben:
 - Abschnitte mit einer Kriteriumsnummer: höchstens ${satzGrenze()} Sätze und
   ${wortGrenze()} Wörter.
 - Der Abschnitt „__allgemein__" (Überschrift „${einleitTitel || 'Allgemeine Angaben'}"):
-  höchstens ${LAENGE.allgemeinWoerterMax} Wörter in 3 bis 4 Absätzen.
+  höchstens ${LAENGE.allgemeinWoerterMax} Wörter in 2 bis 3 Absätzen.
 
 Was erhalten bleiben MUSS: alle Feststellungen aus den Notizen des Verfassers, jedes wörtliche
 Zitat aus den Richtlinien einschließlich der Anführungszeichen, jede Stufenbezeichnung und der
@@ -146,9 +145,8 @@ Gib zu jeder Nummer den gekürzten Text zurück, sonst nichts.`;
 
 function laengenVorgabeAllgemein(titel) {
     return `LÄNGE – HARTE OBERGRENZE: höchstens ${LAENGE.allgemeinWoerterMax} Wörter
-(etwa ${LAENGE.allgemeinZeichenMax} Zeichen, also eine halbe bis drei viertel A4-Seite),
-in 3 bis 4 knappen Absätzen. Der Abschnitt „${titel}" ordnet den Fall ein und benennt die
-Schwerpunkte – er nimmt die Einzelbegründungen NICHT vorweg und zählt keine Kriterien auf.
-Wird es länger, kürze durch Weglassen von Wiederholungen und Allgemeinplätzen, nicht durch
-Weglassen meiner Feststellungen.`;
+(etwa ${LAENGE.allgemeinZeichenMax} Zeichen, also HÖCHSTENS eine halbe A4-Seite),
+in 2 bis 3 knappen Absätzen. Der Abschnitt „${titel}" nimmt die Einzelbegründungen NICHT
+vorweg und zählt keine Kriterien ab. Wird es länger, kürze durch Weglassen von
+Wiederholungen und Allgemeinplätzen, nicht durch Weglassen meiner Feststellungen.`;
 }

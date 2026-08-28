@@ -242,6 +242,56 @@ function computeDiffs() {
 
 // Baut die Aufgabenbeschreibung für die KI (BRi-Texte + Quervergleichs-Material + Stil).
 // mitAllgemein = zusätzlich den einleitenden Abschnitt "Allgemeine Angaben" verfassen.
+/* Aufgabenstellung für den einleitenden Abschnitt. Er hat je nach Vorgangsart einen
+   anderen Zweck – und in KEINEM Fall die Aufgabe, die Bewertung zu begründen. Das
+   geschieht weiter unten, kriteriumsweise, mit Richtlinienbezug. */
+function allgemeinAufgabe(vorgang) {
+    const titel = (vorgang === 'widerspruch' || vorgang === 'anhoerung') ? 'Allgemeine Angaben' : 'Anamnese';
+    const gemeinsam = `ZUSÄTZLICHE AUFGABE – Abschnitt „${titel}":\n`
+        + laengenVorgabeAllgemein(titel) + '\n'
+        + `Zusammenhängender Fließtext, 2 bis 3 knappe Absätze (durch Leerzeile getrennt),\n`
+        + 'KEINE Aufzählungszeichen, individuell auf diesen Fall bezogen.\n'
+        + 'ZWINGEND: Er baut auf MEINEN NOTIZEN auf. Übernimm deren Feststellungen und forme die\n'
+        + 'Stichpunkte zu Fließtext aus, ohne Inhalte zu verändern oder hinzuzuerfinden.\n';
+
+    // Diese Sperre ist der Kern der Änderung: keine Begründung, keine Richtlinien, keine Stufen.
+    const sperre = 'STRENG VERBOTEN in diesem Abschnitt – all das gehört ausschließlich in den\n'
+        + 'Abschnitt „Befund und Stellungnahme":\n'
+        + '- jede Begründung, warum eine andere Wertung richtig wäre\n'
+        + '- jeder Bezug auf die Begutachtungs-Richtlinien und jedes Zitat daraus\n'
+        + '- jede Stufenbezeichnung („überwiegend selbständig" und dergleichen)\n'
+        + '- jeder Ableitungssatz („… ist somit eine Wertung mit … ableitbar")\n'
+        + '- das Abzählen einzelner Kriterien und jede Punktzahlen-Zusammenfassung\n'
+        + 'Beginne NICHT mit „Im Gutachten des … erfolgte die Einstufung …".\n\n';
+
+    if (vorgang === 'erstantrag' || vorgang === 'hoeherstufung') {
+        return gemeinsam
+            + `ZWECK: Eine knappe DARSTELLUNG DER AKTUELLEN PFLEGESITUATION. Wer den Abschnitt\n`
+            + 'liest, soll in wenigen Sätzen wissen, wie die versicherte Person lebt und wobei sie\n'
+            + 'Unterstützung braucht. Nenne thematisch gebündelt:\n'
+            + '- die tragenden gesundheitlichen Einschränkungen und ihren Verlauf\n'
+            + '- wer wie oft unterstützt (Angehörige, Pflegedienst) und wobei\n'
+            + (vorgang === 'hoeherstufung'
+                ? '- was sich seit der letzten Begutachtung verschlechtert hat, seit wann und wodurch\n'
+                : '- welche Versorgung derzeit sichergestellt ist und wo sie an Grenzen stößt\n')
+            + sperre;
+    }
+
+    return gemeinsam
+        + `ZWECK: Das AUFZEIGEN VON LÜCKEN UND WIDERSPRÜCHEN im Gutachten – mehr nicht.\n`
+        + 'Wer den Abschnitt liest, soll in wenigen Sätzen erkennen, wo das Gutachten\n'
+        + 'unvollständig oder in sich widersprüchlich ist. Nenne thematisch gebündelt:\n'
+        + '- innere Widersprüche: was der Gutachter im Befundtext selbst feststellt, in der\n'
+        + '  Bewertung aber nicht berücksichtigt\n'
+        + '- Lücken: was nicht erhoben, nicht praktisch erprobt, nicht erfragt wurde – dazu\n'
+        + '  eine zu kurze Begutachtungsdauer, wenn sie im Material genannt ist\n'
+        + '- übergangene Angaben der versicherten Person oder der Pflegeperson aus meinen Notizen\n'
+        + 'Bündele nach Themen (etwa Mobilität, Selbstversorgung, psychische Situation), nicht\n'
+        + 'nach Kriterien. Keine meiner Notizen darf unter den Tisch fallen: Was dort steht und\n'
+        + 'keinem einzelnen Kriterium zuzuordnen ist, gehört hierher.\n'
+        + sperre;
+}
+
 function buildBegruendungPrompt(diffs, mitAllgemein) {
     const cut = (s, n) => (s && s.length > n) ? s.slice(0, n) + ' …' : (s || '');
     let p = '';
@@ -327,30 +377,7 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
         p += 'MODULÜBERSICHT (gewichtete Punkte):\n' + mo
            + `Gesamt: Gutachten ${rO.total.toFixed(2)} (${rO.pg ? 'Pflegegrad ' + rO.pg : 'kein Pflegegrad'}) / meine Einschätzung `
            + `${rE.total.toFixed(2)} (${rE.pg ? 'Pflegegrad ' + rE.pg : 'kein Pflegegrad'})\n\n`;
-        const einleitTitel = (typeof appModus !== 'undefined' && appModus !== 'widerspruch')
-            ? 'Anamnese' : 'Allgemeine Angaben';
-        p += `ZUSÄTZLICHE AUFGABE – Abschnitt „${einleitTitel}":\n`
-           + laengenVorgabeAllgemein(einleitTitel) + '\n'
-           + `Verfasse den einleitenden Abschnitt „${einleitTitel}" als zusammenhängenden\n`
-           + 'Fließtext aus 3 bis 4 knappen Absätzen (Absätze durch Leerzeile trennen, KEINE\n'
-           + 'Aufzählungszeichen), individuell auf diesen Fall bezogen:\n'
-           + '- ZWINGEND: Dieser Abschnitt baut inhaltlich auf MEINEN NOTIZEN aus dem Erstgespräch auf.\n'
-           + '  Übernimm deren Feststellungen vollständig und forme die Stichpunkte zu Fließtext aus;\n'
-           + '  ordne sie sachlich, ohne Inhalte zu verändern oder hinzuzuerfinden. Erst darauf stützt\n'
-           + '  sich die Kritik an der gutachterlichen Wertung.\n'
-           + '- Stelle die gutachterliche Gesamtwertung als unabhängiger Sachverständiger fachlich infrage.\n'
-           + '- Gehe auf die Begutachtungsdauer ein, wenn sie im Material genannt ist, und kritisiere eine zu\n'
-           + '  kurze Dauer als Verstoß gegen die Pflicht zu sorgfältiger, kriterienscharfer Exploration.\n'
-           + '- Benenne die wesentlichen übersehenen oder fehlbeurteilten Einschränkungen THEMATISCH gebündelt\n'
-           + '  (etwa Mobilität und Transfer, Selbstversorgung, psychische Situation, nächtlicher Hilfebedarf)\n'
-           + '  und beziehe dich dabei auf die oben als abweichend markierten Module. Zähle NICHT die einzelnen\n'
-           + '  Kriterien ab – das folgt im Abschnitt „Befund und Stellungnahme".\n'
-           + '- Arbeite heraus, wo der Gutachter Feststellungen im Text trifft, sie in der Bewertung aber nicht\n'
-           + '  berücksichtigt, und wo Angaben der versicherten Person oder der Pflegeperson übergangen wurden.\n'
-           + '- Keine meiner Notizen darf unter den Tisch fallen: Was dort steht und nicht einem einzelnen\n'
-           + '  Kriterium zuzuordnen ist, gehört in diesen Abschnitt.\n'
-           + 'Beginne NICHT mit „Im Gutachten des … erfolgte die Einstufung …" und wiederhole keine\n'
-           + 'Punktzahlen-Zusammenfassung – beide Sätze stehen bereits im Dokument.\n\n';
+        p += allgemeinAufgabe((typeof appModus !== 'undefined') ? appModus : 'widerspruch');
     }
     return p;
 }
@@ -571,14 +598,18 @@ ZWINGEND:
     if (mitAllgemein) {
         prompt += 'ZUSÄTZLICHE AUFGABE – Abschnitt „Allgemeine Angaben":\n'
                 + laengenVorgabeAllgemein('Allgemeine Angaben') + '\n'
-                + 'Verfasse ihn NEU für das Anhörungsverfahren, in 3 bis 4 knappen Absätzen:\n'
-                + '- Nenne beide Gutachten mit Datum, Punktzahl und Pflegegrad.\n'
+                + 'ZWECK: Das AUFZEIGEN VON LÜCKEN UND WIDERSPRÜCHEN im Anhörungsgutachten – mehr nicht.\n'
+                + 'Verfasse ihn NEU, in 2 bis 3 knappen Absätzen:\n'
+                + '- Nenne beide Gutachten mit Datum, Punktzahl und Pflegegrad (nur diese Zahlen).\n'
                 + '- Halte fest, in welchen Punkten der Medizinische Dienst gefolgt ist, und dass dies die\n'
                 + '  Tragfähigkeit der Stellungnahme bestätigt.\n'
                 + '- Arbeite heraus, dass er in den entscheidenden Punkten nicht gefolgt ist, und nenne den\n'
                 + '  Abstand zur Schwelle mit den oben genannten Zahlen.\n'
                 + '- Baue meine Anmerkungen zum Anhörungsverfahren vollständig ein.\n'
-                + 'Zähle die einzelnen Kriterien NICHT ab – das folgt im Abschnitt „Befund und Stellungnahme".\n\n';
+                + 'STRENG VERBOTEN in diesem Abschnitt – das gehört in „Befund und Stellungnahme":\n'
+                + 'jede Begründung, warum eine andere Wertung richtig wäre; jeder Bezug auf die\n'
+                + 'Begutachtungs-Richtlinien und jedes Zitat daraus; jede Stufenbezeichnung; jeder\n'
+                + 'Ableitungssatz; das Abzählen einzelner Kriterien über die reine Nennung hinaus.\n\n';
     }
 
     const schema = {
