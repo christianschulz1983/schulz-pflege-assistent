@@ -206,6 +206,67 @@ async function selbsttest() {
             document.querySelectorAll('#verf-name-sel').length === 1 &&
             document.querySelectorAll('#verf-qual-sel').length === 1);
 
+        // ---------- 9. Medicproof: eigenes Formular, gleiche Rechenlogik ----------
+        if (typeof modulGegenprobe === 'function') {
+            const k = nr => ITEMS.find(i => i.nr === nr);
+            const anweisung = aiReadGutachten.toString();
+            pruefeWahr('Medicproof: eigener Abschnitt in der Anweisung',
+                anweisung.includes('SONDERFALL MEDICPROOF'));
+            pruefeWahr('Medicproof: Punktwert ist nicht der Stufenindex',
+                anweisung.includes('Der Punktwert ist') && anweisung.includes('SPALTENPOSITION 0..3'));
+            pruefeWahr('Medicproof: Essen mit 0, 3, 6, 9 wird eigens genannt',
+                anweisung.includes('5.4.8 Essen'));
+            // Nicht nur auf „Häufigkeit" prüfen – das Wort steht auch im Abschnitt für den
+            // Medizinischen Dienst. Gesucht ist die Medicproof-Spaltenreihenfolge.
+            pruefeWahr('Medicproof: Modul 5 mit eigener Häufigkeitsspalte',
+                anweisung.includes('mit Hilfe: pro Tag') && anweisung.includes('Spalte „Häufigkeit'));
+            pruefeWahr('Medicproof: kein Antragsdatum',
+                anweisung.includes('KEIN Antragsdatum'));
+            pruefeWahr('Medicproof: 5.5.16 als Fließtext benannt',
+                anweisung.includes('5.5.16'));
+            pruefeWahr('Medicproof: „Beurteilung nicht erforderlich" behandelt',
+                anweisung.includes('Beurteilung nicht erforderlich'));
+
+            // Modulweise Gegenprobe
+            const vm = {};
+            ITEMS.forEach(i => { vm[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+            // Modul 4: 4.4.2 = 1, 4.4.3 = 1, 4.4.5 = 1, 4.4.6 = 1, 4.4.10 = 2, 4.4.11 = 1
+            // Einzelpunkte: 1 + 1 + 1 + 1 + 4 + 1 = 9  (4.4.10 hat die Werte 0/2/4/6)
+            vm[k('4.4.2').id] = 1; vm[k('4.4.3').id] = 1; vm[k('4.4.5').id] = 1;
+            vm[k('4.4.6').id] = 1; vm[k('4.4.10').id] = 2; vm[k('4.4.11').id] = 1;
+            const stimmig = { valuesMap: vm,
+                extracted: { raws: [0, 0, 0, 9, 0, 0], weights: [0, 0, 0, 20, 0, 0], total: 20, pg: 1 } };
+            pruefe('Gegenprobe: stimmige Werte ergeben keine Meldung', modulGegenprobe(stimmig).length, 0);
+
+            // Der typische Medicproof-Lesefehler: bei 4.4.10 wurde der PUNKTWERT 4 statt der
+            // Spaltenposition 2 eingetragen. Das ergibt in Modul 4 eine zu hohe Summe.
+            const falsch = { valuesMap: Object.assign({}, vm), extracted: stimmig.extracted };
+            falsch.valuesMap[k('4.4.10').id] = 3;      // Punktwert 6 statt Position 2
+            const abw = modulGegenprobe(falsch);
+            pruefe('Gegenprobe: Lesefehler wird erkannt', abw.length, 1);
+            pruefeWahr('Gegenprobe: nennt das betroffene Modul',
+                abw[0] && abw[0].modul.includes('Modul 4'));
+            pruefe('Gegenprobe: nennt beide Zahlen',
+                abw[0] ? [abw[0].ausKriterien, abw[0].lautGutachten] : null, [11, 9]);
+
+            // Modul 5 mit Häufigkeiten
+            const vm5 = {};
+            ITEMS.forEach(i => { vm5[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+            vm5[k('4.5.1').id] = { count: 1, period: 'D' };
+            vm5[k('4.5.13').id] = { count: 1, period: 'W' };
+            vm5[k('4.5.14').id] = { count: 1, period: 'W' };
+            const r5 = calculateInternal({ special: 0, values: vm5 });
+            pruefe('Modul 5 aus Medicproof-Häufigkeiten', r5.raws[4], 3);
+            pruefe('Gegenprobe: Modul 5 stimmig',
+                modulGegenprobe({ valuesMap: vm5,
+                    extracted: { raws: [0, 0, 0, 0, 3, 0], weights: [0, 0, 0, 0, 10, 0], total: 10, pg: 0 } }).length, 0);
+
+            // Ohne Modul-Zusammenfassung keine Gegenprobe (lokal ausgelesene Fälle)
+            pruefe('Ohne Zusammenfassung keine Gegenprobe',
+                modulGegenprobe({ valuesMap: vm, extracted: null }).length, 0);
+
+        }
+
         // ---------- 9a. Namensprüfung gegen den Dokumenttext ----------
         // Anlass: Aus „Beate Eul" wurde beim Einlesen „Beate Eui".
         if (typeof pruefeName === 'function') {

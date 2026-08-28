@@ -40,6 +40,7 @@ pflege-app/
   bri_texte.js        BRi-Originaltexte, 65 Kriterien (nicht von Hand ändern)
   laien_hinweise.js   Praxishinweise, 58 Kriterien (Hilfsmittel-Regeln, Fallstricke)
   pflege_server.py    Lokaler Server: PDF-Text, OCR, liefert die App aus
+  test_pflege_server.py  Selbsttest für den Server (python test_pflege_server.py)
 ```
 Alle Skripte sind klassische Skripte im gemeinsamen Namensraum – **keine ES-Module**,
 weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
@@ -47,6 +48,9 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
 ## Feste Regeln
 1. **Nach jeder Änderung den Selbsttest ausführen** und das Ergebnis nennen. Er darf nie
    rot werden. Neue Funktionen bekommen eine eigene Prüfung in `js/selbsttest.js`.
+   Der Selbsttest prüft nur den Browserteil. Wird `pflege_server.py` geändert, zusätzlich
+   im Ordner `pflege-app` `python test_pflege_server.py` laufen lassen **und den Server
+   neu starten** – er lädt die Datei nur beim Start.
 2. **Jede Änderung committen und pushen.** Repository ist öffentlich:
    https://github.com/christianschulz1983/schulz-pflege-assistent
 3. **Keine Patientendaten, keine Zugangsdaten, keine Bankdaten im Code.** Das Repository ist
@@ -98,6 +102,19 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    `setzeBewertung()` in `js/bewertung.js`, nennt seine Quelle und wird protokolliert;
    ein unbekannter Ursprung wird abgewiesen. Neue Schreibstellen niemals direkt auf
    `stateEigene.values` / `stateOrig.values` setzen.
+12. **Zwei Gutachtenformulare, eine Rechenlogik.** Neben dem Medizinischen Dienst wird das
+   Formular der **Medicproof GmbH** eingelesen (Abschnitte 5.1–5.6 statt 4.1–4.6, siehe
+   „SONDERFALL MEDICPROOF" in `js/auslese.js`). Drei Unterschiede sind fehleranfällig:
+   (a) Es gibt **kein Antragsdatum** – das Feld bleibt leer.
+   (b) Neben jeder Option steht ihr **Punktwert**; gesucht ist aber die **Spaltenposition
+   0..3**. Bei 5.4.8 Essen (0/3/6/9), 5.4.9 und 5.4.10 (0/2/4/6) und Modul 3 (0/1/3/5)
+   fallen beide auseinander – dort entsteht der typische Lesefehler.
+   (c) In Modul 5 sagt die Markierung nur den **Zeitraum**; die Zahl steht rechts in der
+   eigenen Spalte **„Häufigkeit"** (`extract_values` in `pflege_server.py` erkennt diese
+   Spalte an der Überschrift und schaltet um).
+   Absicherung: `modulGegenprobe()` in `js/auslese.js` rechnet die eingelesenen Kriterien
+   je Modul nach und vergleicht sie mit „Summe der Einzelpunkte" aus dem Gutachten. Jede
+   Abweichung wird in der Prüfansicht angezeigt. Diese Gegenprobe niemals entfernen.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -126,7 +143,8 @@ Bewertungsstand, Vergleichsreiter und eigener Vorlage.
 Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kriterium
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
-sie beim Versand bei. Der Selbsttest umfasst 486 Pruefungen.
+sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
+beide eingelesen. Der Selbsttest umfasst 500 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
