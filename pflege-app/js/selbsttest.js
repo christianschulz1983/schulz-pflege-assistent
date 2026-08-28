@@ -206,6 +206,56 @@ async function selbsttest() {
             document.querySelectorAll('#verf-name-sel').length === 1 &&
             document.querySelectorAll('#verf-qual-sel').length === 1);
 
+        // ---------- 9a. Namensprüfung gegen den Dokumenttext ----------
+        // Anlass: Aus „Erika Mahl" wurde beim Einlesen „Erika Mahi".
+        if (typeof pruefeName === 'function') {
+            const dokument = 'Medizinischer Dienst\nFrau Erika Mahl\nMusterweg 3\n12345 Musterstadt\n\n'
+                + 'Betreffend: Frau Erika Mahl, geboren am 01.01.1950\n'
+                + 'Frau Mahl wurde im Hausbesuch begutachtet.';
+
+            pruefe('Namensschlüssel: l und i sind gleichwertig',
+                namensSchluessel('Mahl'), namensSchluessel('Mahi'));
+            pruefe('Namensschlüssel: rn und m sind gleichwertig',
+                namensSchluessel('Sturn'), namensSchluessel('Stum'));
+            pruefeWahr('Namensschlüssel unterscheidet echte Namen',
+                namensSchluessel('Meier') !== namensSchluessel('Schulz'));
+
+            const falsch = pruefeName('Frau Erika Mahi', dokument);
+            pruefe('Falsch gelesener Name wird beanstandet', falsch.length, 1);
+            pruefe('Beanstandet wird der Nachname', falsch[0] && falsch[0].wort, 'Mahi');
+            pruefe('Die richtige Schreibweise wird angeboten',
+                falsch[0] && falsch[0].alternativen, ['Mahl']);
+
+            pruefe('Richtig gelesener Name wird nicht beanstandet',
+                pruefeName('Frau Erika Mahl', dokument).length, 0);
+            pruefe('Ohne Dokumenttext keine Beanstandung',
+                pruefeName('Frau Erika Mahi', '').length, 0);
+            pruefe('Anrede wird nicht geprüft',
+                pruefeName('Frau Erika Mahl', dokument).filter(x => /Frau/.test(x.wort)).length, 0);
+            // Ein Name, den es im Dokument gar nicht gibt, ergibt keine erfundene Alternative
+            pruefe('Fremder Name ergibt keine Alternative',
+                pruefeName('Herr Kurt Probemann', dokument).length, 0);
+
+            // Ersetzen eines Namensbestandteils
+            const merkReviewN = reviewData;
+            reviewData = { stam: { betreffend: 'Frau Erika Mahi' }, text: dokument };
+            uebernehmeNamensteil('Mahi', 'Mahl');
+            pruefe('Übernehmen ersetzt nur den falschen Teil',
+                reviewData.stam.betreffend, 'Frau Erika Mahl');
+            pruefe('Danach ist nichts mehr zu beanstanden',
+                pruefeName(reviewData.stam.betreffend, dokument).length, 0);
+            reviewData = merkReviewN;
+
+            // Der Dokumenttext muss bis in die Prüfstruktur gelangen
+            const norm = normalizeImport({ _text: dokument, stam_betreffend: 'Frau Erika Mahi',
+                                           diagnoses: [], values_orig: [] });
+            pruefe('Dokumenttext steht in der Prüfstruktur zur Verfügung', norm.text, dokument);
+            pruefe('Prüfung greift auf die Prüfstruktur zu',
+                pruefeName(norm.stam.betreffend, norm.text).length, 1);
+            pruefeWahr('Anweisung an die KI nennt die Verwechslungsgefahr',
+                aiReadGutachten.toString().includes('BUCHSTABENGENAUIGKEIT'));
+        }
+
         // ---------- 9b. Dritter Bewertungsstand: das Anhörungsgutachten ----------
         // Phase 1 des Anhörungsvorgangs. Der dritte Stand darf sich auf die bestehenden
         // Vorgangsarten in keiner Weise auswirken.

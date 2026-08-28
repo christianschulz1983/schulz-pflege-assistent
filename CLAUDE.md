@@ -30,6 +30,7 @@ pflege-app/
   js/anhoerung.js     Anhoerungsverfahren: Erfassung und Vorlage
   js/vergleich.js     Dreiervergleich und Schwellenwertrechnung
   js/anlagen.js       Anlagen: Zuordnung zum Kriterium, Verzeichnis im Dokument
+  js/namenspruefung.js Abgleich der eingelesenen Namen gegen den Dokumenttext
   js/befund.js        Befunderhebung (Erstantrag, Höherstufung)
   js/erfassung.js     Pflegepersonen, Aufenthalte, Versorgung, Übernahme in Modul 5
   js/hoeherstufung.js Dokumentvorlage der Anträge und Deckblatt
@@ -59,6 +60,11 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    immer „kein Pflegegrad". Schrift Calibri 11 pt, blaue Überschriften 14 pt, Briefkopf 9 pt.
 7. **Die drei Durchführungsarten** sind abschließend: Hausbesuch mit persönlicher
    Befunderhebung / per Aktenlage / strukturiertes Telefoninterview.
+7a. **Namen buchstabengenau.** Schrifterkennung verwechselt l/I/i/1, rn/m, cl/d, 0/O, 5/S,
+   8/B. Die Prüfansicht gleicht den eingelesenen Namen gegen den Dokumenttext ab
+   (`js/namenspruefung.js`) und bietet die dort gefundene Schreibweise an. Der Abgleich
+   greift nur, wenn der lokale Server Text geliefert hat – online steht er nicht zur
+   Verfügung, dort bleibt die Sichtprüfung.
 8. **Längenvorgaben für erzeugte Texte** (`js/laenge.js`, Grenzen nur dort pflegen):
    Einleitung („Allgemeine Angaben" bzw. „Anamnese") höchstens 390 Wörter / 2.700 Zeichen –
    das ist eine halbe bis drei viertel A4-Seite bei Calibri 11 pt. Jede Begründung zu einem
@@ -114,7 +120,7 @@ Bewertungsstand, Vergleichsreiter und eigener Vorlage.
 Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kriterium
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
-sie beim Versand bei. Der Selbsttest umfasst 452 Pruefungen.
+sie beim Versand bei. Der Selbsttest umfasst 467 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
