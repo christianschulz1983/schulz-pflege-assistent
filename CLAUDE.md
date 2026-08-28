@@ -35,6 +35,7 @@ pflege-app/
   js/erfassung.js     Pflegepersonen, Aufenthalte, Versorgung, Übernahme in Modul 5
   js/hoeherstufung.js Dokumentvorlage der Anträge und Deckblatt
   js/arztberichte.js  Mehrfach-Upload ärztlicher Unterlagen mit Zusammenführung
+  js/nummerierung.js  Nummerierung des Gutachtens (4.x.y bzw. 5.x.y bei Medicproof)
   js/selbsttest.js    Selbsttest (Knopf oben rechts)
   befund_katalog.js   Befundkatalog, acht Gruppen (nicht von Hand ändern)
   bri_texte.js        BRi-Originaltexte, 65 Kriterien (nicht von Hand ändern)
@@ -128,6 +129,22 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    zerbrach der Pfad am Leerzeichen in „Pflegegradassistent für Berater". Beim Start
    führt der Server einmal eine echte Texterkennung aus – nur wenn die gelingt, meldet
    er `ocrAvailable`. Fehler bei einzelnen Seiten werden nie stillschweigend übergangen.
+14. **Das Schriftstück trägt die Nummerierung des Gutachtens** (`js/nummerierung.js`,
+   Regeln nur dort pflegen). Medicproof nummeriert dieselben Module 5.1 bis 5.6. Die App
+   rechnet intern immer mit 4.x.y – daran wird nichts geändert. Im **erzeugten
+   Schriftstück** steht dagegen die Zählung des Gutachtens, auf das es sich bezieht:
+   in der Tabelle (`modulNr`), in den Überschriften (`zeigeNr`) und in allen Fließtexten
+   einschließlich Einleitung und Begründungen (`nummernImText`). Das gilt für **alle vier
+   Vorgangsarten**.
+   Zwei Ausnahmen, die genauso wichtig sind wie die Regel:
+   - **Wörtliche BRi-Zitate bleiben unangetastet.** 4.x.y ist die Nummerierung der
+     Richtlinie selbst; sie zu ändern hieße, ein Zitat zu verfälschen. Alles zwischen
+     „ und “ wird deshalb ausgelassen. Die Zitatprüfung läuft immer über den
+     Originaltext, nie über den umgestellten.
+   - **Zweiteilige Nummern nur nach einem Hinweiswort** (Ziffer, Abschnitt, Nummer, Nr.,
+     Punkt, Modul). Sonst würde aus „4.5 Punkte" ein falsches „5.5 Punkte".
+   Die interne Kennung in `data-nr` bleibt immer 4.x.y – daran hängt das Wiederfinden
+   bereits erzeugter Begründungen.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -157,7 +174,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 516 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 548 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

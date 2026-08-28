@@ -58,13 +58,15 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
 
     const row = (label, o, e, bold) => `<tr><td${bold ? ' style="font-weight:bold"' : ''}>${esc(label)}</td><td class="num">${o}</td><td class="num">${e}</td></tr>`;
     const tableRows = [
-        row('4.1 Mobilität', f2(rO.weights[0]), f2(rE.weights[0])),
-        row('4.2 Kognitive und kommunikative Fähigkeiten', f2(rO.weights[1]), f2(rE.weights[1])),
-        row('4.3 Verhaltensweisen und psychische Problemlagen', f2(rO.weights[2]), f2(rE.weights[2])),
+        // Die Modulnummern richten sich nach dem Gutachten: 4.x beim Medizinischen
+        // Dienst, 5.x bei Medicproof.
+        row(modulNr(1, org) + ' Mobilität', f2(rO.weights[0]), f2(rE.weights[0])),
+        row(modulNr(2, org) + ' Kognitive und kommunikative Fähigkeiten', f2(rO.weights[1]), f2(rE.weights[1])),
+        row(modulNr(3, org) + ' Verhaltensweisen und psychische Problemlagen', f2(rO.weights[2]), f2(rE.weights[2])),
         row('Höchster Wert aus Modul 2 und Modul 3', f2(Math.max(rO.weights[1], rO.weights[2])), f2(Math.max(rE.weights[1], rE.weights[2])), true),
-        row('4.4 Selbstversorgung', f2(rO.weights[3]), f2(rE.weights[3])),
-        row('4.5 Krankheits- und therapiebedingten Anforderungen', f2(rO.weights[4]), f2(rE.weights[4])),
-        row('4.6 Gestaltung des Alltagslebens und sozialer Kontakte', f2(rO.weights[5]), f2(rE.weights[5])),
+        row(modulNr(4, org) + ' Selbstversorgung', f2(rO.weights[3]), f2(rE.weights[3])),
+        row(modulNr(5, org) + ' Krankheits- und therapiebedingten Anforderungen', f2(rO.weights[4]), f2(rE.weights[4])),
+        row(modulNr(6, org) + ' Gestaltung des Alltagslebens und sozialer Kontakte', f2(rO.weights[5]), f2(rE.weights[5])),
         row('Summe der gewichteten Punkte', f2(rO.total), f2(rE.total), true),
         row('Pflegegrad', esc(origPGTxt), esc(eigPGTxt), true)
     ].join('');
@@ -74,26 +76,29 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     const critHtml = diffs.length
         ? diffs.map(d => {
             const txt = (bg[d.nr] || '').trim();
-            let body = txt
-                ? txt.split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
+            // Nummern auf die Zählung des Gutachtens umstellen (bei Medicproof 5.x.y).
+            const txtAnz = nummernImText(txt, org);
+            let body = txtAnz
+                ? txtAnz.split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
                 : `<div>Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „${esc(d.e)}“ ableitbar.</div>`;
             // Nicht im BRi belegte Zitate sichtbar machen – sie müssen geprüft oder gestrichen werden.
+            // Geprüft wird der ORIGINALTEXT: die BRi kennt nur ihre eigene Nummerierung.
             if (txt) {
                 const offen = unbelegteZitate(d.nr, txt);
                 if (offen.length) {
                     body += `<div class="zitat-warnung" data-warn="1">⚠ Bitte prüfen: Folgende Passage${offen.length > 1 ? 'n sind' : ' ist'} `
-                          + `nicht wörtlich im BRi-Text zu ${esc(d.nr)} belegt – vor dem Versand streichen oder korrigieren: `
+                          + `nicht wörtlich im BRi-Text zu ${esc(zeigeNr(d.nr, org))} belegt – vor dem Versand streichen oder korrigieren: `
                           + offen.map(z => `„${esc(z)}“`).join(' · ') + `</div>`;
                 }
             }
-            return `<div class="crit" data-nr="${esc(d.nr)}" data-vals="${esc(d.o)}|${esc(d.e)}"><div class="ct">${esc(d.nr)}: ${esc(d.title)}</div><div>Gutachterliche Bewertung: „${esc(d.o)}“</div>${body}</div>`;
+            return `<div class="crit" data-nr="${esc(d.nr)}" data-vals="${esc(d.o)}|${esc(d.e)}"><div class="ct">${esc(zeigeNr(d.nr, org))}: ${esc(d.title)}</div><div>Gutachterliche Bewertung: „${esc(d.o)}“</div>${body}</div>`;
         }).join('')
         : `<p>Es wurden keine von der Begutachtung abweichenden Einzelkriterien erfasst.</p>`;
 
     // „Allgemeine Angaben": bevorzugt der ausformulierte, fallbezogene Text der KI (Absätze).
     // Ohne KI-Text werden die Notizen wie bisher als Stichpunkte übernommen.
     const notesBullets = (allgemeinText && allgemeinText.trim())
-        ? allgemeinText.trim().split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
+        ? nummernImText(allgemeinText.trim(), org).split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
         : (notes
             ? `<ul class="aa">${notes.split(/\r?\n/).filter(l => l.trim()).map(l => `<li>${esc(l.trim())}</li>`).join('')}</ul>`
             : '');

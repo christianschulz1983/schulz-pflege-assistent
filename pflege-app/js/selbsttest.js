@@ -347,6 +347,99 @@ async function selbsttest() {
             reviewData = merk;
         }
 
+        // ---------- 9c. Nummerierung nach der Zählung des Gutachtens ----------
+        // Medicproof nummeriert dieselben Module 5.1 bis 5.6. Im erzeugten Schriftstück
+        // muss die Nummerierung DES GUTACHTENS stehen, sonst sucht der Leser bei „4.1.1"
+        // eine Zeile, die in seinem Gutachten „5.1.1" heißt.
+        if (typeof nummernImText === 'function') {
+            const MD = 'Medizinischer Dienst Nord';
+            const MP = 'Medicproof GmbH';
+
+            pruefeWahr('Medicproof wird erkannt', istMedicproof(MP) && istMedicproof('medicproof gmbh'));
+            pruefeWahr('Medizinischer Dienst bleibt 4.x',
+                !istMedicproof(MD) && !istMedicproof('') && !istMedicproof('MD Bund'));
+
+            pruefe('Kriteriumsnummer umgestellt', zeigeNr('4.1.1', MP), '5.1.1');
+            pruefe('Kriteriumsnummer bleibt beim MD', zeigeNr('4.1.1', MD), '4.1.1');
+            pruefe('Sonderkriterium umgestellt', zeigeNr('F 4.1.B', MP), 'F 5.1.B');
+            pruefe('Modulnummer der Tabelle', modulNr(4, MP), '5.4');
+            pruefe('Modulnummer beim MD', modulNr(4, MD), '4.4');
+
+            pruefe('Fließtext: alle Nummern umgestellt',
+                nummernImText('Bei 4.1.1 und 4.5.13 sowie 4.3.10 wurde falsch gewertet.', MP),
+                'Bei 5.1.1 und 5.5.13 sowie 5.3.10 wurde falsch gewertet.');
+            pruefe('Fließtext: beim MD unverändert',
+                nummernImText('Bei 4.1.1 wurde falsch gewertet.', MD),
+                'Bei 4.1.1 wurde falsch gewertet.');
+            pruefe('Modulnummer nach Hinweiswort',
+                nummernImText('Unter Ziffer 4.4 des Gutachtens.', MP),
+                'Unter Ziffer 5.4 des Gutachtens.');
+
+            // Das darf NICHT passieren: aus einer Dezimalzahl eine Modulnummer machen.
+            pruefe('Dezimalzahl bleibt unangetastet',
+                nummernImText('Es fehlen 4.5 Punkte bis zur Schwelle.', MP),
+                'Es fehlen 4.5 Punkte bis zur Schwelle.');
+            pruefe('Datum bleibt unangetastet',
+                nummernImText('Die Begutachtung fand am 4.1.2026 statt.', MP),
+                'Die Begutachtung fand am 4.1.2026 statt.');
+
+            // Wörtliche BRi-Zitate bleiben unverändert: die Nummerierung 4.x.y ist die
+            // der Richtlinie selbst. Sie zu ändern hieße, ein Zitat zu verfälschen.
+            const AUF = '„', ZU = '“';   // „ und “
+            pruefe('BRi-Zitat bleibt wörtlich',
+                nummernImText('Zu 4.2.1 heißt es: ' + AUF + 'Die Kriterien 4.2.1 bis 4.2.8 beziehen sich auf die kognitiven Funktionen.' + ZU + ' Das trifft zu.', MP),
+                'Zu 5.2.1 heißt es: ' + AUF + 'Die Kriterien 4.2.1 bis 4.2.8 beziehen sich auf die kognitiven Funktionen.' + ZU + ' Das trifft zu.');
+            pruefe('Text nach dem Zitat wird wieder umgestellt',
+                nummernImText(AUF + 'Zitat 4.1.1' + ZU + ' danach 4.1.2 Ende.', MP),
+                AUF + 'Zitat 4.1.1' + ZU + ' danach 5.1.2 Ende.');
+
+            pruefe('Leerer Text bleibt leer', nummernImText('', MP), '');
+            pruefe('Nichts übergeben ergibt leeren Text', nummernImText(null, MP), '');
+
+            // Und nun am erzeugten Schriftstück selbst – für ALLE vier Vorgangsarten.
+            // Geprüft wird beides: dass bei Medicproof keine 4.x.y übrig bleibt UND dass
+            // beim Medizinischen Dienst keine einzige 5.x.y auftaucht.
+            const merkOrg = document.getElementById('stam-organisation').value;
+            const merkModus = appModus;
+            const merkO = JSON.parse(JSON.stringify(stateOrig));
+            const merkE = JSON.parse(JSON.stringify(stateEigene));
+            const merkZ = JSON.parse(JSON.stringify(stateZweit));
+            try {
+                const kid = nr => ITEMS.find(i => i.nr === nr).id;
+                setzeBewertung('orig', kid('4.1.1'), 0, 'gutachten');
+                setzeBewertung('own', kid('4.1.1'), 2, 'berater');
+                setzeBewertung('zweit', kid('4.1.1'), 1, 'gutachten');
+                const bg = { '4.1.1': 'Zu 4.1.1 fehlt jede Erhebung.' };
+                const rein = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+                const bauen = m => {
+                    appModus = m;
+                    if (m === 'anhoerung') return rein(buildAnhoerung('N', bg, 'Einleitung 4.1.1.'));
+                    if (m === 'widerspruch') return rein(baueDokument('N', bg, 'Einleitung 4.1.1.'));
+                    return rein(buildHoeherstufung('N', bg, 'Einleitung 4.1.1.'));
+                };
+                ['widerspruch', 'hoeherstufung', 'erstantrag', 'anhoerung'].forEach(m => {
+                    document.getElementById('stam-organisation').value = MP;
+                    const mp = bauen(m);
+                    document.getElementById('stam-organisation').value = MD;
+                    const md = bauen(m);
+                    const mpVier = (mp.match(/\b4\.[1-6]\.\d+/g) || []).length;
+                    const mpFuenf = (mp.match(/\b5\.[1-6]\.\d+/g) || []).length;
+                    const mdVier = (md.match(/\b4\.[1-6]\.\d+/g) || []).length;
+                    const mdFuenf = (md.match(/\b5\.[1-6]\.\d+/g) || []).length;
+                    pruefe(m + ': bei Medicproof keine 4.x.y mehr', mpVier, 0);
+                    pruefe(m + ': beim Med. Dienst keine 5.x.y', mdFuenf, 0);
+                    // Gleiche Anzahl heißt: umgestellt, nicht verloren und nicht erfunden.
+                    pruefe(m + ': Anzahl der Nummern unverändert', mpFuenf, mdVier);
+                    pruefeWahr(m + ': es gibt überhaupt Nummern', mdVier > 0);
+                });
+            } finally {
+                document.getElementById('stam-organisation').value = merkOrg;
+                appModus = merkModus;
+                stateOrig.values = merkO.values; stateEigene.values = merkE.values;
+                stateZweit.values = merkZ.values;
+            }
+        }
+
         // ---------- 9a. Namensprüfung gegen den Dokumenttext ----------
         // Anlass: Aus „Beate Eul" wurde beim Einlesen „Beate Eui".
         if (typeof pruefeName === 'function') {

@@ -222,15 +222,15 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
     const row = (label, o, z, e, bold) => `<tr><td${bold ? ' style="font-weight:bold"' : ''}>${esc(label)}</td>`
         + `<td class="num">${o}</td><td class="num">${z}</td><td class="num">${e}</td></tr>`;
     const tableRows = [
-        row('4.1 Mobilität', f2(rO.weights[0]), f2(rZ.weights[0]), f2(rE.weights[0])),
-        row('4.2 Kognitive und kommunikative Fähigkeiten', f2(rO.weights[1]), f2(rZ.weights[1]), f2(rE.weights[1])),
-        row('4.3 Verhaltensweisen und psychische Problemlagen', f2(rO.weights[2]), f2(rZ.weights[2]), f2(rE.weights[2])),
+        row(modulNr(1, org) + ' Mobilität', f2(rO.weights[0]), f2(rZ.weights[0]), f2(rE.weights[0])),
+        row(modulNr(2, org) + ' Kognitive und kommunikative Fähigkeiten', f2(rO.weights[1]), f2(rZ.weights[1]), f2(rE.weights[1])),
+        row(modulNr(3, org) + ' Verhaltensweisen und psychische Problemlagen', f2(rO.weights[2]), f2(rZ.weights[2]), f2(rE.weights[2])),
         row('Höchster Wert aus Modul 2 und Modul 3',
             f2(Math.max(rO.weights[1], rO.weights[2])), f2(Math.max(rZ.weights[1], rZ.weights[2])),
             f2(Math.max(rE.weights[1], rE.weights[2])), true),
-        row('4.4 Selbstversorgung', f2(rO.weights[3]), f2(rZ.weights[3]), f2(rE.weights[3])),
-        row('4.5 Krankheits- und therapiebedingten Anforderungen', f2(rO.weights[4]), f2(rZ.weights[4]), f2(rE.weights[4])),
-        row('4.6 Gestaltung des Alltagslebens und sozialer Kontakte', f2(rO.weights[5]), f2(rZ.weights[5]), f2(rE.weights[5])),
+        row(modulNr(4, org) + ' Selbstversorgung', f2(rO.weights[3]), f2(rZ.weights[3]), f2(rE.weights[3])),
+        row(modulNr(5, org) + ' Krankheits- und therapiebedingten Anforderungen', f2(rO.weights[4]), f2(rZ.weights[4]), f2(rE.weights[4])),
+        row(modulNr(6, org) + ' Gestaltung des Alltagslebens und sozialer Kontakte', f2(rO.weights[5]), f2(rZ.weights[5]), f2(rE.weights[5])),
         row('Summe der gewichteten Punkte', f2(rO.total), f2(rZ.total), f2(rE.total), true),
         row('Pflegegrad', esc(pgWert(origPG)), esc(pgWert(zweitPG)), esc(pgWert(rE.pg)), true)
     ].join('');
@@ -241,14 +241,17 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
     const critHtml = strittig.length
         ? strittig.map(l => {
             const txt = (bg[l.nr] || '').trim();
-            let body = txt
-                ? txt.split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
+            // Nummern auf die Zählung des Gutachtens umstellen (bei Medicproof 5.x.y).
+            const txtAnz = nummernImText(txt, org);
+            let body = txtAnz
+                ? txtAnz.split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
                 : `<div>Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „${esc(l.bText)}“ ableitbar.</div>`;
             if (txt) {
+                // Geprüft wird der Originaltext – die BRi kennt nur ihre eigene Nummerierung.
                 const offen = unbelegteZitate(l.nr, txt);
                 if (offen.length) {
                     body += `<div class="zitat-warnung" data-warn="1">⚠ Bitte prüfen: Folgende Passage${offen.length > 1 ? 'n sind' : ' ist'} `
-                          + `nicht wörtlich im BRi-Text zu ${esc(l.nr)} belegt – vor dem Versand streichen oder korrigieren: `
+                          + `nicht wörtlich im BRi-Text zu ${esc(zeigeNr(l.nr, org))} belegt – vor dem Versand streichen oder korrigieren: `
                           + offen.map(z => `„${esc(z)}“`).join(' · ') + `</div>`;
                 }
             }
@@ -256,14 +259,14 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
                 ? `<div>Bereits die richtlinienkonforme Wertung dieses einen Kriteriums ergäbe ${esc(pgSatz(l.pgMit))}.</div>` : '';
             const anl = (typeof anlagenVerweisHtml === 'function') ? anlagenVerweisHtml(l.nr) : '';
             return `<div class="crit" data-nr="${esc(l.nr)}" data-vals="${esc(lagenSchluessel(l))}">`
-                 + `<div class="ct">${esc(l.nr)}: ${esc(l.titel)}</div>`
+                 + `<div class="ct">${esc(zeigeNr(l.nr, org))}: ${esc(l.titel)}</div>`
                  + `<div>Erstgutachten: „${esc(l.eText)}“ · Anhörungsgutachten: „${esc(l.zText)}“ · Meine Beurteilung: „${esc(l.bText)}“</div>`
                  + body + kipp + anl + `</div>`;
         }).join('')
         : `<p>Nach dem Anhörungsgutachten sind keine Einzelkriterien strittig geblieben.</p>`;
 
     const allgemein = (allgemeinText && allgemeinText.trim())
-        ? allgemeinText.trim().split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
+        ? nummernImText(allgemeinText.trim(), org).split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
         : anhoerungAllgemeinStandard(analyse, org, begut, zweitDatum, origPts, zweitPts, pgSatz, origPG, zweitPG, notizenAnh);
 
     const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}</span><span>: ${esc(v || '')}</span></div>`;
@@ -355,12 +358,12 @@ function anhoerungAllgemeinStandard(a, org, begut, zweitDatum, origPts, zweitPts
           + `${esc(zweitDatum || '—')} kommt zu ${esc(dativ(zweitPG))} bei ${esc(zweitPts)} gewichteten Punkten.</p>`;
     if (a.gefolgt.length) {
         p += `<p>In ${a.gefolgt.length} Kriterium/Kriterien ist der Medizinische Dienst den Ausführungen der `
-           + `pflegefachlichen Stellungnahme gefolgt (${esc(a.gefolgt.map(l => l.nr).join(', '))}). `
+           + `pflegefachlichen Stellungnahme gefolgt (${esc(a.gefolgt.map(l => zeigeNr(l.nr, org)).join(', '))}). `
            + `Dies bestätigt die Tragfähigkeit der dort erhobenen Befunde.</p>`;
     }
     if (a.strittig.length) {
         p += `<p>In ${a.strittig.length} Kriterium/Kriterien blieb es bei der bisherigen Wertung `
-           + `(${esc(a.strittig.map(l => l.nr).join(', '))}), obwohl sich die Befundlage nicht geändert hat.</p>`;
+           + `(${esc(a.strittig.map(l => zeigeNr(l.nr, org)).join(', '))}), obwohl sich die Befundlage nicht geändert hat.</p>`;
     }
     // Der Abstand zur Schwelle wird nur genannt, wenn die Angabe des Gutachtens zu seinen
     // eigenen Kriterien passt. Sonst wäre die Aussage nicht belastbar.
@@ -370,7 +373,7 @@ function anhoerungAllgemeinStandard(a, org, begut, zweitDatum, origPts, zweitPts
            + `von ${esc(f2(a.naechsteSchwelle))} Punkten.`;
         if (a.kipper.length) {
             p += ` Bereits die richtlinienkonforme Wertung eines einzelnen der strittigen Kriterien `
-               + `(${esc(a.kipper.map(l => l.nr).join(', '))}) würde diese Schwelle überschreiten.`;
+               + `(${esc(a.kipper.map(l => zeigeNr(l.nr, org)).join(', '))}) würde diese Schwelle überschreiten.`;
         }
         p += `</p>`;
     }
