@@ -35,7 +35,9 @@ function befundBlock() {
                 if (typeof z.haeufigkeit === 'number') teile.push(PSYCHE_HAEUFIGKEIT[z.haeufigkeit]);
                 if (z.wertung !== null) teile.push(PSYCHE_WERTUNG[z.wertung]);
                 if ((z.bemerkung || '').trim()) teile.push(z.bemerkung.trim());
-                zeilen.push([psycheTitel(z.nr), teile.join(' – ')]);
+                // Die Katalogtitel tragen die Kriteriumsnummer mit; sie folgt der
+                // Zählung des Gutachtens (bei Medicproof 5.x.y).
+                zeilen.push([nummernImText(psycheTitel(z.nr)), teile.join(' – ')]);
             });
         }
         g.eintraege.forEach(e => {
@@ -52,7 +54,7 @@ function befundBlock() {
                 // und würden das Dokument mit 35 Zeilen ohne Aussage füllen.
                 if (e.nba && w === 0) return;
                 const zusatz = [befundZusatzText(e), befundTexte[e.id + '_zusatz']].filter(Boolean).join(', ');
-                zeilen.push([e.titel + (s ? ' ' + s : ''), e.skala[w] + (zusatz ? ' – ' + zusatz : '')]);
+                zeilen.push([nummernImText(e.titel) + (s ? ' ' + s : ''), e.skala[w] + (zusatz ? ' – ' + zusatz : '')]);
             });
         });
         (befundExtra[g.id] || []).forEach(x => {
@@ -175,16 +177,19 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
     const critHtml = diffs.length
         ? diffs.map(d => {
             const txt = (bg[d.nr] || '').trim();
-            let body = txt
-                ? txt.split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
+            // Nummern auf die Zählung des Gutachtens umstellen (bei Medicproof 5.x.y).
+            const txtAnz = nummernImText(txt, org);
+            let body = txtAnz
+                ? txtAnz.split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
                 : `<div>Laut gutachterlichen Richtlinien SGB XI ist eine Wertung mit „${esc(d.e)}“ ableitbar.</div>`;
             if (txt) {
+                // Geprüft wird der Originaltext – die BRi kennt nur ihre eigene Nummerierung.
                 const offen = unbelegteZitate(d.nr, txt);
-                if (offen.length) body += `<div class="zitat-warnung" data-warn="1">⚠ Bitte prüfen: nicht wörtlich im BRi-Text zu ${esc(d.nr)} belegt: `
+                if (offen.length) body += `<div class="zitat-warnung" data-warn="1">⚠ Bitte prüfen: nicht wörtlich im BRi-Text zu ${esc(zeigeNr(d.nr, org))} belegt: `
                     + offen.map(z => `„${esc(z)}“`).join(' · ') + `</div>`;
             }
             return `<div class="crit" data-nr="${esc(d.nr)}" data-vals="${esc(d.o)}|${esc(d.e)}">`
-                 + `<div class="ct">${esc(d.nr)}: ${esc(d.title)}</div>`
+                 + `<div class="ct">${esc(zeigeNr(d.nr, org))}: ${esc(d.title)}</div>`
                  + (istHoeher ? `<div>Bewertung im Vorgutachten: „${esc(d.o)}“</div>` : '')
                  + `${body}</div>`;
         }).join('')
@@ -194,9 +199,10 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
     const row = (label, o, e, bold) => istHoeher
         ? `<tr><td${bold ? ' style="font-weight:bold"' : ''}>${esc(label)}</td><td class="num">${o}</td><td class="num">${e}</td></tr>`
         : `<tr><td${bold ? ' style="font-weight:bold"' : ''}>${esc(label)}</td><td class="num">${e}</td></tr>`;
-    const mN = ['4.1 Mobilität', '4.2 Kognitive und kommunikative Fähigkeiten',
-                '4.3 Verhaltensweisen und psychische Problemlagen', '4.4 Selbstversorgung',
-                '4.5 Krankheits- und therapiebedingten Anforderungen', '4.6 Gestaltung des Alltagslebens und sozialer Kontakte'];
+    // Modulnummern nach der Zählung des Gutachtens: 4.x beim Medizinischen Dienst, 5.x bei Medicproof.
+    const mN = [modulNr(1, org) + ' Mobilität', modulNr(2, org) + ' Kognitive und kommunikative Fähigkeiten',
+                modulNr(3, org) + ' Verhaltensweisen und psychische Problemlagen', modulNr(4, org) + ' Selbstversorgung',
+                modulNr(5, org) + ' Krankheits- und therapiebedingten Anforderungen', modulNr(6, org) + ' Gestaltung des Alltagslebens und sozialer Kontakte'];
     const tableRows = [
         row(mN[0], f2(rO.weights[0]), f2(rE.weights[0])),
         row(mN[1], f2(rO.weights[1]), f2(rE.weights[1])),
@@ -210,7 +216,7 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
     ].join('');
 
     const notesBlock = (allgemeinText && allgemeinText.trim())
-        ? allgemeinText.trim().split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
+        ? nummernImText(allgemeinText.trim(), org).split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
         : (notes ? `<p>${esc(notes).replace(/\n/g, '<br>')}</p>` : '');
 
     const zweck = istHoeher
