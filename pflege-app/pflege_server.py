@@ -196,10 +196,15 @@ def extract_values(file_bytes, mime):
         except Exception:
             continue
         cols = {}
+        haeufigkeit_x = None
         for x0, y0, x1, y1, wd, b, l, n in words:
             s = wd.strip()
             if s in ("Tag", "Woche", "Monat") and s not in cols:
                 cols[s] = (x0 + x1) / 2.0
+            # MEDICPROOF fuehrt eine eigene Spalte "Haeufigkeit" ganz rechts; die Spalten
+            # "pro Tag/Woche/Monat" enthalten dort nur die Markierung, nicht die Zahl.
+            if s.rstrip(":") in ("Häufigkeit", "Haeufigkeit") and haeufigkeit_x is None:
+                haeufigkeit_x = (x0 + x1) / 2.0
         crit_tokens = []
         for x0, y0, x1, y1, wd, b, l, n in words:
             m = CRIT_RE.match(wd.strip())
@@ -210,7 +215,35 @@ def extract_values(file_bytes, mime):
             roww = sorted([w for w in words if abs(w[1] - cy) < 6], key=lambda w: w[0])
             count = None
             period = None
-            if cols:
+            if cols and haeufigkeit_x is not None:
+                # MEDICPROOF: Markierung sagt den Zeitraum, die Zahl steht in "Haeufigkeit".
+                pos = _row_filled_index(roww)
+                if pos is not None:
+                    marks = sorted([w for w in roww
+                                    if len(w[4].strip()) == 1
+                                    and (w[4].strip() in KNOWN_FILLED or w[4].strip() in KNOWN_EMPTY)],
+                                   key=lambda w: w[0])
+                    if pos < len(marks):
+                        mx = (marks[pos][0] + marks[pos][2]) / 2.0
+                        best, bestd = None, 1e9
+                        for name, hx in cols.items():
+                            dd = abs(mx - hx)
+                            if dd < bestd:
+                                bestd, best = dd, name
+                        if best and bestd < 30:
+                            period = {"Tag": "D", "Woche": "W", "Monat": "M"}[best]
+                            for x0, y0, x1, y1, wd, b, l, n in roww:
+                                s = wd.strip()
+                                if s.isdigit() and abs((x0 + x1) / 2.0 - haeufigkeit_x) < 40:
+                                    count = int(s)
+                                    break
+                            if count is None:
+                                count = 0
+                        else:
+                            # Markierung bei "entfaellt" oder "selbstaendig"
+                            period, count = "W", 0
+            elif cols:
+                # Medizinischer Dienst: die Zahl steht unmittelbar in der Zeitraumspalte.
                 for x0, y0, x1, y1, wd, b, l, n in roww:
                     s = wd.strip()
                     if s.isdigit():
@@ -227,6 +260,9 @@ def extract_values(file_bytes, mime):
                             count = int(s)
                             break
             idx = _row_filled_index(roww)
+            # Bei MEDICPROOF-Modul-5-Zeilen ist die Markierungsposition kein Stufenindex.
+            if haeufigkeit_x is not None and count is not None:
+                idx = None
             if idx is None and count is None:
                 continue  # keine erkennbare Markierung -> keine echte Tabellenzeile
             # nicht ueberschreiben, falls eine bessere Zeile schon erkannt wurde

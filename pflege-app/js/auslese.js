@@ -159,6 +159,55 @@ async function aiReadGutachten(event, ziel) {
             - Modul 5: 4.5.16 (Diät) ist KEINE Häufigkeit, sondern selbständig..unselbständig -> val_num 0..3.
             Verwechsle Spalten niemals: die horizontale Ausrichtung im Text entscheidet. Erfinde keine Werte; wenn eine Zeile leer/entfällt ist, gib 0 bzw. count 0 an.
 
+            ============================================================
+            SONDERFALL MEDICPROOF – anderes Formular, gleiche Rechenlogik
+            ============================================================
+            Erkennungsmerkmale: Logo/Wort „Medicproof", Kopfzeile jeder Seite mit Kasse,
+            VS-Nr., Name und Geburtsdatum, Fußzeile „Signiert von … am …" und „Seite n/m",
+            Abschnittsnummern 5.1 bis 5.6 statt 4.1 bis 4.6, Überschrift
+            „6 ERGEBNIS DER BEGUTACHTUNG".
+
+            M1. Es gibt KEIN Antragsdatum. stam_antrag MUSS leer bleiben ("").
+            M2. stam_organisation ist „Medicproof GmbH". Die Kasse steht in der Kopfzeile
+                (z. B. „PBeaKK" = Postbeamtenkrankenkasse) oder im beiliegenden Bescheid.
+            M3. Auf der Seite „ZUSAMMENFASSUNG" stehen: „Begutachtung am" (stam_begutachtung),
+                „Besondere Bedarfskonstellation" (ja/nein -> special_orig), „Pflegebedürftigkeit:
+                Pflegegrad n seit …" (pflegegrad) und „Gesamtpunkte" (total_weight).
+            M4. ACHTUNG – DER HÄUFIGSTE FEHLER: In den Tabellen der Module 1, 2, 3, 4 und 6 steht
+                NEBEN JEDER OPTION IHR PUNKTWERT, zum Beispiel „○0  ⊙1  ○2  ○3". Der Punktwert ist
+                NICHT der gesuchte val_num. Gesucht ist die SPALTENPOSITION 0..3, also
+                0 = erste Spalte („selbständig" bzw. „unbeeinträchtigt"), 1 = zweite, 2 = dritte,
+                3 = vierte Spalte. Das fällt besonders bei diesen Zeilen auseinander:
+                - 5.4.8 Essen: die Punktwerte lauten 0, 3, 6, 9 -> val_num bleibt 0, 1, 2 oder 3
+                - 5.4.9 Trinken und 5.4.10 Toilette: Punktwerte 0, 2, 4, 6 -> val_num 0..3
+                - Modul 3 (5.3.x): Punktwerte 0, 1, 3, 5 -> val_num 0..3
+                Ist also bei 5.4.8 die zweite Spalte mit dem Punktwert 3 angekreuzt, lautet
+                val_num 1 und NICHT 3.
+            M5. MODUL 5 (5.5.1 bis 5.5.15) hat bei Medicproof ein ANDERES Format als beim
+                Medizinischen Dienst. Die Spalten lauten:
+                „entfällt | selbständig | mit Hilfe: pro Tag | mit Hilfe: pro Woche | mit Hilfe: pro Monat | Häufigkeit"
+                Die Markierung steht in einer der fünf ersten Spalten, die ZAHL steht ganz rechts
+                in der eigenen Spalte „Häufigkeit". Lies beides zusammen:
+                - Markierung bei „mit Hilfe: pro Tag"   -> val_obj_period = "D"
+                - Markierung bei „mit Hilfe: pro Woche" -> val_obj_period = "W"
+                - Markierung bei „mit Hilfe: pro Monat" -> val_obj_period = "M"
+                - val_obj_count = die Zahl aus der Spalte „Häufigkeit" derselben Zeile
+                - Markierung bei „entfällt" oder „selbständig" -> val_obj_count = 0
+                Beispiel: „5.5.1 Medikation" mit Markierung bei „mit Hilfe: pro Tag" und der Zahl 1
+                in der Spalte Häufigkeit ergibt count 1 und period "D".
+            M6. 5.5.16 (Diät) steht bei Medicproof NICHT in einer Tabelle, sondern als Fließtext
+                („entfällt/nicht erforderlich" oder eine Stufenbezeichnung). Ordne den Text der
+                Stufe zu: entfällt/nicht erforderlich/selbständig -> val_num 0.
+            M7. Zeilen mit dem Hinweis „Beurteilung nicht erforderlich, da …" sind nicht bewertet
+                -> val_num 0 bzw. count 0. Erfinde dort nichts.
+            M8. Unter jeder Modultabelle stehen „Summe der Einzelpunkte: n" und „Gewichtete
+                Punkte: x". Übernimm diese Werte als modul_<n>_raw und modul_<n>_weight. Die
+                Tabelle unter „6 ERGEBNIS DER BEGUTACHTUNG" wiederholt die gewichteten Punkte je
+                Modul und nennt die Gesamtpunkte – nutze sie zur Gegenprobe.
+            M9. Die Zuordnung der Abschnitte: 5.1 = Modul 1, 5.2 = Modul 2, 5.3 = Modul 3,
+                5.4 = Modul 4, 5.5 = Modul 5, 5.6 = Modul 6. Die IDs in values_orig richten sich
+                weiterhin nach der App-Nummerierung (4.1.1 = id 1 und so fort).
+
             Liefere alle Ergebnisse strictly als valides JSON-Objekt zurück.`
             + (istZweit ? `
 
@@ -444,6 +493,7 @@ function rvExtract(kind, idx, v) {
         rvSpiegel('rev-stam-pg', reviewData.stam.pg);
     } else {
         reviewData.extracted[kind][idx] = rvZahl(v);
+        if (typeof rvZeigeModulGegenprobe === 'function') rvZeigeModulGegenprobe();
     }
     rvPruefePlausibel();
 }
@@ -453,6 +503,49 @@ function rvExtract(kind, idx, v) {
 function pgAusPunkten(punkte) {
     const p = rvZahl(punkte);
     return p >= 90 ? 5 : p >= 70 ? 4 : p >= 47.5 ? 3 : p >= 27 ? 2 : p >= 12.5 ? 1 : 0;
+}
+
+/* Modulweise Gegenprobe: Beide Gutachtenarten weisen je Modul die Summe der Einzelpunkte
+   aus. Rechnet man die eingelesenen Kriterien zusammen, muss dieselbe Summe herauskommen.
+   Tut sie das nicht, wurde in diesem Modul mindestens ein Kriterium falsch gelesen – etwa
+   weil bei Medicproof der PUNKTWERT neben der Option mit der Spaltenposition verwechselt
+   wurde. Die Prüfung nennt das Modul, damit gezielt nachgesehen werden kann. */
+function modulGegenprobe(rev) {
+    if (!rev || !rev.extracted || !rev.valuesMap) return [];
+    const stand = { special: 0, values: {} };
+    ITEMS.forEach(i => {
+        const v = rev.valuesMap[i.id];
+        stand.values[i.id] = (i.m === 5 && i.group !== 'D')
+            ? { count: (v && typeof v === 'object') ? Number(v.count) || 0 : 0,
+                period: (v && typeof v === 'object') ? (v.period || 'W') : 'W' }
+            : (Number(v) || 0);
+    });
+    const r = calculateInternal(stand);
+    const namen = ['Modul 1 Mobilität', 'Modul 2 Kognition', 'Modul 3 Verhalten',
+                   'Modul 4 Selbstversorgung', 'Modul 5 Krankheitsbewältigung', 'Modul 6 Alltag'];
+    const abw = [];
+    for (let m = 0; m < 6; m++) {
+        const laut = Number(rev.extracted.raws[m]);
+        if (!Number.isFinite(laut)) continue;
+        if (Math.round(r.raws[m]) !== Math.round(laut)) {
+            abw.push({ modul: namen[m], ausKriterien: r.raws[m], lautGutachten: laut });
+        }
+    }
+    return abw;
+}
+
+function rvZeigeModulGegenprobe() {
+    const box = document.getElementById('rev-modul-pruefung');
+    if (!box) return;
+    const abw = modulGegenprobe(reviewData);
+    if (!abw.length) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="hinweis-warnung"><b>Bitte prüfen – die Einzelkriterien passen '
+        + 'nicht zu den Modulsummen des Gutachtens:</b><br>'
+        + abw.map(a => escapeHtml(a.modul) + ': aus den Kriterien ' + a.ausKriterien
+            + ', laut Gutachten ' + a.lautGutachten).join('<br>')
+        + '<br>In diesen Modulen wurde mindestens ein Kriterium falsch gelesen. '
+        + 'Häufigste Ursache bei Medicproof: der Punktwert neben der Option wurde mit der '
+        + 'Spaltenposition verwechselt (etwa bei 4.4.8 Essen mit den Werten 0, 3, 6, 9).</div>';
 }
 
 function rvPruefePlausibel() {
@@ -478,6 +571,8 @@ function rvMarkEdited(id) {
     reviewGeaendert.add(id);
     const el = document.getElementById('rev-row-' + id);
     if (el) { el.classList.remove('rev-missing'); el.classList.add('rev-ok'); }
+    // Nach jeder Korrektur neu gegenrechnen – so sieht man sofort, ob es jetzt passt.
+    if (typeof rvZeigeModulGegenprobe === 'function') rvZeigeModulGegenprobe();
 }
 function rvValNum(id, v) { reviewData.valuesMap[id] = parseInt(v); rvMarkEdited(id); }
 function rvM5Count(id, v) { if (typeof reviewData.valuesMap[id] !== 'object') reviewData.valuesMap[id] = { count: 0, period: 'W' }; reviewData.valuesMap[id].count = Number(v); rvMarkEdited(id); }
@@ -551,6 +646,7 @@ function openImportReview(file, data, mimeType) {
     }
     document.getElementById('review-form').innerHTML = buildReviewForm(reviewData);
     rvPruefePlausibel();
+    rvZeigeModulGegenprobe();
     if (typeof nameHinweisAnzeigen === 'function') nameHinweisAnzeigen();
     document.getElementById('review-overlay').classList.add('active');
 }
@@ -685,7 +781,7 @@ function buildReviewForm(rev) {
             html += `<div>${m + 1}. ${modNames[m]}</div><div><input type="number" step="1" value="${rev.extracted.raws[m]}" oninput="rvExtract('raws',${m},this.value)"></div><div><input type="number" step="0.01" value="${rev.extracted.weights[m]}" oninput="rvExtract('weights',${m},this.value)"></div>`;
         }
         html += `<div><b>Gesamt / PG</b></div><div><input type="number" step="1" id="rev-extract-pg" value="${rev.extracted.pg}" oninput="rvExtract('pg',0,this.value)" title="Pflegegrad"></div><div><input type="number" step="0.01" id="rev-extract-total" value="${rev.extracted.total}" oninput="rvExtract('total',0,this.value)" title="Gesamtpunkte"></div>`;
-        html += `</div></div>`;
+        html += `</div><div id="rev-modul-pruefung" style="margin-top:10px"></div></div>`;
     }
 
     html += `<div class="rev-section"><div class="rev-sec-title">Anamnese</div><textarea class="rev-textarea" oninput="rvText('anamnese',this.value)">${esc(rev.anamnese || '')}</textarea></div>`;
