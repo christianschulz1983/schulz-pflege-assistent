@@ -114,6 +114,7 @@ async function aiReadGutachten(event, ziel) {
 
             EXAKTE LOKALISIERUNGS- UND EXTRAKTIONSREGELN FÜR DIE STAMMDATEN:
             1. Name (stam_betreffend): IMMER im Format "Herr Vorname Nachname" bzw. "Frau Vorname Nachname" (Anrede + Vorname + Nachname). Die Anrede (Herr/Frau) aus dem Adress-/Briefkopf übernehmen (z.B. "Herrn Jürgen Maier" -> "Herr Jürgen Maier"). NICHT als "Nachname, Vorname" zurückgeben.
+            1a. BUCHSTABENGENAUIGKEIT BEIM NAMEN – höchste Sorgfalt: Der Name steht im Dokument mehrfach (Anschrift, Kopfzeile, Fließtext). Vergleiche diese Stellen miteinander und übernimm die Schreibweise, die dort übereinstimmend steht. Achte besonders auf Zeichen, die leicht verwechselt werden: kleines l gegen großes I gegen i gegen die Ziffer 1; rn gegen m; cl gegen d; 0 gegen O; 5 gegen S; 8 gegen B; ü gegen u. Beispiel: "Eul" (mit kleinem L am Ende) darf nicht zu "Eui" werden. Rate nie – im Zweifel die Schreibweise aus der Anschrift des Bescheids nehmen.
             2. Geburtsdatum (stam_geboren): MUSS immer ausgelesen werden. IMMER im Format tt.mm.jjjj zurückgeben (z.B. "12.04.1941"). Das gilt für ALLE Datumsfelder (geboren, Antrag, Bescheid, Begutachtung).
             3. Kundennummer (stam_kundennummer): MUSS immer zwingend leer bzw. ein leerer String sein (""). Sie wird nicht automatisch befüllt, da sie für das händische Ausfüllen freigelassen wird.
             4. Kasse (stam_kasse): Extrahiere die zuständige Pflegekasse/Krankenkasse.
@@ -294,12 +295,15 @@ async function aiReadGutachten(event, ziel) {
             if (data) {
                 // Google erfolgreich -> präzise lokale Kriterien (Text-PDFs) haben Vorrang
                 if (haveLocalValues) { data.values_orig = serverValuesToValuesOrig(local.values); data._localValues = true; }
+                // Den ausgelesenen Text mitgeben: daran wird die Schreibweise des Namens geprüft.
+                if (haveLocalText) data._text = local.text;
                 openImportReview(file, data, mimeType);
                 showToast("Gutachten gelesen ✓ – bitte prüfen und übernehmen.", "success");
             } else {
                 // Google nicht verfügbar (z.B. 429) -> lokale Reserve, damit nichts blockiert
                 const fb = (local && local.ok) ? localMetaToData(local) : {};
                 if (haveLocalValues) { fb.values_orig = serverValuesToValuesOrig(local.values); }
+                if (haveLocalText) fb._text = local.text;
                 fb._localValues = true;
                 openImportReview(file, fb, mimeType);
                 const online = isOnlineHosted();
@@ -369,6 +373,8 @@ function normalizeImport(data) {
             art: normalizeArt(data.anh_art) || ''
         },
         diagnoses: (Array.isArray(data.diagnoses) ? data.diagnoses : []).map(d => ({ icd: d.icd || '', text: d.text || '' })),
+        // Volltext des Dokuments, soweit lokal ausgelesen – Grundlage der Namensprüfung
+        text: data._text || '',
         anamnese: data.anamnese || '',
         befund: data.befund || '',
         special: data.special_orig || 0,
@@ -393,6 +399,7 @@ function rvStam(k, v) {
         if (k === 'pts') { reviewData.extracted.total = rvZahl(v); rvSpiegel('rev-extract-total', reviewData.extracted.total); }
     }
     if (k === 'pg' || k === 'pts') rvPruefePlausibel();
+    if (k === 'betreffend' && typeof nameHinweisAnzeigen === 'function') nameHinweisAnzeigen();
 }
 function rvDiag(idx, field, v) { if (!reviewData.diagnoses[idx]) reviewData.diagnoses[idx] = { icd: '', text: '' }; reviewData.diagnoses[idx][field] = v; }
 // Weitere Diagnosezeile in der Prüfansicht anhängen
@@ -544,6 +551,7 @@ function openImportReview(file, data, mimeType) {
     }
     document.getElementById('review-form').innerHTML = buildReviewForm(reviewData);
     rvPruefePlausibel();
+    if (typeof nameHinweisAnzeigen === 'function') nameHinweisAnzeigen();
     document.getElementById('review-overlay').classList.add('active');
 }
 
@@ -645,6 +653,7 @@ function buildReviewForm(rev) {
     const tf = (label, k, type) => `<label class="rev-field"><span>${label}</span><input type="${type || 'text'}" id="rev-stam-${k}" value="${esc(rev.stam[k] || '')}" oninput="rvStam('${k}',this.value)"></label>`;
     html += `<div class="rev-section"><div class="rev-sec-title">Stammdaten</div><div class="rev-grid">`;
     html += tf('Betreffend', 'betreffend');
+    html += `</div><div id="rev-name-pruefung"></div><div class="rev-grid">`;
     html += tf('Geboren am', 'geboren', 'date');
     html += tf('Kasse', 'kasse');
     html += tf('Versicherungs-Nr.', 'versnr');
