@@ -347,6 +347,44 @@ async function selbsttest() {
             reviewData = merk;
         }
 
+        // ---------- 9e. Umrechnungstabellen aller sechs Module ----------
+        // Anlass: In Modul 1 stand die Grenze zu 7,5 gewichteten Punkten bei 7 statt bei 6.
+        // Wer genau 6 Einzelpunkte hatte, bekam 5,00 statt 7,50 – zweieinhalb Punkte zu
+        // wenig. Solche Grenzfehler sieht man nur, wenn JEDER Wert einzeln geprüft wird.
+        // Die Tabellen stehen ausgeschrieben hier, unabhängig von MODUL_SPANNEN – sonst
+        // prüfte sich die Tabelle nur gegen sich selbst.
+        if (typeof gewichtetePunkte === 'function') {
+            const SOLL = {
+                1: [[0,1,0], [2,3,2.5], [4,5,5], [6,9,7.5], [10,15,10]],
+                2: [[0,1,0], [2,5,3.75], [6,10,7.5], [11,16,11.25], [17,33,15]],
+                3: [[0,0,0], [1,2,3.75], [3,4,7.5], [5,6,11.25], [7,65,15]],
+                4: [[0,2,0], [3,7,10], [8,18,20], [19,36,30], [37,54,40]],
+                5: [[0,0,0], [1,1,5], [2,3,10], [4,5,15], [6,15,20]],
+                6: [[0,0,0], [1,3,3.75], [4,6,7.5], [7,11,11.25], [12,18,15]]
+            };
+            Object.keys(SOLL).forEach(m => {
+                const modul = Number(m);
+                let falsch = [];
+                SOLL[m].forEach(([von, bis, gew]) => {
+                    for (let p = von; p <= bis; p++) {
+                        const ist = gewichtetePunkte(modul, p);
+                        if (ist !== gew) falsch.push(p + ': ' + ist + ' statt ' + gew);
+                    }
+                });
+                pruefe('Modul ' + modul + ': jede Punktzahl richtig umgerechnet', falsch, []);
+            });
+            // Der konkrete Fehler, der gefunden wurde
+            pruefe('Modul 1 mit 6 Einzelpunkten ergibt 7,50', gewichtetePunkte(1, 6), 7.5);
+            pruefe('Modul 1 mit 5 Einzelpunkten ergibt 5,00', gewichtetePunkte(1, 5), 5);
+            // Lückenlos: keine Spanne darf fehlen oder sich überlappen
+            [1,2,3,4,5,6].forEach(m => {
+                const s = MODUL_SPANNEN[m].slice().sort((a,b) => a.ab - b.ab);
+                let lueckenlos = s[0].ab === 0;
+                for (let k = 1; k < s.length; k++) if (s[k].ab !== s[k-1].bis + 1) lueckenlos = false;
+                pruefeWahr('Modul ' + m + ': Spannen lückenlos und überschneidungsfrei', lueckenlos);
+            });
+        }
+
         // ---------- 9d. Modul 5: Gruppenwertung im Schriftstück erklären ----------
         // Anlass gemeldet: „Ich stelle fest, dass die Physiotherapie nicht zu werten ist,
         // gleichzeitig ändern sich die Punkte im Modul 5 nicht." Die Rechnung ist richtig –
@@ -438,6 +476,19 @@ async function selbsttest() {
                 stateOrig.values = mO.values; stateEigene.values = mE.values;
                 stateZweit.values = mZ.values; stateOrig.extracted = mEx; appModus = mModus;
             }
+
+            // Derselbe Sachverhalt muss auch IN DER APP stehen – dort schaut der Berater
+            // hin, nicht ins fertige Schriftstück.
+            const rO = { raws: [0,0,0,0,3,0], weights: [0,0,0,0,10,0] };
+            const rE = { raws: [0,0,0,0,2,0], weights: [0,0,0,0,10,0] };
+            const hin = modulHinweisText(5, rO, rE);
+            pruefeWahr('Ansicht erklärt gleichbleibende Punkte',
+                hin.includes('3 → 2') && hin.includes('bleiben bei 10,00')
+                && hin.includes('2 bis 3 Einzelpunkte') && hin.includes('richtig gerechnet'));
+            pruefe('Kein Hinweis, wenn die Einzelpunkte gleich bleiben',
+                modulHinweisText(5, rO, { raws: [0,0,0,0,3,0], weights: [0,0,0,0,10,0] }), '');
+            pruefe('Kein Hinweis, wenn sich die gewichteten Punkte ändern',
+                modulHinweisText(5, rO, { raws: [0,0,0,0,1,0], weights: [0,0,0,0,5,0] }), '');
 
             // Die KI darf für Modul 5 keinen Punktgewinn behaupten – sie kennt die
             // Gruppenwertung nicht von selbst.

@@ -46,27 +46,54 @@ function m5Gruppen(st) {
              gesamt: pA + pB + pC + pD };
 }
 
-// Gewichtete Punkte des Moduls 5 aus den Einzelpunkten. Die Spannen sind breit –
-// darum bewegt sich der gewichtete Wert oft nicht, obwohl sich ein Kriterium ändert.
-const M5_SPANNEN = [
-    { ab: 6, bis: null, gew: 20 },
-    { ab: 4, bis: 5, gew: 15 },
-    { ab: 2, bis: 3, gew: 10 },
-    { ab: 1, bis: 1, gew: 5 },
-    { ab: 0, bis: 0, gew: 0 }
-];
-function m5Gewichtet(einzel) {
-    const s = M5_SPANNEN.find(x => einzel >= x.ab);
+/* UMRECHNUNG: SUMME DER EINZELPUNKTE -> GEWICHTETE PUNKTE.
+   Die Tabellen der Begutachtungs-Richtlinien, je Modul absteigend nach Untergrenze.
+   Sie stehen hier an EINER Stelle, weil eine falsche Grenze sonst unbemerkt bleibt:
+   In Modul 1 stand die Grenze zu 7,5 Punkten lange bei 7 statt bei 6. Wer genau
+   6 Einzelpunkte hatte, bekam 5,00 statt 7,50 gewichtete Punkte – zweieinhalb Punkte
+   zu wenig, was einen Pflegegrad kosten kann.
+
+   Modul 1  0–1 → 0    2–3 → 2,5    4–5 → 5      6–9  → 7,5     10–15 → 10
+   Modul 2  0–1 → 0    2–5 → 3,75   6–10 → 7,5   11–16 → 11,25  17–33 → 15
+   Modul 3  0   → 0    1–2 → 3,75   3–4 → 7,5    5–6  → 11,25   7–65  → 15
+   Modul 4  0–2 → 0    3–7 → 10     8–18 → 20    19–36 → 30     37–54 → 40
+   Modul 5  0   → 0    1   → 5      2–3 → 10     4–5  → 15      6–15  → 20
+   Modul 6  0   → 0    1–3 → 3,75   4–6 → 7,5    7–11 → 11,25   12–18 → 15
+   Der Selbsttest prüft jede einzelne Grenze gegen diese Tabelle. */
+const MODUL_SPANNEN = {
+    1: [{ ab: 10, bis: 15, gew: 10 },   { ab: 6, bis: 9,  gew: 7.5 },
+        { ab: 4,  bis: 5,  gew: 5 },    { ab: 2, bis: 3,  gew: 2.5 },  { ab: 0, bis: 1, gew: 0 }],
+    2: [{ ab: 17, bis: 33, gew: 15 },   { ab: 11, bis: 16, gew: 11.25 },
+        { ab: 6,  bis: 10, gew: 7.5 },  { ab: 2,  bis: 5,  gew: 3.75 }, { ab: 0, bis: 1, gew: 0 }],
+    3: [{ ab: 7,  bis: 65, gew: 15 },   { ab: 5,  bis: 6,  gew: 11.25 },
+        { ab: 3,  bis: 4,  gew: 7.5 },  { ab: 1,  bis: 2,  gew: 3.75 }, { ab: 0, bis: 0, gew: 0 }],
+    4: [{ ab: 37, bis: 54, gew: 40 },   { ab: 19, bis: 36, gew: 30 },
+        { ab: 8,  bis: 18, gew: 20 },   { ab: 3,  bis: 7,  gew: 10 },   { ab: 0, bis: 2, gew: 0 }],
+    5: [{ ab: 6,  bis: 15, gew: 20 },   { ab: 4,  bis: 5,  gew: 15 },
+        { ab: 2,  bis: 3,  gew: 10 },   { ab: 1,  bis: 1,  gew: 5 },    { ab: 0, bis: 0, gew: 0 }],
+    6: [{ ab: 12, bis: 18, gew: 15 },   { ab: 7,  bis: 11, gew: 11.25 },
+        { ab: 4,  bis: 6,  gew: 7.5 },  { ab: 1,  bis: 3,  gew: 3.75 }, { ab: 0, bis: 0, gew: 0 }]
+};
+
+function spanneZu(modul, einzel) {
+    return (MODUL_SPANNEN[modul] || []).find(s => einzel >= s.ab) || null;
+}
+function gewichtetePunkte(modul, einzel) {
+    const s = spanneZu(modul, einzel);
     return s ? s.gew : 0;
 }
 // Beschreibt die Spanne im Klartext: „2 bis 3 Einzelpunkte", „6 und mehr Einzelpunkte".
-function m5SpannenText(einzel) {
-    const s = M5_SPANNEN.find(x => einzel >= x.ab);
+function spannenText(modul, einzel) {
+    const s = spanneZu(modul, einzel);
     if (!s) return '';
-    if (s.bis === null) return s.ab + ' und mehr Einzelpunkte';
+    const hoechst = (MODUL_SPANNEN[modul] || [])[0];
+    if (s === hoechst) return s.ab + ' und mehr Einzelpunkte';
     if (s.bis === s.ab) return s.ab === 0 ? 'kein Einzelpunkt' : s.ab + ' Einzelpunkt';
     return s.ab + ' bis ' + s.bis + ' Einzelpunkte';
 }
+// Modul 5 ist der Fall, in dem die breiten Spannen im Schriftstück erklärt werden müssen.
+function m5Gewichtet(einzel) { return gewichtetePunkte(5, einzel); }
+function m5SpannenText(einzel) { return spannenText(5, einzel); }
 
 // pref ist entweder eine Spalte ('orig' | 'zweit' | 'own') oder – für Was-wäre-wenn-
 // Rechnungen – unmittelbar ein Bewertungsstand. Wird ein Stand übergeben, wird immer
@@ -95,12 +122,13 @@ function calculateInternal(pref) {
     // Modul 5 nach BRi: je Gruppe summieren, dann der GRUPPE EINEN Punktwert zuordnen.
     // Gerechnet wird in m5Gruppen() – der einzigen Stelle für diese Logik.
     const ptsM5 = m5Gruppen(st).gesamt;
-    let w1=s1>=10?10:s1>=7?7.5:s1>=4?5:s1>=2?2.5:0;
-    let p2=s2>=17?15:s2>=11?11.25:s2>=6?7.5:s2>=2?3.75:0;
-    let p3=s3>=7?15:s3>=5?11.25:s3>=3?7.5:s3>=1?3.75:0;
-    let w4=s4>=37?40:s4>=19?30:s4>=8?20:s4>=3?10:0;
-    let w5=m5Gewichtet(ptsM5);
-    let w6=s6>=12?15:s6>=7?11.25:s6>=4?7.5:s6>=1?3.75:0;
+    // Alle sechs Umrechnungen aus MODUL_SPANNEN – nicht mehr von Hand ausgeschrieben.
+    let w1=gewichtetePunkte(1,s1);
+    let p2=gewichtetePunkte(2,s2);
+    let p3=gewichtetePunkte(3,s3);
+    let w4=gewichtetePunkte(4,s4);
+    let w5=gewichtetePunkte(5,ptsM5);
+    let w6=gewichtetePunkte(6,s6);
     let wm23=Math.max(p2,p3);
     let total=st.special==1?100:(w1+wm23+w4+w5+w6);
     let pg=total>=90?5:total>=70?4:total>=47.5?3:total>=27?2:total>=12.5?1:0;
@@ -146,7 +174,12 @@ function calculate(pref) {
     setEl('total-w-'+pref, total.toFixed(2).replace('.',','));
     setEl('pg-title-'+pref, pg>0?'PFLEGEGRAD '+pg:'KEIN PFLEGEGRAD');
 
-    const tiers={1:[2,4,7,10],2:[2,6,11,17],3:[2,6,11,17],4:[3,8,19,37],5:[1,2,4,6],6:[1,4,7,12]};
+    // Die nächste erreichbare Stufe kommt aus derselben Tabelle wie die Umrechnung –
+    // vorher stand sie ein zweites Mal von Hand da und wich in Modul 1 und 3 ab.
+    const tiers = {};
+    [1,2,3,4,5,6].forEach(m => {
+        tiers[m] = MODUL_SPANNEN[m].map(s => s.ab).filter(a => a > 0).sort((a,b) => a-b);
+    });
     const getGap=(mod,sum)=>{
         const next=tiers[mod].find(t=>t>sum);
         if(!next)return{t:'Max ✓',cls:'gap-green'};
@@ -210,11 +243,37 @@ function calculate(pref) {
 
 function updateLiveCompRows() {
     const rO=calculateInternal('orig');
+    const rE=calculateInternal('own');
     for(let m=1;m<=6;m++){
         const ew=document.getElementById('mod-w-comp-'+m);
         const er=document.getElementById('mod-r-comp-'+m);
         if(ew)ew.innerText=rO.weights[m-1].toFixed(2);
         if(er)er.innerText=rO.raws[m-1];
+        zeigeModulHinweis(m, rO, rE);
     }
+}
+
+/* Erklärt in der Ansicht, warum sich die gewichteten Punkte nicht bewegen, obwohl die
+   Einzelpunkte sich geändert haben. Gemeldet wurde genau das: „Ich stelle fest, dass die
+   Physiotherapie nicht zu werten ist, gleichzeitig ändern sich die Punkte im Modul 5
+   nicht." Die Rechnung ist richtig – die Spannen der Richtlinien sind breit. Ohne diesen
+   Satz sieht es wie ein Rechenfehler aus. */
+function modulHinweisText(m, rO, rE) {
+    const einzelO = rO.raws[m-1], einzelE = rE.raws[m-1];
+    const gewO = rO.weights[m-1], gewE = rE.weights[m-1];
+    if (einzelO === einzelE || gewO !== gewE) return '';
+    const f2 = n => Number(n).toFixed(2).replace('.', ',');
+    return 'Die Einzelpunkte ändern sich (' + einzelO + ' → ' + einzelE + '), die gewichteten '
+         + 'Punkte bleiben bei ' + f2(gewE) + '. Beide Werte fallen nach den Richtlinien in '
+         + 'dieselbe Spanne (' + spannenText(m, einzelE) + '). Das ist richtig gerechnet.';
+}
+
+function zeigeModulHinweis(m, rO, rE) {
+    const zeile = document.getElementById('mod-hinweis-row-' + m);
+    const zelle = document.getElementById('mod-hinweis-' + m);
+    if (!zeile || !zelle) return;
+    const txt = modulHinweisText(m, rO, rE);
+    zelle.innerText = txt;
+    zeile.style.display = txt ? '' : 'none';
 }
 
