@@ -255,6 +255,11 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
                           + offen.map(z => `„${esc(z)}“`).join(' · ') + `</div>`;
                 }
             }
+            // Modul 5 wird je Gruppe gewertet. Verglichen wird hier das
+            // Anhörungsgutachten mit der eigenen Beurteilung.
+            const m5 = (l.item && l.item.m === 5 && typeof m5WirkungSatz === 'function')
+                ? m5WirkungSatz(l.nr, 'zweit', 'own') : '';
+            if (m5) body += `<div class="m5-wirkung">${esc(nummernImText(m5, org))}</div>`;
             const kipp = l.kipptAllein
                 ? `<div>Bereits die richtlinienkonforme Wertung dieses einen Kriteriums ergäbe ${esc(pgSatz(l.pgMit))}.</div>` : '';
             const anl = (typeof anlagenVerweisHtml === 'function') ? anlagenVerweisHtml(l.nr) : '';

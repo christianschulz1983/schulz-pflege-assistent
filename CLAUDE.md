@@ -154,6 +154,16 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
 - Modul 3 setzt eine fachärztliche Diagnose mit mindestens sechs Monaten Behandlung voraus.
 - Modul 5 setzt in der Regel ärztliche Verordnung und sechs Monate Dauerhaftigkeit voraus.
 - Modul 5 wird je Gruppe summiert und dann **einmal** bepunktet, nicht je Kriterium.
+  Gerechnet wird das ausschließlich in `m5Gruppen()` in `js/berechnung.js`.
+  Die gewichteten Punkte liegen in **breiten Spannen** (`m5Gewichtet`): 0 → 0, 1 → 5,
+  2–3 → 10, 4–5 → 15, ab 6 → 20. Ein Kriterium kann sich deshalb ändern, ohne dass sich
+  die gewichteten Punkte bewegen. Das ist richtig gerechnet und **kein Fehler** – es sieht
+  nur wie einer aus. Damit das Schriftstück nicht widersprüchlich wirkt, ergänzt
+  `m5WirkungSatz()` (`js/vorschlaege.js`) bei jedem Modul-5-Kriterium einen **gerechneten**
+  Satz: Gruppe, Einzelpunkte vorher/nachher und die Wirkung auf die gewichteten Punkte –
+  einschließlich der Aussage, wenn sie sich nicht ändern. In allen vier Vorgangsarten.
+  Die KI wird eigens angewiesen, für Modul 5 **keine** Punktzahl und keinen Punktgewinn
+  zu behaupten; die Rechnung ergänzt die App.
 - Modul 5, Kriterien **4.5.1 bis 4.5.14**: Ist keine Maßnahme festgestellt, steht im erzeugten
   Schriftstück **„entfällt oder selbständig"** – niemals „0", „null" oder „0x pro Woche".
   Eine Häufigkeit von null ist keine Bewertung (`m5HaeufigkeitText` in `js/vorschlaege.js`).
@@ -174,7 +184,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 548 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 573 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

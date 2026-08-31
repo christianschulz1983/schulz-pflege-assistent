@@ -31,6 +31,9 @@ const STELLUNGNAHME_CSS = `
 .stmt .zitat-warnung{margin:6px 0 0;padding:7px 10px;border-left:4px solid #dc2626;
  background:rgba(220,38,38,0.08);color:#b91c1c;font-size:11px;line-height:1.5;}
 @media print{.stmt .zitat-warnung{display:none;}}
+/* Rechnerische Wirkung einer Änderung in Modul 5. Gehört in den Versand – Modul 5 wird
+   je Gruppe gewertet, und ohne diesen Satz wirkt die Punktzahl widersprüchlich. */
+.stmt .m5-wirkung{margin:5px 0 0;}
 .stmt ul.aa{margin:8px 0 8px 24px;}
 .stmt ul.aa li{margin:3px 0;}
 .stmt .stmt-footer{margin-top:34px;border-top:1px solid #ccc;padding-top:8px;display:flex;justify-content:space-between;font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#333;}
