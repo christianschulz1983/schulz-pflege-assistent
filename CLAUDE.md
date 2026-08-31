@@ -153,6 +153,12 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
 - Kognitiv bedingter Anleitungsbedarf bei Alltagshandlungen gehört zu 4.2.5.
 - Modul 3 setzt eine fachärztliche Diagnose mit mindestens sechs Monaten Behandlung voraus.
 - Modul 5 setzt in der Regel ärztliche Verordnung und sechs Monate Dauerhaftigkeit voraus.
+- **Die Umrechnungstabellen aller sechs Module stehen in `MODUL_SPANNEN`** (`js/berechnung.js`)
+  und nirgends sonst. Eine falsche Grenze bleibt sonst jahrelang unbemerkt: In Modul 1 stand
+  die Grenze zu 7,5 gewichteten Punkten bei 7 statt bei 6 – wer genau 6 Einzelpunkte hatte,
+  bekam 5,00 statt 7,50. Der Selbsttest prüft **jede einzelne Punktzahl** jedes Moduls gegen
+  eine getrennt ausgeschriebene Solltabelle. Grenzen nie an zwei Stellen führen – die
+  Sprungmarken der Spalte „fehlende Punkte" kommen aus derselben Tabelle.
 - Modul 5 wird je Gruppe summiert und dann **einmal** bepunktet, nicht je Kriterium.
   Gerechnet wird das ausschließlich in `m5Gruppen()` in `js/berechnung.js`.
   Die gewichteten Punkte liegen in **breiten Spannen** (`m5Gewichtet`): 0 → 0, 1 → 5,
@@ -184,7 +190,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 573 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 590 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

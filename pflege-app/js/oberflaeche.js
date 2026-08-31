@@ -197,6 +197,9 @@ function fillTable(pref) {
             <td>Gew.: <span id="mod-w-comp-${m}">0,00</span></td>
             <td id="mod-r-comp-${m}" style="text-align:center;border-left:1px solid var(--border)">0</td>
             <td></td>
+        </tr>
+        <tr class="mod-hinweis-row" id="mod-hinweis-row-${m}" style="display:none">
+            <td colspan="5" id="mod-hinweis-${m}" class="mod-hinweis"></td>
         </tr>` : ''}`;
     }
 }

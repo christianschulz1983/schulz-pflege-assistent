@@ -283,6 +283,14 @@
             color: var(--text-muted); background: var(--bg-card2); border-bottom: 1px solid var(--border);
         }
 
+        /* Erklaerung, wenn sich die Einzelpunkte aendern, die gewichteten aber nicht.
+           Sieht ohne Hinweis wie ein Rechenfehler aus. */
+        .mod-hinweis-row td.mod-hinweis {
+            padding: 7px 14px 9px 28px; font-size: 11px; line-height: 1.5;
+            color: var(--text-secondary); background: var(--bg-card2);
+            border-bottom: 1px solid var(--border); border-left: 3px solid var(--accent);
+        }
+
         /* RESULT TABLE */
         .result-table { width: 100%; border-collapse: collapse; }
         .result-table thead tr { background: var(--bg-card2); }
