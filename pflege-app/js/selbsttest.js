@@ -347,6 +347,105 @@ async function selbsttest() {
             reviewData = merk;
         }
 
+        // ---------- 9d. Modul 5: Gruppenwertung im Schriftstück erklären ----------
+        // Anlass gemeldet: „Ich stelle fest, dass die Physiotherapie nicht zu werten ist,
+        // gleichzeitig ändern sich die Punkte im Modul 5 nicht." Die Rechnung ist richtig –
+        // 3 und 2 Einzelpunkte liegen beide in der Spanne 2 bis 3 und ergeben 10,00
+        // gewichtete Punkte. Genau das muss im Schriftstück stehen, sonst liest es sich
+        // widersprüchlich.
+        if (typeof m5WirkungSatz === 'function') {
+            // Die Spannen des Moduls 5 nach den Richtlinien
+            pruefe('Modul 5: 0 Einzelpunkte', m5Gewichtet(0), 0);
+            pruefe('Modul 5: 1 Einzelpunkt', m5Gewichtet(1), 5);
+            pruefe('Modul 5: 2 Einzelpunkte', m5Gewichtet(2), 10);
+            pruefe('Modul 5: 3 Einzelpunkte', m5Gewichtet(3), 10);
+            pruefe('Modul 5: 4 Einzelpunkte', m5Gewichtet(4), 15);
+            pruefe('Modul 5: 5 Einzelpunkte', m5Gewichtet(5), 15);
+            pruefe('Modul 5: 6 Einzelpunkte', m5Gewichtet(6), 20);
+            pruefe('Modul 5: 9 Einzelpunkte', m5Gewichtet(9), 20);
+            pruefe('Spannentext 2 bis 3', m5SpannenText(3), '2 bis 3 Einzelpunkte');
+            pruefe('Spannentext 6 und mehr', m5SpannenText(7), '6 und mehr Einzelpunkte');
+            pruefe('Spannentext ein Punkt', m5SpannenText(1), '1 Einzelpunkt');
+
+            const mO = JSON.parse(JSON.stringify(stateOrig));
+            const mE = JSON.parse(JSON.stringify(stateEigene));
+            const mZ = JSON.parse(JSON.stringify(stateZweit));
+            const mEx = stateOrig.extracted;
+            const mModus = appModus;
+            try {
+                const kid = nr => ITEMS.find(i => i.nr === nr).id;
+                const leeren = () => ITEMS.forEach(i => {
+                    const l = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0;
+                    stateOrig.values[i.id] = JSON.parse(JSON.stringify(l));
+                    stateEigene.values[i.id] = JSON.parse(JSON.stringify(l));
+                    stateZweit.values[i.id] = JSON.parse(JSON.stringify(l));
+                });
+                stateOrig.extracted = null;
+
+                // Der gemeldete Fall: ein Punkt aus Gruppe A, zwei Besuche in Gruppe C.
+                // 4.5.14 fällt weg -> Modul 5 von 3 auf 2, gewichtet bleibt 10,00.
+                leeren();
+                [['4.5.1', { count: 1, period: 'D' }], ['4.5.13', { count: 1, period: 'W' }],
+                 ['4.5.14', { count: 1, period: 'W' }]].forEach(([nr, v]) => {
+                    stateOrig.values[kid(nr)] = Object.assign({}, v);
+                    stateZweit.values[kid(nr)] = Object.assign({}, v);
+                    stateEigene.values[kid(nr)] = Object.assign({}, v);
+                });
+                stateEigene.values[kid('4.5.14')] = { count: 0, period: 'W' };
+
+                pruefe('Gemeldeter Fall: Einzelpunkte sinken',
+                    [calculateInternal('orig').raws[4], calculateInternal('own').raws[4]], [3, 2]);
+                pruefe('Gemeldeter Fall: gewichtete Punkte bleiben gleich',
+                    [calculateInternal('orig').weights[4], calculateInternal('own').weights[4]], [10, 10]);
+
+                const satz = m5WirkungSatz('4.5.14', 'orig', 'own');
+                pruefeWahr('Satz nennt die Gruppe', satz.includes('4.5.12–4.5.15')
+                    && satz.includes('nicht einzeln, sondern als Gruppe'));
+                pruefeWahr('Satz nennt die Einzelpunkte des Moduls', satz.includes('2 statt 3 Einzelpunkte'));
+                pruefeWahr('Satz erklärt, warum sich nichts ändert',
+                    satz.includes('bleiben bei 10,00') && satz.includes('2 bis 3 Einzelpunkte'));
+
+                // Der Satz muss in ALLEN vier Vorgangsarten im Schriftstück stehen.
+                const rein = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+                const bauen = m => {
+                    appModus = m;
+                    if (m === 'anhoerung') return rein(buildAnhoerung('N', {}, ''));
+                    if (m === 'widerspruch') return rein(baueDokument('N', {}, ''));
+                    return rein(buildHoeherstufung('N', {}, ''));
+                };
+                ['widerspruch', 'hoeherstufung', 'erstantrag', 'anhoerung'].forEach(m => {
+                    const t = bauen(m);
+                    pruefeWahr(m + ': Modul-5-Wirkung steht im Schriftstück',
+                        t.includes('nicht einzeln, sondern als Gruppe gewertet')
+                        && t.includes('bleiben bei 10,00'));
+                });
+
+                // Kippt die Spanne, muss der Satz die Änderung nennen – nicht das Gegenteil.
+                leeren();
+                stateOrig.values[kid('4.5.13')] = { count: 1, period: 'W' };
+                stateOrig.values[kid('4.5.14')] = { count: 1, period: 'W' };
+                stateEigene.values[kid('4.5.13')] = { count: 1, period: 'W' };
+                stateEigene.values[kid('4.5.14')] = { count: 0, period: 'W' };
+                pruefe('Kippende Spanne: gewichtete Punkte ändern sich',
+                    [calculateInternal('orig').weights[4], calculateInternal('own').weights[4]], [10, 5]);
+                const satz2 = m5WirkungSatz('4.5.14', 'orig', 'own');
+                pruefeWahr('Satz nennt die Änderung', satz2.includes('von 10,00 auf 5,00'));
+                pruefeWahr('Satz behauptet nicht Gleichbleiben', !satz2.includes('bleiben bei'));
+
+                // Kein Modul-5-Kriterium -> kein Satz
+                pruefe('Kein Satz außerhalb von Modul 5', m5WirkungSatz('4.1.1', 'orig', 'own'), '');
+            } finally {
+                stateOrig.values = mO.values; stateEigene.values = mE.values;
+                stateZweit.values = mZ.values; stateOrig.extracted = mEx; appModus = mModus;
+            }
+
+            // Die KI darf für Modul 5 keinen Punktgewinn behaupten – sie kennt die
+            // Gruppenwertung nicht von selbst.
+            const bp = buildBegruendungPrompt.toString();
+            pruefeWahr('KI-Anweisung warnt vor Punktangaben in Modul 5',
+                bp.includes('ACHTUNG MODUL 5') && bp.includes('KEINEN Punktgewinn'));
+        }
+
         // ---------- 9c. Nummerierung nach der Zählung des Gutachtens ----------
         // Medicproof nummeriert dieselben Module 5.1 bis 5.6. Im erzeugten Schriftstück
         // muss die Nummerierung DES GUTACHTENS stehen, sonst sucht der Leser bei „4.1.1"

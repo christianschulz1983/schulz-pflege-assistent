@@ -188,6 +188,10 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
                 if (offen.length) body += `<div class="zitat-warnung" data-warn="1">⚠ Bitte prüfen: nicht wörtlich im BRi-Text zu ${esc(zeigeNr(d.nr, org))} belegt: `
                     + offen.map(z => `„${esc(z)}“`).join(' · ') + `</div>`;
             }
+            // Modul 5 wird je Gruppe gewertet – siehe m5WirkungSatz().
+            const m5 = (d.m === 5 && typeof m5WirkungSatz === 'function')
+                ? m5WirkungSatz(d.nr, 'orig', 'own') : '';
+            if (m5) body += `<div class="m5-wirkung">${esc(nummernImText(m5, org))}</div>`;
             return `<div class="crit" data-nr="${esc(d.nr)}" data-vals="${esc(d.o)}|${esc(d.e)}">`
                  + `<div class="ct">${esc(zeigeNr(d.nr, org))}: ${esc(d.title)}</div>`
                  + (istHoeher ? `<div>Bewertung im Vorgutachten: „${esc(d.o)}“</div>` : '')

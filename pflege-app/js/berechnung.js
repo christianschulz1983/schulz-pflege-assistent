@@ -12,6 +12,62 @@ function nbaEinzelpunkte(st, id) {
     return Number.isFinite(p) ? p : 0;
 }
 
+/* MODUL 5 WIRD JE GRUPPE GEWERTET, NICHT JE KRITERIUM.
+   Die Häufigkeiten einer Gruppe werden zuerst zusammengezählt, dann bekommt die GRUPPE
+   EINEN Punktwert. Deshalb kann sich ein einzelnes Kriterium ändern, ohne dass die
+   Punkte des Moduls sich bewegen – und umgekehrt kann eine kleine Änderung die ganze
+   Gruppe kippen. Diese Funktion ist die einzige Stelle, an der das gerechnet wird.
+
+   Gruppe A (4.5.1–4.5.7)   Maßnahmen, Durchschnitt pro Tag
+   Gruppe B (4.5.8–4.5.11)  Maßnahmen, Durchschnitt pro Tag
+   Gruppe C (4.5.12–4.5.15) Besuche, umgerechnet auf den Monat (1x pro Woche = 4,3)
+   Gruppe D (4.5.16)        Diät – einziges Kriterium mit eigener Stufe */
+const M5_BEREICHE = { A: '4.5.1–4.5.7', B: '4.5.8–4.5.11', C: '4.5.12–4.5.15', D: '4.5.16' };
+
+function m5Gruppen(st) {
+    let sumA = 0, sumB = 0, sumC = 0, pD = 0;
+    ITEMS.filter(i => i.m === 5).forEach(i => {
+        if (i.group === 'D') { pD += nbaEinzelpunkte(st, i.id); return; }
+        const d = st.values[i.id] || { count: 0, period: 'W' };
+        let daily = Number(d.count);
+        if (d.period === 'W') daily /= 7;
+        if (d.period === 'M') daily /= 30;
+        if (i.group === 'A') sumA += daily;
+        else if (i.group === 'B') sumB += daily;
+        else if (i.group === 'C') sumC += (Number(d.count) * (i.factor[d.period] || 0));
+    });
+    sumA = Math.round(sumA * 10000) / 10000;
+    sumB = Math.round(sumB * 10000) / 10000;
+    const pA = sumA > 8 ? 3 : sumA > 3 ? 2 : sumA >= 1 ? 1 : 0;
+    const pB = sumB >= 3 ? 3 : sumB >= 1 ? 2 : sumB >= 0.1429 ? 1 : 0;
+    const pC = sumC >= 60 ? 6 : sumC >= 12.9 ? 3 : sumC >= 8.6 ? 2 : sumC >= 4.3 ? 1 : 0;
+    return { A: { summe: sumA, pkt: pA }, B: { summe: sumB, pkt: pB },
+             C: { summe: sumC, pkt: pC }, D: { summe: pD, pkt: pD },
+             gesamt: pA + pB + pC + pD };
+}
+
+// Gewichtete Punkte des Moduls 5 aus den Einzelpunkten. Die Spannen sind breit –
+// darum bewegt sich der gewichtete Wert oft nicht, obwohl sich ein Kriterium ändert.
+const M5_SPANNEN = [
+    { ab: 6, bis: null, gew: 20 },
+    { ab: 4, bis: 5, gew: 15 },
+    { ab: 2, bis: 3, gew: 10 },
+    { ab: 1, bis: 1, gew: 5 },
+    { ab: 0, bis: 0, gew: 0 }
+];
+function m5Gewichtet(einzel) {
+    const s = M5_SPANNEN.find(x => einzel >= x.ab);
+    return s ? s.gew : 0;
+}
+// Beschreibt die Spanne im Klartext: „2 bis 3 Einzelpunkte", „6 und mehr Einzelpunkte".
+function m5SpannenText(einzel) {
+    const s = M5_SPANNEN.find(x => einzel >= x.ab);
+    if (!s) return '';
+    if (s.bis === null) return s.ab + ' und mehr Einzelpunkte';
+    if (s.bis === s.ab) return s.ab === 0 ? 'kein Einzelpunkt' : s.ab + ' Einzelpunkt';
+    return s.ab + ' bis ' + s.bis + ' Einzelpunkte';
+}
+
 // pref ist entweder eine Spalte ('orig' | 'zweit' | 'own') oder – für Was-wäre-wenn-
 // Rechnungen – unmittelbar ein Bewertungsstand. Wird ein Stand übergeben, wird immer
 // aus den Kriterien gerechnet; eine Zusammenfassung aus dem Gutachten gilt dann nicht.
@@ -36,29 +92,14 @@ function calculateInternal(pref) {
     let s3=ITEMS.filter(i=>i.m===3).reduce((s,i)=>s+getV(i.id),0);
     let s4=ITEMS.filter(i=>i.m===4).reduce((s,i)=>s+getV(i.id),0);
     let s6=ITEMS.filter(i=>i.m===6).reduce((s,i)=>s+(Number(st.values[i.id])||0),0);
-    // Modul 5 nach BRi: Häufigkeiten je Gruppe ZUERST aufsummieren und in einen
-    // Durchschnitt pro Tag umrechnen, dann der GRUPPE EINEN Punktwert zuordnen
-    // (nicht je Einzelkriterium). Gruppe A: 4.5.1–4.5.7, Gruppe B: 4.5.8–4.5.11.
-    let ptsM5=0, sumA=0, sumB=0, sumC=0;
-    ITEMS.filter(i=>i.m===5).forEach(i=>{
-        if(i.group==='D'){ptsM5+=getV(i.id);return;}
-        let d=st.values[i.id]||{count:0,period:'W'};
-        let daily=Number(d.count); if(d.period==='W')daily/=7; if(d.period==='M')daily/=30;
-        if(i.group==='A') sumA+=daily;
-        else if(i.group==='B') sumB+=daily;
-        else if(i.group==='C') sumC+=(Number(d.count)*(i.factor[d.period]||0));
-    });
-    sumA=Math.round(sumA*10000)/10000;
-    sumB=Math.round(sumB*10000)/10000;
-    let pA=sumA>8?3:sumA>3?2:sumA>=1?1:0;
-    let pB=sumB>=3?3:sumB>=1?2:sumB>=0.1429?1:0;
-    let pC=sumC>=60?6:sumC>=12.9?3:sumC>=8.6?2:sumC>=4.3?1:0;
-    ptsM5+=pA+pB+pC;
+    // Modul 5 nach BRi: je Gruppe summieren, dann der GRUPPE EINEN Punktwert zuordnen.
+    // Gerechnet wird in m5Gruppen() – der einzigen Stelle für diese Logik.
+    const ptsM5 = m5Gruppen(st).gesamt;
     let w1=s1>=10?10:s1>=7?7.5:s1>=4?5:s1>=2?2.5:0;
     let p2=s2>=17?15:s2>=11?11.25:s2>=6?7.5:s2>=2?3.75:0;
     let p3=s3>=7?15:s3>=5?11.25:s3>=3?7.5:s3>=1?3.75:0;
     let w4=s4>=37?40:s4>=19?30:s4>=8?20:s4>=3?10:0;
-    let w5=ptsM5>=6?20:ptsM5>=4?15:ptsM5>=2?10:ptsM5>=1?5:0;
+    let w5=m5Gewichtet(ptsM5);
     let w6=s6>=12?15:s6>=7?11.25:s6>=4?7.5:s6>=1?3.75:0;
     let wm23=Math.max(p2,p3);
     let total=st.special==1?100:(w1+wm23+w4+w5+w6);
@@ -76,20 +117,10 @@ function calculate(pref) {
     // Anzeige: der Gruppen-Punktwert erscheint NUR auf der untersten Zeile der Gruppe
     // (wie die "Summe"-Zeile im BRi), die übrigen Zeilen zeigen "–" – damit nicht der
     // Eindruck einer Mehrfachzählung entsteht.
-    let sumA=0, sumB=0, sumC=0;
-    ITEMS.filter(i=>i.m===5).forEach(i=>{
-        if(i.group==='D'){const el=document.getElementById('pts-'+pref+'-'+i.id);if(el)el.innerText=getV(i.id);return;}
-        let d=st.values[i.id]||{count:0,period:'W'};
-        let daily=Number(d.count); if(d.period==='W')daily/=7; if(d.period==='M')daily/=30;
-        if(i.group==='A') sumA+=daily;
-        else if(i.group==='B') sumB+=daily;
-        else if(i.group==='C') sumC+=(Number(d.count)*(i.factor[d.period]||0));
+    const grp5 = m5Gruppen(st);
+    ITEMS.filter(i => i.m === 5 && i.group === 'D').forEach(i => {
+        const el = document.getElementById('pts-'+pref+'-'+i.id); if (el) el.innerText = getV(i.id);
     });
-    sumA=Math.round(sumA*10000)/10000;
-    sumB=Math.round(sumB*10000)/10000;
-    let pA=sumA>8?3:sumA>3?2:sumA>=1?1:0;
-    let pB=sumB>=3?3:sumB>=1?2:sumB>=0.1429?1:0;
-    let pC=sumC>=60?6:sumC>=12.9?3:sumC>=8.6?2:sumC>=4.3?1:0;
     const showGroupPts = (grp, val, range) => {
         const ids = ITEMS.filter(i=>i.m===5 && i.group===grp).map(i=>i.id);
         ids.forEach((id, k) => {
@@ -99,9 +130,9 @@ function calculate(pref) {
             else { el.innerText = '–'; el.title = 'Punkte werden je Gruppe '+range+' gemeinsam vergeben (Wert in der untersten Zeile der Gruppe)'; }
         });
     };
-    showGroupPts('A', pA, '4.5.1–4.5.7');
-    showGroupPts('B', pB, '4.5.8–4.5.11');
-    showGroupPts('C', pC, '4.5.12–4.5.15');
+    showGroupPts('A', grp5.A.pkt, M5_BEREICHE.A);
+    showGroupPts('B', grp5.B.pkt, M5_BEREICHE.B);
+    showGroupPts('C', grp5.C.pkt, M5_BEREICHE.C);
     ITEMS.filter(i=>i.m&&i.m!==5).forEach(i=>{const el=document.getElementById('pts-'+pref+'-'+i.id);if(el)el.innerText=getV(i.id);});
     if(pref==='own'){ ITEMS.forEach(it=>applyVorgHighlight(it.id)); }
 

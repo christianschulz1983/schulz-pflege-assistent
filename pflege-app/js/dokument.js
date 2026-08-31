@@ -91,6 +91,11 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
                           + offen.map(z => `„${esc(z)}“`).join(' · ') + `</div>`;
                 }
             }
+            // Modul 5 wird je Gruppe gewertet – ohne diesen Satz sieht es aus, als
+            // bewirke die Änderung nichts (oder zu viel).
+            const m5 = (d.m === 5 && typeof m5WirkungSatz === 'function')
+                ? m5WirkungSatz(d.nr, 'orig', 'own') : '';
+            if (m5) body += `<div class="m5-wirkung">${esc(nummernImText(m5, org))}</div>`;
             return `<div class="crit" data-nr="${esc(d.nr)}" data-vals="${esc(d.o)}|${esc(d.e)}"><div class="ct">${esc(zeigeNr(d.nr, org))}: ${esc(d.title)}</div><div>Gutachterliche Bewertung: „${esc(d.o)}“</div>${body}</div>`;
         }).join('')
         : `<p>Es wurden keine von der Begutachtung abweichenden Einzelkriterien erfasst.</p>`;

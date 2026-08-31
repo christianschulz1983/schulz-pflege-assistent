@@ -214,6 +214,48 @@ function m5HaeufigkeitText(nr, wert) {
     return zahl + 'x pro ' + (o.period === 'D' ? 'Tag' : o.period === 'W' ? 'Woche' : 'Monat');
 }
 
+/* WAS EINE ÄNDERUNG IN MODUL 5 TATSÄCHLICH BEWIRKT.
+   Modul 5 wird je Gruppe gewertet, nicht je Kriterium, und die gewichteten Punkte
+   liegen in breiten Spannen. Deshalb kann ein Kriterium sich ändern, ohne dass die
+   Punkte des Moduls sich bewegen. Ohne diese Erklärung liest sich das Schriftstück
+   widersprüchlich: Es wird für ein Kriterium argumentiert, und die Punktzahl bleibt
+   gleich. Der Satz wird GERECHNET, nicht von der KI verfasst.
+   von/nach sind Bewertungsstände ('orig' | 'zweit' | 'own'). */
+function m5WirkungSatz(nr, von, nach) {
+    const item = ITEMS.find(i => i.nr === nr);
+    if (!item || item.m !== 5) return '';
+    const stV = zustandZu(von), stN = zustandZu(nach);
+    const gV = m5Gruppen(stV), gN = m5Gruppen(stN);
+    const f2 = n => Number(n).toFixed(2).replace('.', ',');
+    const grp = item.group;
+    const einzelV = gV.gesamt, einzelN = gN.gesamt;
+    const gewV = m5Gewichtet(einzelV), gewN = m5Gewichtet(einzelN);
+
+    let s = '';
+    if (grp !== 'D') {
+        s += 'Die Kriterien ' + M5_BEREICHE[grp] + ' werden nach den Begutachtungs-Richtlinien '
+           + 'nicht einzeln, sondern als Gruppe gewertet. ';
+        if (gV[grp].pkt !== gN[grp].pkt) {
+            s += 'Die Gruppe kommt damit auf ' + gN[grp].pkt + ' statt ' + gV[grp].pkt + ' Einzelpunkte. ';
+        } else {
+            s += 'Die Gruppe bleibt damit bei ' + gN[grp].pkt + ' Einzelpunkten. ';
+        }
+    }
+    if (einzelV !== einzelN) {
+        s += 'Modul 5 erreicht ' + einzelN + ' statt ' + einzelV + ' Einzelpunkte';
+    } else {
+        s += 'Modul 5 bleibt bei ' + einzelN + ' Einzelpunkten';
+    }
+    if (gewV !== gewN) {
+        s += '; die gewichteten Punkte ändern sich damit von ' + f2(gewV) + ' auf ' + f2(gewN) + '.';
+    } else {
+        // Das ist der Fall, der ohne Erklärung wie ein Rechenfehler aussieht.
+        s += '. Die gewichteten Punkte bleiben bei ' + f2(gewN) + ', weil beide Werte in dieselbe '
+           + 'Bewertungsspanne der Richtlinien fallen (' + m5SpannenText(einzelN) + ').';
+    }
+    return s;
+}
+
 // Alle Abweichungen Vorgutachten <-> eigene Einschätzung ermitteln
 function computeDiffs() {
     const diffs = [];
@@ -319,6 +361,15 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
         p += `--- Kriterium ${d.nr}: ${d.title} (Modul ${d.m}) ---\n`;
         p += `Bewertung des Gutachters: „${d.o}"\nMeine Bewertung: „${d.e}"\n`;
         p += `Stufenbezeichnungen: verwende ausschließlich „${d.o}" und „${d.e}" – keine anderen Wörter für diese Stufen.\n`;
+        if (d.m === 5) {
+            // Ohne diesen Hinweis behauptet die KI regelmäßig einen Punktgewinn, den es
+            // wegen der Gruppenwertung gar nicht gibt.
+            p += 'ACHTUNG MODUL 5: Dieses Kriterium wird NICHT einzeln bepunktet. Die Häufigkeiten\n'
+               + 'der Gruppe werden zuerst zusammengezählt, dann erhält die GRUPPE einen Punktwert.\n'
+               + 'Nenne deshalb KEINE Punktzahl und behaupte KEINEN Punktgewinn für dieses Kriterium.\n'
+               + 'Begründe ausschließlich fachlich, warum die Maßnahme in dieser Häufigkeit zu werten\n'
+               + 'ist oder nicht zu werten ist. Die rechnerische Auswirkung ergänzt die App selbst.\n';
+        }
         if (b) {
             p += `BRi-Definition: ${cut(b.definition, 1400)}\n`;
             const lo = briLevel(d.nr, d.oIdx), le = briLevel(d.nr, d.eIdx);
