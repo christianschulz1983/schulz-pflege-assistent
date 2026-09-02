@@ -76,7 +76,9 @@ function buildDeckblatt() {
     if (!name) name = 'Herr/ Frau';
     const kasse = g('stam-kasse') || 'Pflegekasse';
     const pgAlt = erfassungExtra.pg;
-    const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}</span><span>: ${esc(v || '')}</span></div>`;
+    // Doppelpunkt direkt hinter der Bezeichnung; die Angaben bleiben in ihrer Spalte
+    // (Breite von .k in STELLUNGNAHME_CSS).
+    const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}:</span> <span>${esc(v || '')}</span></div>`;
 
     return `<div class="stmt deckblatt">
     <div class="stmt-head">
@@ -150,7 +152,9 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
     if (notesEl) erstgespraechNotes = notesEl.value;
     const notes = (typeof notesOverride === 'string' ? notesOverride : (erstgespraechNotes || '')).trim();
 
-    const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}</span><span>: ${esc(v || '')}</span></div>`;
+    // Doppelpunkt direkt hinter der Bezeichnung; die Angaben bleiben in ihrer Spalte
+    // (Breite von .k in STELLUNGNAHME_CSS).
+    const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}:</span> <span>${esc(v || '')}</span></div>`;
     const df = (key, val) => `<span data-f="${key}">${esc(val == null ? '' : String(val))}</span>`;
 
     // Pflegepersonen

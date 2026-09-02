@@ -108,7 +108,9 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
             ? `<ul class="aa">${notes.split(/\r?\n/).filter(l => l.trim()).map(l => `<li>${esc(l.trim())}</li>`).join('')}</ul>`
             : '');
 
-    const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}</span><span>: ${esc(v || '')}</span></div>`;
+    // Doppelpunkt direkt hinter der Bezeichnung; die Angaben bleiben in ihrer Spalte
+    // (Breite von .k in STELLUNGNAHME_CSS).
+    const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}:</span> <span>${esc(v || '')}</span></div>`;
 
     return `<div class="stmt">
     <div class="stmt-head">
@@ -575,13 +577,31 @@ function printAppealText() {
     const title = escapeHtml(document.getElementById('stam-betreffend').value || 'Stellungnahme');
     const kopie = docEl.cloneNode(true);
     kopie.querySelectorAll('.zitat-warnung').forEach(el => el.remove());
+    /* KEINE BROWSER-KOPFZEILE IM PDF.
+       Datum, Titel, „about:blank" und „1/4" zeichnet der Browser in den SEITENRAND des
+       @page-Kastens. Solange dort Platz ist, erscheinen sie – auch in der gespeicherten
+       PDF. Deshalb: Seitenrand auf null, und die Ränder selbst erzeugen.
+       Der Rand muss auf JEDER Seite stehen, nicht nur auf der ersten. Ein Innenabstand
+       am Text leistet das nicht (er greift oben nur auf Seite 1). Eine Tabelle mit
+       thead/tfoot leistet es: Der Browser wiederholt beide auf jeder gedruckten Seite,
+       und die leeren Zeilen darin wirken als oberer und unterer Rand. */
     printWindow.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Pflegefachliche Stellungnahme - ${title}</title><style>${STELLUNGNAHME_CSS}
-        body{margin:0;}
+        @page{size:A4;margin:0;}
+        html,body{margin:0;padding:0;}
         #appeal-document, .stmt{max-width:none;border:none;border-radius:0;}
         #appeal-document{padding:0;}
-        body{padding:16mm 15mm;}
-        @page{margin:14mm;}
-    </style></head><body><div id="appeal-document">${kopie.innerHTML}</div><script>window.onload=function(){window.print();}<\/script></body></html>`);
+        table.druckrahmen{width:100%;border-collapse:collapse;}
+        table.druckrahmen > thead > tr > td,
+        table.druckrahmen > tfoot > tr > td,
+        table.druckrahmen > tbody > tr > td{padding:0;border:0;}
+        .rand-oben{height:20mm;}
+        .rand-unten{height:16mm;}
+        .druckinhalt{padding:0 20mm;}
+    </style></head><body><table class="druckrahmen">
+        <thead><tr><td><div class="rand-oben"></div></td></tr></thead>
+        <tfoot><tr><td><div class="rand-unten"></div></td></tr></tfoot>
+        <tbody><tr><td><div class="druckinhalt"><div id="appeal-document">${kopie.innerHTML}</div></div></td></tr></tbody>
+      </table><script>window.onload=function(){window.print();}<\/script></body></html>`);
     printWindow.document.close();
 }
 

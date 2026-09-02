@@ -83,6 +83,15 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Bei **Widerspruch und Anhörung** zeigt sie **Lücken und Widersprüche** des Gutachtens auf,
    bei **Erstantrag und Höherstufung** stellt sie die **aktuelle Pflegesituation** dar
    (Höherstufung zusätzlich: was hat sich verschlechtert). Sie baut immer auf den Notizen auf.
+8b. **Kopfzeile und Druckbild.** In den Datenzeilen steht der Doppelpunkt unmittelbar
+   hinter der Bezeichnung; die Angaben beginnen bei 217 px (`.k` in `STELLUNGNAHME_CSS`).
+   Zwischen beiden Feldern steht ein Leerzeichen – der Flex-Satz überspringt es, aber
+   Word kennt kein Flex und bräuchte es sonst.
+   Im Druck gilt `@page{margin:0}`, damit der Browser keine Kopf-/Fußzeile
+   („about:blank", Datum, Seitenzahl) in den Seitenrand setzt. Die Ränder erzeugt eine
+   Tabelle mit leerem `thead`/`tfoot` (`printAppealText`) – die wiederholt der Browser
+   auf **jeder** Seite. Ein Innenabstand am Text kann das nicht: Er greift oben nur auf
+   Seite 1. Niemals wieder einen Seitenrand in `@page` eintragen.
 9. **Anhörungsverfahren** (`js/anhoerung.js`, `js/vergleich.js`): Vierter Vorgang. Beginnt
    mit „Fall laden" (Widerspruchsfall) – Erstgutachten und eigene Bewertung stehen damit
    fest; neu eingelesen wird nur das Anhörungsgutachten in `stateZweit`. Vorlage: zwei
@@ -90,6 +99,10 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    **drei Spalten** in der Gegenüberstellung, nur die **strittig gebliebenen** Kriterien,
    Fazit mit beiden Gutachten. Bis zu 8 Sätze je Begründung, eigene Stilvorlage
    (`pflege_stilbeispiele_anhoerung`). Anhörungsschreiben bleiben Stilvorlage **nur** hier.
+   In den **Allgemeinen Angaben** steht **immer** ein Verweis darauf, wie sich das
+   Anhörungsgutachten zur ursprünglichen Stellungnahme verhält – worin ihm gefolgt wurde
+   und worin nicht. Dieser Satz wird von `anhoerungVerweisSatz()` **gerechnet** und
+   angehängt; die KI ist ausdrücklich angewiesen, die Kriterien NICHT selbst aufzuzählen.
 10. **Korrigieren zerstört nichts** (`js/korrektur.js`): „Erfasste Daten korrigieren" öffnet
    die Prüfansicht erneut, setzt aber – anders als das Einlesen – nichts zurück. Notizen,
    Befund, Erfassung und die geschriebene Stellungnahme bleiben erhalten. Übernommen werden
@@ -190,7 +203,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 590 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 612 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
