@@ -28,6 +28,7 @@ pflege-app/
   js/laenge.js        Laengengrenzen der erzeugten Texte
   js/korrektur.js     Erfasste Daten nachtraeglich korrigieren
   js/anhoerung.js     Anhoerungsverfahren: Erfassung und Vorlage
+  js/grundlage.js     Anhoerung: Grundlage aus einer alten Stellungnahme (Ausweichweg)
   js/vergleich.js     Dreiervergleich und Schwellenwertrechnung
   js/anlagen.js       Anlagen: Zuordnung zum Kriterium, Verzeichnis im Dokument
   js/namenspruefung.js Abgleich der eingelesenen Namen gegen den Dokumenttext
@@ -103,6 +104,16 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Anhörungsgutachten zur ursprünglichen Stellungnahme verhält – worin ihm gefolgt wurde
    und worin nicht. Dieser Satz wird von `anhoerungVerweisSatz()` **gerechnet** und
    angehängt; die KI ist ausdrücklich angewiesen, die Kriterien NICHT selbst aufzuzählen.
+9a. **Grundlage der Anhörung – zwei Wege** (`js/grundlage.js`). **Regelweg: „Fall laden".**
+   Die Falldatei enthält alle 65 Kriterien exakt; nichts wird geraten. **Ausweichweg für
+   Altfälle:** Erstgutachten einlesen, danach die damalige Stellungnahme als PDF. Das geht,
+   weil die eigene Einschätzung im Widerspruch überall dort dem Gutachten entspricht, wo
+   nicht widersprochen wurde – die Stellungnahme nennt genau die strittigen Kriterien mit
+   beiden Wertungen. Der Ausweichweg schreibt **nur** `stateEigene`; Erstgutachten,
+   Stammdaten und Notizen bleiben unberührt. `wertungAusText()` ordnet einen Wortlaut einer
+   Stufe zu und liefert **null**, wenn er zu keiner passt – dann wird nichts eingetragen,
+   sondern in der Prüfansicht gemeldet. `stellungnahmeGegenprobe()` rechnet die gelesenen
+   Wertungen gegen die Modulsummen der Stellungnahme.
 10. **Korrigieren zerstört nichts** (`js/korrektur.js`): „Erfasste Daten korrigieren" öffnet
    die Prüfansicht erneut, setzt aber – anders als das Einlesen – nichts zurück. Notizen,
    Befund, Erfassung und die geschriebene Stellungnahme bleiben erhalten. Übernommen werden
@@ -203,7 +214,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 612 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 646 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

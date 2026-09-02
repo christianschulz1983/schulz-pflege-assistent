@@ -347,6 +347,134 @@ async function selbsttest() {
             reviewData = merk;
         }
 
+        // ---------- 9h. Anhörung: Grundlage aus einer alten Stellungnahme ----------
+        // Ausweichweg für Altfälle ohne gespeicherte Falldatei. Regelweg bleibt „Fall laden".
+        if (typeof wertungAusText === 'function') {
+            // Stufenbezeichnungen – wörtlich und ausgeschrieben
+            pruefe('Stellungnahme lesen: selbständig', wertungAusText('4.1.1', 'selbständig'), 0);
+            pruefe('Stellungnahme lesen: überwiegend selbständig',
+                wertungAusText('4.1.1', 'überwiegend selbständig'), 1);
+            pruefe('Stellungnahme lesen: überwiegend unselbständig',
+                wertungAusText('4.1.1', 'überwiegend unselbständig'), 2);
+            pruefe('Stellungnahme lesen: unselbständig', wertungAusText('4.1.1', 'unselbständig'), 3);
+            pruefe('Stellungnahme lesen: Anführungszeichen stören nicht',
+                wertungAusText('4.1.1', '„überwiegend unselbständig"'), 2);
+
+            // Modul 5: Häufigkeiten
+            pruefe('Stellungnahme lesen: 1x pro Woche',
+                wertungAusText('4.5.13', '1x pro Woche'), { count: 1, period: 'W' });
+            pruefe('Stellungnahme lesen: 3x pro Tag',
+                wertungAusText('4.5.1', '3x pro Tag'), { count: 3, period: 'D' });
+            pruefe('Stellungnahme lesen: 2 mal im Monat',
+                wertungAusText('4.5.13', '2 mal im Monat'), { count: 2, period: 'M' });
+            pruefe('Stellungnahme lesen: entfällt oder selbständig',
+                wertungAusText('4.5.14', 'entfällt oder selbständig'), { count: 0, period: 'W' });
+
+            // Und was NICHT passieren darf: raten. Unpassendes ergibt null.
+            pruefe('Unpassender Text ergibt keine Wertung',
+                wertungAusText('4.1.1', 'die Wertung ist nicht haltbar'), null);
+            pruefe('Leerer Text ergibt keine Wertung', wertungAusText('4.1.1', ''), null);
+            pruefe('Unbekanntes Kriterium ergibt keine Wertung',
+                wertungAusText('4.9.9', 'selbständig'), null);
+
+            // Zusammenbau: Grundlage ist das Erstgutachten, darüber die strittigen Wertungen.
+            const mO = JSON.parse(JSON.stringify(stateOrig));
+            const mZiel = (typeof importZiel !== 'undefined') ? importZiel : 'orig';
+            try {
+                const kid = nr => ITEMS.find(i => i.nr === nr).id;
+                ITEMS.forEach(i => {
+                    stateOrig.values[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0;
+                });
+                stateOrig.values[kid('4.1.1')] = 1;      // Gutachten: überwiegend selbständig
+                stateOrig.values[kid('4.2.5')] = 2;      // Gutachten: nicht strittig gewesen
+                stateOrig.values[kid('4.5.13')] = { count: 1, period: 'W' };
+
+                const daten = stellungnahmeZuImport({
+                    kriterien: [
+                        { crit: '4.1.1', gutachten: 'überwiegend selbständig', eigene: 'unselbständig' },
+                        { crit: '4.5.13', gutachten: '1x pro Woche', eigene: '3x pro Woche' },
+                        { crit: '4.3.99', gutachten: 'x', eigene: 'y' },          // gibt es nicht
+                        { crit: '4.1.2', gutachten: 'selbständig', eigene: 'unklar' } // nicht zuzuordnen
+                    ],
+                    eigene_modul_1_weight: 2.5
+                }, 'Volltext');
+
+                const wert = id => (daten.values_orig.find(w => w.id === id) || {});
+                pruefe('Strittiges Kriterium übernommen', wert(kid('4.1.1')).val_num, 3);
+                pruefe('Modul-5-Häufigkeit übernommen',
+                    [wert(kid('4.5.13')).val_obj_count, wert(kid('4.5.13')).val_obj_period], [3, 'W']);
+                pruefe('Nicht strittiges Kriterium bleibt beim Gutachten', wert(kid('4.2.5')).val_num, 2);
+                pruefeWahr('Nur die strittigen gelten als rekonstruiert',
+                    daten._rekonstruiert.length === 2
+                    && daten._rekonstruiert.includes(kid('4.1.1'))
+                    && daten._rekonstruiert.includes(kid('4.5.13')));
+                pruefeWahr('Unklares wird gemeldet statt geraten',
+                    daten._nichtZuordenbar.length === 2
+                    && daten._nichtZuordenbar.join(' ').includes('4.1.2'));
+                pruefeWahr('Kein Gutachten-Kopf in dieser Ansicht', daten._nurKriterien === true);
+                pruefeWahr('Alle 65 Kriterien sind belegt',
+                    daten.values_orig.length === ITEMS.filter(i => i.m).length);
+
+                // Medicproof-Nummern werden auf die interne Zählung gebracht
+                const mp = stellungnahmeZuImport({ kriterien: [
+                    { crit: '5.1.1', eigene: 'unselbständig' } ] }, '');
+                pruefe('Medicproof-Nummer wird zugeordnet',
+                    (mp.values_orig.find(w => w.id === kid('4.1.1')) || {}).val_num, 3);
+
+                // Die Übernahme muss auch wirklich schreiben. Erst war hier der ANZEIGETEXT
+                // der Quelle statt ihres Schlüssels übergeben – setzeBewertung wies alles
+                // ab, die Ansicht sah richtig aus und nichts wurde eingetragen.
+                const mE = JSON.parse(JSON.stringify(stateEigene));
+                try {
+                    ITEMS.forEach(i => {
+                        stateEigene.values[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0;
+                    });
+                    const revU = normalizeImport(daten);
+                    uebernehmeAlteStellungnahme(revU);
+                    // Nicht den Rückgabewert prüfen (er zählt nur die Änderungen), sondern
+                    // ob am Ende JEDES Kriterium den vorgesehenen Wert trägt.
+                    const falschUebernommen = ITEMS.filter(i => i.m).filter(i =>
+                        JSON.stringify(stateEigene.values[i.id]) !== JSON.stringify(revU.valuesMap[i.id]));
+                    pruefe('Übernahme schreibt jedes Kriterium',
+                        falschUebernommen.map(i => i.nr), []);
+                    pruefe('Übernahme: strittige Wertung steht in der eigenen Spalte',
+                        stateEigene.values[kid('4.1.1')], 3);
+                    pruefe('Übernahme: Häufigkeit steht in der eigenen Spalte',
+                        [stateEigene.values[kid('4.5.13')].count, stateEigene.values[kid('4.5.13')].period], [3, 'W']);
+                    pruefe('Übernahme: nicht strittiges folgt dem Gutachten',
+                        stateEigene.values[kid('4.2.5')], 2);
+                    pruefe('Übernahme lässt das Erstgutachten unberührt',
+                        stateOrig.values[kid('4.1.1')], 1);
+                } finally { stateEigene.values = mE.values; }
+
+                // Gegenprobe gegen die Modulsummen der Stellungnahme
+                const rev = normalizeImport(daten);
+                pruefe('Gegenprobe: stimmige Summe meldet nichts',
+                    stellungnahmeGegenprobe(Object.assign({}, rev,
+                        { eigeneSummen: { weights: [calculateInternal({ special: 0, values: rev.valuesMap }).weights[0], null, null, null, null, null] } })).length, 0);
+                const falsch = stellungnahmeGegenprobe(Object.assign({}, rev,
+                    { eigeneSummen: { weights: [99, null, null, null, null, null] } }));
+                pruefe('Gegenprobe: falsche Summe wird erkannt', falsch.length, 1);
+                pruefeWahr('Gegenprobe nennt beide Zahlen',
+                    falsch[0] && falsch[0].lautStellungnahme === 99);
+                pruefe('Ohne Summen keine Gegenprobe',
+                    stellungnahmeGegenprobe(Object.assign({}, rev, { eigeneSummen: null })).length, 0);
+            } finally {
+                stateOrig.values = mO.values;
+                if (typeof importZiel !== 'undefined') importZiel = mZiel;
+            }
+
+            // Die Anweisung an die KI muss den Aufbau der Stellungnahme benennen.
+            const anw = stellungnahmeAnweisung();
+            pruefeWahr('Anweisung: kein Gutachten', anw.includes('Es ist KEIN Gutachten'));
+            pruefeWahr('Anweisung: nur Kriterien mit eigenem Block',
+                anw.includes('Befund und Stellungnahme') && anw.includes('NUR Kriterien'));
+            pruefeWahr('Anweisung: nichts erfinden', anw.includes('Erfinde keine Wertung'));
+            pruefeWahr('Anweisung: Modul 5 als Häufigkeit', anw.includes('HÄUFIGKEITEN'));
+            pruefeWahr('Anweisung: Modulsummen zur Gegenprobe',
+                anw.includes('eigene_modul_1_weight'));
+        }
+
         // ---------- 9g. Anhörung: Pflichtverweis in den Allgemeinen Angaben ----------
         // Gewünscht: In den Allgemeinen Angaben steht IMMER ein kurzer Verweis darauf, wie
         // sich das Zweitgutachten zur ursprünglichen pflegefachlichen Stellungnahme verhält.

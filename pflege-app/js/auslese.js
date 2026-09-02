@@ -500,7 +500,13 @@ function normalizeImport(data) {
             total: data.total_weight !== undefined && data.total_weight !== null ? data.total_weight : (data.stam_pts_manual ? parseFloat(data.stam_pts_manual) : 0),
             pg: data.pflegegrad !== undefined && data.pflegegrad !== null ? data.pflegegrad : (data.stam_pg_manual ? parseInt(data.stam_pg_manual) : 0)
         },
-        valuesMap, provided
+        valuesMap, provided,
+        // Rekonstruktion aus einer alten Stellungnahme: dann werden nur die Kriterien
+        // gezeigt und geprüft, nicht Stammdaten, Diagnosen und Modulsummen.
+        nurKriterien: !!data._nurKriterien,
+        rekonstruiert: data._rekonstruiert || null,
+        nichtZuordenbar: data._nichtZuordenbar || null,
+        eigeneSummen: data._eigeneSummen || null
     };
 }
 
@@ -678,6 +684,7 @@ function rvMarkEdited(id) {
     if (el) { el.classList.remove('rev-missing'); el.classList.add('rev-ok'); }
     // Nach jeder Korrektur neu gegenrechnen – so sieht man sofort, ob es jetzt passt.
     if (typeof rvZeigeModulGegenprobe === 'function') rvZeigeModulGegenprobe();
+    if (typeof rvZeigeStellungnahmePruefung === 'function') rvZeigeStellungnahmePruefung();
 }
 function rvValNum(id, v) { reviewData.valuesMap[id] = parseInt(v); rvMarkEdited(id); }
 function rvM5Count(id, v) { if (typeof reviewData.valuesMap[id] !== 'object') reviewData.valuesMap[id] = { count: 0, period: 'W' }; reviewData.valuesMap[id].count = Number(v); rvMarkEdited(id); }
@@ -753,6 +760,7 @@ function openImportReview(file, data, mimeType) {
     rvZeigeScanHinweis();
     rvPruefePlausibel();
     rvZeigeModulGegenprobe();
+    if (typeof rvZeigeStellungnahmePruefung === 'function') rvZeigeStellungnahmePruefung();
     if (typeof nameHinweisAnzeigen === 'function') nameHinweisAnzeigen();
     document.getElementById('review-overlay').classList.add('active');
 }
@@ -834,6 +842,19 @@ function applyImportedData(rev) {
 function applyReviewedImport() {
     // Beim Anhörungsverfahren gehen die Werte in die dritte Spalte; der bestehende Fall
     // (Erstgutachten, eigene Bewertung, Notizen, Stellungnahme) bleibt unangetastet.
+    // Rekonstruktion aus der damaligen Stellungnahme: Es wird ausschließlich die eigene
+    // Beurteilung gesetzt. Erstgutachten, Stammdaten und Notizen bleiben unberührt.
+    if (importZiel === 'stellungnahme' && typeof uebernehmeAlteStellungnahme === 'function') {
+        uebernehmeAlteStellungnahme(reviewData);
+        const ausPS = (reviewData.rekonstruiert || []).length;
+        importZiel = 'orig';
+        closeReview();
+        switchTab(1);
+        showToast('Eigene Beurteilung übernommen. ' + ausPS + ' Kriterien stammen aus Ihrer '
+            + 'damaligen Stellungnahme, alle übrigen aus dem Erstgutachten. '
+            + 'Das Erstgutachten selbst blieb unverändert.', 'success');
+        return;
+    }
     if (importZiel === 'zweit' && typeof uebernehmeAnhoerung === 'function') {
         uebernehmeAnhoerung(reviewData);
         closeReview();
@@ -852,6 +873,32 @@ function buildReviewForm(rev) {
     const modNames = ["Mobilität", "Kognitive Fähigkeiten", "Verhaltensweisen", "Selbstversorgung", "Krankheitsbed. Anforderungen", "Alltagsgestaltung"];
     let html = '';
     html += '<div id="rev-scan-hinweis"></div>';
+
+    // Rekonstruktion aus einer alten Stellungnahme: Hier gibt es keine Stammdaten und
+    // keine Modulsummen zu prüfen – nur die Wertungen. Alles andere wegzulassen ist
+    // wichtig, sonst sähe es aus, als würde auch der Fallkopf überschrieben.
+    if (rev.nurKriterien) {
+        const anzahl = (rev.rekonstruiert || []).length;
+        const namen = (rev.rekonstruiert || [])
+            .map(id => (ITEMS.find(i => i.id === id) || {}).nr).filter(Boolean);
+        html += `<div class="rev-section"><div class="rev-sec-title">Aus Ihrer damaligen Stellungnahme gelesen</div>
+            <p style="font-size:12px;line-height:1.65;color:var(--text-secondary);padding:0 2px">
+              In <b>${anzahl}</b> Kriterien wurde damals widersprochen${namen.length ? ': ' + esc(namen.join(', ')) : ''}.
+              Diese Wertungen stehen unten bereits eingetragen. <b>Alle übrigen Kriterien
+              entsprechen dem Erstgutachten</b> – so ist der Widerspruch damals entstanden.
+              Übernommen wird ausschließlich Ihre eigene Beurteilung; das Erstgutachten und
+              die Stammdaten bleiben unberührt.
+            </p>`;
+        if ((rev.nichtZuordenbar || []).length) {
+            html += `<div class="hinweis-warnung" style="margin-top:10px"><b>Nicht zuzuordnen:</b>
+                ${esc(rev.nichtZuordenbar.join(' · '))}<br>
+                Diese Angaben aus der Stellungnahme passten zu keiner Stufe. Bitte unten von Hand setzen –
+                die App trägt hier bewusst nichts ein.</div>`;
+        }
+        html += `<div id="rev-stellungnahme-pruefung" style="margin-top:10px"></div></div>`;
+        html += buildReviewKriterien(rev);
+        return html;
+    }
 
     const tf = (label, k, type) => `<label class="rev-field"><span>${label}</span><input type="${type || 'text'}" id="rev-stam-${k}" value="${esc(rev.stam[k] || '')}" oninput="rvStam('${k}',this.value)"></label>`;
     html += `<div class="rev-section"><div class="rev-sec-title">Stammdaten</div><div class="rev-grid">`;
@@ -894,11 +941,26 @@ function buildReviewForm(rev) {
     html += `<div class="rev-section"><div class="rev-sec-title">Anamnese</div><textarea class="rev-textarea" oninput="rvText('anamnese',this.value)">${esc(rev.anamnese || '')}</textarea></div>`;
     html += `<div class="rev-section"><div class="rev-sec-title">Befund</div><textarea class="rev-textarea" oninput="rvText('befund',this.value)">${esc(rev.befund || '')}</textarea></div>`;
 
-    html += `<div class="rev-section"><div class="rev-sec-title">Einzelkriterien (NBA) — <span style="color:var(--green)">grün = erkannt</span> · <span style="color:var(--yellow)">gelb = nicht erkannt</span></div>`;
+    html += buildReviewKriterien(rev);
+    return html;
+}
+
+// Der Kriterienteil der Prüfansicht. Eigene Funktion, weil ihn zwei Wege brauchen:
+// der Gutachten-Import und die Rekonstruktion aus einer alten Stellungnahme.
+function buildReviewKriterien(rev) {
+    const esc = escapeHtml;
+    const modNames = ["Mobilität", "Kognitive Fähigkeiten", "Verhaltensweisen", "Selbstversorgung", "Krankheitsbed. Anforderungen", "Alltagsgestaltung"];
+    // Bei der Rekonstruktion bedeutet „erkannt" etwas anderes: gemeint sind die
+    // Kriterien, die in der Stellungnahme tatsächlich aufgeführt waren.
+    const rekon = rev.nurKriterien ? new Set(rev.rekonstruiert || []) : null;
+    const kopf = rev.nurKriterien
+        ? `Einzelkriterien (NBA) — <span style="color:var(--green)">grün = aus der Stellungnahme gelesen</span> · <span style="color:var(--yellow)">gelb = unverändert aus dem Erstgutachten</span>`
+        : `Einzelkriterien (NBA) — <span style="color:var(--green)">grün = erkannt</span> · <span style="color:var(--yellow)">gelb = nicht erkannt</span>`;
+    let html = `<div class="rev-section"><div class="rev-sec-title">${kopf}</div>`;
     for (let m = 1; m <= 6; m++) {
         html += `<div class="rev-mod-label">Modul ${m}: ${modNames[m - 1]}</div>`;
         ITEMS.filter(i => i.m === m).forEach(i => {
-            const ok = rev.provided.has(i.id);
+            const ok = rekon ? rekon.has(i.id) : rev.provided.has(i.id);
             const v = rev.valuesMap[i.id];
             let control = '';
             if (i.m === 5 && i.group !== 'D') {

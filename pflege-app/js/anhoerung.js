@@ -37,11 +37,35 @@ function renderAnhoerungBereich() {
         <div class="card">
             <div class="card-header"><div class="dot"></div>Anhörungsverfahren</div>
             <div style="padding:16px 20px">
-                <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px">
-                    Laden Sie zuerst den gespeicherten Widerspruchsfall über „Fall laden“. Damit stehen
-                    das Erstgutachten und Ihre damalige Bewertung fest. Lesen Sie anschließend das
-                    Anhörungsschreiben und das beigefügte Zweitgutachten ein – beides zusammen oder
-                    einzeln, je nachdem wie die Kasse es verschickt hat.
+                <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;
+                            text-transform:uppercase;color:var(--text-secondary);margin-bottom:8px">
+                    Schritt 1 · Grundlage aus dem Widerspruch</div>
+                <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+                    <b>Regelweg:</b> Laden Sie den gespeicherten Widerspruchsfall über „Fall laden“.
+                    Darin stehen alle 65 Kriterien genau so, wie Sie sie damals gesetzt haben –
+                    nichts wird geraten. Das ist immer der genauere Weg.
+                </p>
+                <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+                    <b>Ausweichweg für Altfälle</b> ohne gespeicherte Falldatei: Lesen Sie zuerst das
+                    <b>Erstgutachten</b> wie gewohnt ein und danach hier Ihre damalige
+                    <b>pflegefachliche Stellungnahme</b>. Aus beidem zusammen entsteht Ihr damaliger
+                    Stand: Die Stellungnahme nennt die strittigen Kriterien, alle übrigen entsprechen
+                    dem Gutachten. Jede gelesene Wertung wird Ihnen zur Prüfung vorgelegt.
+                </p>
+                <button class="btn btn-secondary" onclick="document.getElementById('grundlageStellungnahme').click()">
+                    📄 Damalige Stellungnahme einlesen (Ausweichweg)</button>
+                <input type="file" id="grundlageStellungnahme" accept=".pdf,image/*"
+                       onchange="leseAlteStellungnahme(event)" style="display:none">
+                <div id="grundlage-status" style="font-size:11px;color:var(--text-muted);margin:10px 0 18px"></div>
+
+                <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;
+                            text-transform:uppercase;color:var(--text-secondary);margin-bottom:8px">
+                    Schritt 2 · Anhörungsschreiben und Zweitgutachten</div>
+                <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+                    Lesen Sie das Anhörungsschreiben der Kasse und das beigefügte Zweitgutachten ein –
+                    beides zusammen oder einzeln, je nachdem wie die Kasse es verschickt hat. Danach
+                    zeigt Reiter 2 alle drei Stände nebeneinander; in die Stellungnahme gehen nur die
+                    Kriterien ein, in denen Sie dem Zweitgutachten widersprechen.
                 </p>
                 <button class="btn btn-ai" onclick="document.getElementById('anhoerungFiles').click()">
                     ⚡ Anhörungsschreiben und Gutachten einlesen</button>
@@ -100,6 +124,7 @@ function aktualisiereAnhoerungStatus() {
     teile.push(fallGeladen ? '✓ Widerspruchsfall geladen' : '– Widerspruchsfall noch nicht geladen');
     teile.push(hatZweitgutachten() ? '✓ Anhörungsgutachten übernommen' : '– Anhörungsgutachten fehlt noch');
     el.innerText = teile.join('   ·   ');
+    if (typeof aktualisiereGrundlageStatus === 'function') aktualisiereGrundlageStatus();
 }
 
 // Einlesen: mehrere Dateien möglich. Die erste wird ausgewertet, alle werden für die
