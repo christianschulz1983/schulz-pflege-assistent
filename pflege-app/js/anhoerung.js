@@ -270,11 +270,18 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
         }).join('')
         : `<p>Nach dem Anhörungsgutachten sind keine Einzelkriterien strittig geblieben.</p>`;
 
+    // Der Verweis auf das Verhältnis zur ursprünglichen Stellungnahme steht IMMER –
+    // er wird gerechnet und angehängt, nicht der KI überlassen. Der Standardtext ohne
+    // KI enthält dieselbe Gegenüberstellung bereits im Fließtext.
+    const verweis = anhoerungVerweisSatz(analyse, org);
     const allgemein = (allgemeinText && allgemeinText.trim())
         ? nummernImText(allgemeinText.trim(), org).split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
+          + (verweis ? `<p class="anh-verweis">${esc(verweis)}</p>` : '')
         : anhoerungAllgemeinStandard(analyse, org, begut, zweitDatum, origPts, zweitPts, pgSatz, origPG, zweitPG, notizenAnh);
 
-    const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}</span><span>: ${esc(v || '')}</span></div>`;
+    // Doppelpunkt direkt hinter der Bezeichnung; die Angaben bleiben in ihrer Spalte
+    // (Breite von .k in STELLUNGNAHME_CSS).
+    const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}:</span> <span>${esc(v || '')}</span></div>`;
 
     return `<div class="stmt">
     <div class="stmt-head">
@@ -351,6 +358,29 @@ function anhoerungSignatur(analyse, notizen) {
 }
 
 // Ohne KI: ein sachlicher Standardtext, der ausschließlich die Rechnung wiedergibt.
+/* PFLICHTVERWEIS IN DEN ALLGEMEINEN ANGABEN.
+   Der Ausschuss muss auf einen Blick sehen, wie sich das Anhörungsgutachten zur
+   ursprünglichen pflegefachlichen Stellungnahme verhält: worin ihr gefolgt wurde und
+   worin nicht. Dieser Satz wird GERECHNET und von der App eingesetzt – er darf nicht
+   davon abhängen, ob die KI ihn schreibt oder die Zahlen richtig trifft.
+   Rückgabe: leerer Text, wenn es nichts zu vergleichen gibt. */
+function anhoerungVerweisSatz(analyse, org) {
+    const a = analyse || (typeof schwellenAnalyse === 'function' ? schwellenAnalyse() : null);
+    if (!a || (!a.gefolgt.length && !a.strittig.length)) return '';
+    const nr = l => (typeof zeigeNr === 'function') ? zeigeNr(l.nr, org) : l.nr;
+    const zahlwort = n => n === 1 ? 'einem Punkt' : n + ' Punkten';
+    // Bewusst ohne den Namen der Organisation: „ist der Medicproof GmbH gefolgt" wäre
+    // grammatisch falsch. Das Anhörungsgutachten ist als Handelnder eindeutig.
+    const kopf = 'Im Vergleich zur ursprünglichen pflegefachlichen Stellungnahme ';
+    const gefolgt = 'folgt ihr das Anhörungsgutachten in ' + zahlwort(a.gefolgt.length)
+                  + ' (' + a.gefolgt.map(nr).join(', ') + ')';
+    const strittig = 'in ' + zahlwort(a.strittig.length) + ' blieb es bei der bisherigen '
+                   + 'Wertung (' + a.strittig.map(nr).join(', ') + ')';
+    if (a.gefolgt.length && a.strittig.length) return kopf + gefolgt + '; ' + strittig + '.';
+    if (a.gefolgt.length) return kopf + gefolgt + '.';
+    return kopf + 'folgt ihr das Anhörungsgutachten in keinem Punkt; ' + strittig + '.';
+}
+
 function anhoerungAllgemeinStandard(a, org, begut, zweitDatum, origPts, zweitPts, pgSatz, origPG, zweitPG, notizen) {
     const esc = escapeHtml;
     const f2 = n => Number(n).toFixed(2).replace('.', ',');

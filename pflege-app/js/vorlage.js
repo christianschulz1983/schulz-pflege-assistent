@@ -17,7 +17,9 @@ const STELLUNGNAHME_CSS = `
 .stmt p{margin:9px 0;}
 .stmt .data-block{margin:10px 0;}
 .stmt .data-row{display:flex;}
-.stmt .data-row .k{width:210px;flex-shrink:0;}
+/* Der Doppelpunkt steht unmittelbar hinter der Bezeichnung. Die Spaltenbreite ist so
+   gewaehlt, dass die Angaben dahinter genau dort beginnen wie bisher (gemessen: 217 px). */
+.stmt .data-row .k{width:217px;flex-shrink:0;}
 .stmt hr{border:none;border-top:1px solid #9aa3b2;margin:18px 0;}
 .stmt table.cmp{width:100%;border-collapse:collapse;margin:10px 0 6px;font-size:11pt;text-align:left;}
 .stmt table.cmp th,.stmt table.cmp td{border:1px solid #000;padding:6px 9px;vertical-align:top;}

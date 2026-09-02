@@ -347,6 +347,106 @@ async function selbsttest() {
             reviewData = merk;
         }
 
+        // ---------- 9g. Anhörung: Pflichtverweis in den Allgemeinen Angaben ----------
+        // Gewünscht: In den Allgemeinen Angaben steht IMMER ein kurzer Verweis darauf, wie
+        // sich das Zweitgutachten zur ursprünglichen pflegefachlichen Stellungnahme verhält.
+        if (typeof anhoerungVerweisSatz === 'function') {
+            const bau = (gefolgt, strittig) => ({
+                gefolgt: gefolgt.map(n => ({ nr: n })),
+                strittig: strittig.map(n => ({ nr: n }))
+            });
+            const MD = 'Medizinischer Dienst Nord';
+            let s = anhoerungVerweisSatz(bau(['4.1.1', '4.2.5'], ['4.4.8', '4.5.14']), MD);
+            pruefeWahr('Verweis nennt die ursprüngliche Stellungnahme',
+                s.includes('ursprünglichen pflegefachlichen Stellungnahme'));
+            pruefeWahr('Verweis nennt die gefolgten Kriterien',
+                s.includes('in 2 Punkten (4.1.1, 4.2.5)'));
+            pruefeWahr('Verweis nennt die strittig gebliebenen',
+                s.includes('4.4.8, 4.5.14') && s.includes('bei der bisherigen Wertung'));
+            pruefeWahr('Verweis nennt die Organisation nicht (Grammatikfalle)',
+                !/Medizinische[rn]? Dienst|Medicproof/.test(s));
+            pruefeWahr('Verweis doppelt die Stellungnahme nicht',
+                s.split('pflegefachlichen Stellungnahme').length === 2);
+
+            pruefeWahr('Verweis im Singular richtig',
+                anhoerungVerweisSatz(bau(['4.1.1'], []), MD).includes('in einem Punkt'));
+            pruefeWahr('Verweis, wenn in nichts gefolgt wurde',
+                anhoerungVerweisSatz(bau([], ['4.1.1']), MD).includes('in keinem Punkt'));
+            pruefe('Ohne Vergleichsmaterial kein Verweis',
+                anhoerungVerweisSatz(bau([], []), MD), '');
+            // Bei Medicproof trägt auch dieser Satz die Nummerierung des Gutachtens.
+            pruefeWahr('Verweis folgt der Nummerierung des Gutachtens',
+                anhoerungVerweisSatz(bau(['4.1.1'], []), 'Medicproof GmbH').includes('5.1.1'));
+
+            // Die KI darf die Zahlen nicht zusätzlich schreiben – sonst steht es doppelt.
+            const ap = generateBegruendungenAnhoerung.toString();
+            pruefeWahr('KI zählt die Kriterien nicht selbst auf',
+                ap.includes('ZÄHLE DIE KRITERIEN NICHT AUF'));
+        }
+
+        // ---------- 9f. Kopfzeile und Druckbild ----------
+        // Gemeldet: „about:blank" unten links in der gespeicherten PDF, und der
+        // Doppelpunkt stand weit hinter der Bezeichnung statt direkt dahinter.
+        if (typeof printAppealText === 'function') {
+            // (a) Doppelpunkt an der Bezeichnung – in ALLEN Vorlagen
+            // buildStellungnahme, nicht baueDokument: letzteres verteilt nur auf die
+            // Vorlagen und enthält selbst keine Kopfzeile.
+            const quellen = { widerspruch: buildStellungnahme, hoeherstufung: buildHoeherstufung,
+                              anhoerung: buildAnhoerung, deckblatt: buildDeckblatt };
+            Object.keys(quellen).forEach(name => {
+                const src = quellen[name].toString();
+                // Der Doppelpunkt gehört zur Bezeichnung. Das Leerzeichen zwischen den
+                // beiden Feldern ist nötig: Der Flex-Satz überspringt es, aber der
+                // Word-Export kennt kein Flex – dort träfen sonst „Betreffend:" und der
+                // Wert unmittelbar aufeinander.
+                pruefeWahr(name + ': Doppelpunkt steht an der Bezeichnung',
+                    src.includes('${esc(k)}:</span> <span>') && !src.includes('<span>: ${esc(v'));
+            });
+
+            // (b) Die Angaben bleiben in ihrer Spalte (gemessen, nicht geschätzt)
+            const h = document.createElement('div');
+            h.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px';
+            h.innerHTML = '<div class="stmt"><div class="data-block">'
+                + '<div class="data-row"><span class="k">Betreffend:</span><span id="__sv1">Frau A</span></div>'
+                + '<div class="data-row"><span class="k">Gutachtenorganisation:</span><span id="__sv2">Medizinischer Dienst</span></div>'
+                + '</div></div>';
+            const stEl = document.createElement('style'); stEl.textContent = STELLUNGNAHME_CSS;
+            document.body.appendChild(stEl); document.body.appendChild(h);
+            const bezug = h.querySelector('.data-row').getBoundingClientRect();
+            const v1 = document.getElementById('__sv1').getBoundingClientRect();
+            const v2 = document.getElementById('__sv2').getBoundingClientRect();
+            const abstand = Math.round(v1.left - bezug.left);
+            h.remove(); stEl.remove();
+            pruefe('Angaben beginnen an der bisherigen Stelle', abstand, 217);
+            pruefeWahr('Alle Angaben bündig untereinander', Math.abs(v1.left - v2.left) < 0.5);
+
+            // (c) Druckbild: kein Platz für die Kopfzeile des Browsers, aber Ränder
+            //     auf jeder Seite über die wiederholte Kopf-/Fußzeile der Tabelle.
+            const echtesOeffnen = window.open;
+            let druckHtml = '';
+            window.open = () => ({ document: { write: s => { druckHtml += s; }, close: () => {} } });
+            let ziel = document.getElementById('appeal-document');
+            const selbstGebaut = !ziel;
+            if (selbstGebaut) { ziel = document.createElement('div'); ziel.id = 'appeal-document'; document.body.appendChild(ziel); }
+            const merkInhalt = ziel.innerHTML;
+            ziel.innerHTML = '<div class="stmt"><p>Probe</p></div>';
+            printAppealText();
+            if (selbstGebaut) ziel.remove(); else ziel.innerHTML = merkInhalt;
+            window.open = echtesOeffnen;
+
+            pruefeWahr('Druck: kein Seitenrand für die Browser-Kopfzeile',
+                druckHtml.includes('@page{size:A4;margin:0;}'));
+            pruefeWahr('Druck: alter Seitenrand ist weg', !druckHtml.includes('@page{margin:14mm;}'));
+            pruefeWahr('Druck: oberer Rand wiederholt sich je Seite',
+                druckHtml.includes('<thead><tr><td><div class="rand-oben">'));
+            pruefeWahr('Druck: unterer Rand wiederholt sich je Seite',
+                druckHtml.includes('<tfoot><tr><td><div class="rand-unten">'));
+            pruefeWahr('Druck: seitliche Ränder vorhanden',
+                druckHtml.includes('.druckinhalt{padding:0 20mm;}'));
+            pruefeWahr('Druck: der Inhalt steht im Rahmen',
+                druckHtml.includes('<div class="druckinhalt"><div id="appeal-document">'));
+        }
+
         // ---------- 9e. Umrechnungstabellen aller sechs Module ----------
         // Anlass: In Modul 1 stand die Grenze zu 7,5 gewichteten Punkten bei 7 statt bei 6.
         // Wer genau 6 Einzelpunkte hatte, bekam 5,00 statt 7,50 – zweieinhalb Punkte zu
