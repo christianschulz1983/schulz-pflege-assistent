@@ -564,6 +564,8 @@ function rvExtract(kind, idx, v) {
         rvSpiegel('rev-stam-pg', reviewData.stam.pg);
     } else {
         reviewData.extracted[kind][idx] = rvZahl(v);
+        // Beide Prüfungen sofort neu rechnen – so sieht man an der Zeile, ob es jetzt passt.
+        if (typeof rvZeigeModulZeilen === 'function') rvZeigeModulZeilen();
         if (typeof rvZeigeModulGegenprobe === 'function') rvZeigeModulGegenprobe();
     }
     rvPruefePlausibel();
@@ -603,6 +605,33 @@ function modulGegenprobe(rev) {
         }
     }
     return abw;
+}
+
+/* Prüft die Modul-Zusammenfassung IN SICH: Passen Einzelpunkte und gewichtete Punkte
+   derselben Zeile nach den Richtlinien zusammen? Diese Prüfung braucht die
+   Einzelkriterien nicht und greift deshalb auch dann, wenn nur die Zusammenfassung
+   gelesen wurde. Sie steht vor der Gegenprobe, weil eine falsch gelesene Modulzeile
+   sonst alles Weitere verfälscht. */
+function rvZeigeModulZeilen() {
+    const box = document.getElementById('rev-modul-zeilen');
+    if (!box) return;
+    const funde = (typeof modulZeilenPruefung === 'function')
+        ? modulZeilenPruefung(reviewData && reviewData.extracted) : [];
+    if (!funde.length) { box.innerHTML = ''; return; }
+    const f2 = n => Number(n).toFixed(2).replace('.', ',');
+    box.innerHTML = '<div class="hinweis-warnung"><b>Bitte prüfen – Einzelpunkte und gewichtete '
+        + 'Punkte passen nicht zusammen:</b><br>'
+        + funde.map(f => escapeHtml(f.modul) + ': ' + f.einzel + ' Einzelpunkte ergeben nach den '
+            + 'Richtlinien ' + f2(f.gewichtetZuEinzel) + ' gewichtete Punkte, angegeben sind '
+            + f2(f.gewichtet) + '.'
+            + (f.einzelZuGewichtet
+                ? ' Zu ' + f2(f.gewichtet) + ' gewichteten Punkten gehören '
+                  + escapeHtml(f.einzelZuGewichtet) + ' Einzelpunkte.'
+                : ' Diese gewichtete Punktzahl gibt es in diesem Modul gar nicht.')
+          ).join('<br>')
+        + '<br>Eine der beiden Zahlen wurde falsch gelesen. Gleichen Sie die Zeile mit der PDF '
+        + 'links ab und korrigieren Sie sie hier – die Gesamtpunktzahl und der Pflegegrad hängen '
+        + 'daran.</div>';
 }
 
 function rvZeigeModulGegenprobe() {
@@ -759,6 +788,7 @@ function openImportReview(file, data, mimeType) {
     document.getElementById('review-form').innerHTML = buildReviewForm(reviewData);
     rvZeigeScanHinweis();
     rvPruefePlausibel();
+    rvZeigeModulZeilen();
     rvZeigeModulGegenprobe();
     if (typeof rvZeigeStellungnahmePruefung === 'function') rvZeigeStellungnahmePruefung();
     if (typeof nameHinweisAnzeigen === 'function') nameHinweisAnzeigen();
@@ -935,7 +965,8 @@ function buildReviewForm(rev) {
             html += `<div>${m + 1}. ${modNames[m]}</div><div><input type="number" step="1" value="${rev.extracted.raws[m]}" oninput="rvExtract('raws',${m},this.value)"></div><div><input type="number" step="0.01" value="${rev.extracted.weights[m]}" oninput="rvExtract('weights',${m},this.value)"></div>`;
         }
         html += `<div><b>Gesamt / PG</b></div><div><input type="number" step="1" id="rev-extract-pg" value="${rev.extracted.pg}" oninput="rvExtract('pg',0,this.value)" title="Pflegegrad"></div><div><input type="number" step="0.01" id="rev-extract-total" value="${rev.extracted.total}" oninput="rvExtract('total',0,this.value)" title="Gesamtpunkte"></div>`;
-        html += `</div><div id="rev-modul-pruefung" style="margin-top:10px"></div></div>`;
+        html += `</div><div id="rev-modul-zeilen" style="margin-top:10px"></div>`
+              + `<div id="rev-modul-pruefung" style="margin-top:10px"></div></div>`;
     }
 
     html += `<div class="rev-section"><div class="rev-sec-title">Anamnese</div><textarea class="rev-textarea" oninput="rvText('anamnese',this.value)">${esc(rev.anamnese || '')}</textarea></div>`;

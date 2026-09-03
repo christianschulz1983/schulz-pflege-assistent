@@ -141,6 +141,13 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Absicherung: `modulGegenprobe()` in `js/auslese.js` rechnet die eingelesenen Kriterien
    je Modul nach und vergleicht sie mit „Summe der Einzelpunkte" aus dem Gutachten. Jede
    Abweichung wird in der Prüfansicht angezeigt. Diese Gegenprobe niemals entfernen.
+   **Zwei Prüfungen, nicht eine:** `modulZeilenPruefung()` (`js/berechnung.js`) prüft jede
+   Modulzeile **in sich** – passen Einzelpunkte und gewichtete Punkte nach den Richtlinien
+   zusammen? Das geht ohne die Einzelkriterien und greift deshalb immer. Anlass: Ein
+   Gutachten kam mit „Modul 4: 25 Einzelpunkte, 10,00 gewichtete Punkte" herein; 25 ergeben
+   30,00, zu 10,00 gehören 3 bis 7. Der Hinweis nennt **beide Lesarten**, damit der Berater
+   in der PDF nachsehen kann, welche der beiden Zahlen falsch gelesen wurde. Korrigiert wird
+   von Hand – die App ändert die Zahlen nicht selbst.
 13. **Gescannte Gutachten: Text ist Lesehilfe, das Bild ist maßgeblich.**
    `textDecktDokumentAb()` in `js/auslese.js` entscheidet, ob der lokal ausgelesene Text
    das Dokument ersetzen darf. Er darf es **nur** bei einer echten Text-PDF: keine leere
@@ -227,7 +234,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 671 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 687 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

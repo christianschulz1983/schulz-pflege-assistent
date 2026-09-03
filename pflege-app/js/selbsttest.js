@@ -347,6 +347,63 @@ async function selbsttest() {
             reviewData = merk;
         }
 
+        // ---------- 9j. Modulzeilen in sich prüfen ----------
+        // Gemeldet: In der Prüfansicht stand „Modul 4: 25 Einzelpunkte, 10,00 gewichtete
+        // Punkte". Das kann nicht sein – 25 Einzelpunkte ergeben 30,00; zu 10,00 gehören
+        // 3 bis 7 Einzelpunkte. Das lässt sich feststellen, ohne die Kriterien zu kennen.
+        if (typeof modulZeilenPruefung === 'function') {
+            // Der gemeldete Fall, Zahl für Zahl
+            const gemeldet = { raws: [2, 0, 0, 25, 1, 0], weights: [2.5, 0, 0, 10, 5, 0],
+                               total: 17.5, pg: 1 };
+            const funde = modulZeilenPruefung(gemeldet);
+            pruefe('Gemeldeter Fall: genau eine Zeile unstimmig', funde.length, 1);
+            pruefeWahr('Gemeldeter Fall: Modul 4 benannt', funde[0] && funde[0].modul.includes('Modul 4'));
+            pruefe('Gemeldeter Fall: 25 Einzelpunkte ergäben 30,00',
+                funde[0] && funde[0].gewichtetZuEinzel, 30);
+            pruefe('Gemeldeter Fall: zu 10,00 gehören 3 bis 7',
+                funde[0] && funde[0].einzelZuGewichtet, '3 bis 7');
+
+            // Stimmige Zusammenfassung meldet nichts
+            pruefe('Stimmige Zusammenfassung meldet nichts',
+                modulZeilenPruefung({ raws: [2, 0, 0, 5, 1, 0], weights: [2.5, 0, 0, 10, 5, 0] }).length, 0);
+            pruefe('Ohne Zusammenfassung keine Meldung', modulZeilenPruefung(null).length, 0);
+            // Fehlende Zahlen werden übersprungen, nicht als Fehler gemeldet
+            pruefe('Leere Felder melden nichts',
+                modulZeilenPruefung({ raws: [null, '', undefined, 5, 1, 0],
+                                      weights: [2.5, 0, 0, 10, 5, 0] }).length, 0);
+
+            // Rückweg: welche Einzelpunkte gehören zu einer gewichteten Zahl?
+            pruefe('Rückweg Modul 4: 30,00', spannenTextZuGewicht(4, 30), '19 bis 36');
+            pruefe('Rückweg Modul 4: 40,00 ist die höchste Spanne',
+                spannenTextZuGewicht(4, 40), '37 und mehr');
+            pruefe('Rückweg Modul 5: 5,00 ist genau ein Punkt', spannenTextZuGewicht(5, 5), '1');
+            pruefe('Unbekannte Gewichtung ergibt keine Spanne', spannenTextZuGewicht(4, 12.34), '');
+
+            // Eine Gewichtung, die es im Modul gar nicht gibt, muss auffallen
+            const unmoeglich = modulZeilenPruefung({ raws: [2, 0, 0, 5, 1, 0],
+                                                     weights: [2.5, 0, 0, 12.34, 5, 0] });
+            pruefe('Unmögliche Gewichtung wird gemeldet', unmoeglich.length, 1);
+            pruefe('Unmögliche Gewichtung nennt keine Spanne',
+                unmoeglich[0] ? unmoeglich[0].einzelZuGewichtet : null, '');
+
+            // Der Hinweis in der Prüfansicht
+            const merkRev = reviewData;
+            let kasten = document.getElementById('rev-modul-zeilen');
+            const selbst = !kasten;
+            if (selbst) { kasten = document.createElement('div'); kasten.id = 'rev-modul-zeilen'; document.body.appendChild(kasten); }
+            reviewData = { extracted: gemeldet };
+            rvZeigeModulZeilen();
+            const txt = kasten.innerHTML;
+            pruefeWahr('Hinweis nennt beide Lesarten',
+                txt.includes('ergeben nach den Richtlinien 30,00') && txt.includes('gehören 3 bis 7 Einzelpunkte'));
+            pruefeWahr('Hinweis fordert zum Abgleich auf', txt.includes('mit der PDF'));
+            reviewData = { extracted: { raws: [2, 0, 0, 5, 1, 0], weights: [2.5, 0, 0, 10, 5, 0] } };
+            rvZeigeModulZeilen();
+            pruefe('Stimmige Zeilen ergeben keinen Hinweis', kasten.innerHTML, '');
+            if (selbst) kasten.remove();
+            reviewData = merkRev;
+        }
+
         // ---------- 9i. Unterlagen zur Akte in den Notizen dokumentieren ----------
         // Gewünscht: Arztberichte und sonstige Unterlagen hochladen und je Unterlage
         // dokumentieren – von wem, welche Profession, wann, bei Klinikaufenthalt von
