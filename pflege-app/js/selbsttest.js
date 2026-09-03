@@ -347,6 +347,87 @@ async function selbsttest() {
             reviewData = merk;
         }
 
+        // ---------- 9i. Unterlagen zur Akte in den Notizen dokumentieren ----------
+        // Gewünscht: Arztberichte und sonstige Unterlagen hochladen und je Unterlage
+        // dokumentieren – von wem, welche Profession, wann, bei Klinikaufenthalt von
+        // wann bis wann und warum, Diagnosen und Zusammenfassung.
+        if (typeof unterlagenEintrag === 'function') {
+            const voll = unterlagenEintrag({
+                art: 'Entlassungsbericht', verfasser: 'Dr. med. A. Muster',
+                profession: 'Facharzt für Innere Medizin', einrichtung: 'Klinikum Musterstadt',
+                erstelltAm: '12.03.2026', aufenthaltVon: '04.03.2026', aufenthaltBis: '11.03.2026',
+                aufenthaltGrund: 'Sturz mit Oberschenkelhalsfraktur',
+                diagnosen: 'S72.0 Schenkelhalsfraktur, I10 Hypertonie',
+                zusammenfassung: 'Operative Versorgung. Mobilisation am Rollator.',
+                pflegerelevant: 'Transfer nur mit Hilfe möglich.', _datei: 'Bericht.pdf'
+            });
+            pruefeWahr('Eintrag nennt die Art', voll.includes('--- Entlassungsbericht (Bericht.pdf) ---'));
+            pruefeWahr('Eintrag nennt Verfasser und Profession',
+                voll.includes('Verfasser: Dr. med. A. Muster, Facharzt für Innere Medizin, Klinikum Musterstadt'));
+            pruefeWahr('Eintrag nennt das Erstellungsdatum', voll.includes('Erstellt am: 12.03.2026'));
+            pruefeWahr('Eintrag nennt Aufenthalt mit Zeitraum und Grund',
+                voll.includes('Krankenhausaufenthalt: 04.03.2026 bis 11.03.2026 – Grund: Sturz mit Oberschenkelhalsfraktur'));
+            pruefeWahr('Eintrag nennt die Diagnosen', voll.includes('Diagnosen: S72.0'));
+            pruefeWahr('Eintrag nennt die Zusammenfassung', voll.includes('Zusammenfassung: Operative Versorgung'));
+            pruefeWahr('Eintrag nennt das Pflegerelevante', voll.includes('Pflegerelevant: Transfer nur mit Hilfe'));
+
+            // Pflegetagebuch: von wem, welcher Zeitraum, Zusammenfassung
+            const tagebuch = unterlagenEintrag({
+                art: 'Pflegetagebuch', verfasser: 'Tochter, Frau B. Muster', profession: 'Angehörige',
+                zeitraumVon: '01.02.2026', zeitraumBis: '28.02.2026',
+                zusammenfassung: 'Tägliche Unterstützung beim Waschen und Ankleiden.'
+            });
+            pruefeWahr('Pflegetagebuch: Verfasserin und Funktion',
+                tagebuch.includes('Verfasser: Tochter, Frau B. Muster, Angehörige'));
+            pruefeWahr('Pflegetagebuch: Zeitraum',
+                tagebuch.includes('Zeitraum: 01.02.2026 bis 28.02.2026'));
+            pruefeWahr('Pflegetagebuch: kein Krankenhausblock',
+                !tagebuch.includes('Krankenhausaufenthalt'));
+
+            // Fehlende Angaben werden WEGGELASSEN, nicht mit „unbekannt" aufgefüllt.
+            const knapp = unterlagenEintrag({ zusammenfassung: 'Nur ein Satz.' });
+            pruefeWahr('Fehlendes wird weggelassen, nicht erfunden',
+                !/unbekannt|nicht angegeben|Verfasser:|Erstellt am:|Diagnosen:/.test(knapp));
+            pruefeWahr('Ohne Art steht eine neutrale Überschrift', knapp.includes('--- Unterlage ---'));
+            pruefe('Ohne Fund kein Eintrag', unterlagenEintrag(null), '');
+
+            // Anhängen an die Notizen: Vorhandenes darf NIE überschrieben werden.
+            const feld = document.getElementById('erstgespraech-notes');
+            const merkFeld = feld ? feld.value : '';
+            const merkVar = (typeof erstgespraechNotes === 'string') ? erstgespraechNotes : '';
+            try {
+                if (feld) { feld.value = 'Wichtige Notiz aus dem Erstgespräch.'; }
+                erstgespraechNotes = 'Wichtige Notiz aus dem Erstgespräch.';
+                const n = haengeAnNotizen([tagebuch, voll]);
+                pruefe('Zwei Unterlagen angehängt', n, 2);
+                const jetzt = feld ? feld.value : erstgespraechNotes;
+                pruefeWahr('Bestehende Notiz bleibt erhalten',
+                    jetzt.startsWith('Wichtige Notiz aus dem Erstgespräch.'));
+                pruefeWahr('Beide Einträge stehen dahinter',
+                    jetzt.includes('--- Pflegetagebuch ---') && jetzt.includes('--- Entlassungsbericht'));
+                pruefeWahr('Einträge sind durch eine Leerzeile getrennt',
+                    jetzt.includes('Erstgespräch.\n\n--- Pflegetagebuch'));
+                pruefe('Nichts Angehaktes ändert nichts', haengeAnNotizen([]), 0);
+                pruefe('Leere Einträge ändern nichts', haengeAnNotizen(['', '   ']), 0);
+            } finally {
+                if (feld) feld.value = merkFeld;
+                erstgespraechNotes = merkVar;
+            }
+
+            // Die Anweisung muss das Erfinden ausschließen und die Felder benennen.
+            pruefeWahr('Anweisung verbietet Erfinden',
+                UNTERLAGEN_PROMPT.includes('Erfinde nichts') && UNTERLAGEN_PROMPT.includes('rate nicht'));
+            pruefeWahr('Anweisung fragt Profession ab', UNTERLAGEN_PROMPT.includes('profession'));
+            pruefeWahr('Anweisung fragt den Klinikaufenthalt ab',
+                UNTERLAGEN_PROMPT.includes('aufenthaltVon') && UNTERLAGEN_PROMPT.includes('aufenthaltGrund'));
+            pruefeWahr('Anweisung kennt das Pflegetagebuch',
+                UNTERLAGEN_PROMPT.includes('Pflegetagebuch'));
+            pruefeWahr('Der Knopf steht neben den Notizen',
+                renderNBASection('own').includes('unterlagenWaehlen()'));
+            pruefeWahr('Der Knopf fehlt in der Vorgutachten-Ansicht',
+                !renderNBASection('orig').includes('unterlagenWaehlen()'));
+        }
+
         // ---------- 9h. Anhörung: Grundlage aus einer alten Stellungnahme ----------
         // Ausweichweg für Altfälle ohne gespeicherte Falldatei. Regelweg bleibt „Fall laden".
         if (typeof wertungAusText === 'function') {
