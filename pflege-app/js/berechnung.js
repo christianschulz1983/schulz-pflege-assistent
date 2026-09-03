@@ -91,6 +91,51 @@ function spannenText(modul, einzel) {
     if (s.bis === s.ab) return s.ab === 0 ? 'kein Einzelpunkt' : s.ab + ' Einzelpunkt';
     return s.ab + ' bis ' + s.bis + ' Einzelpunkte';
 }
+// Umgekehrter Weg: Zu welcher Spanne von Einzelpunkten gehört ein gewichteter Wert?
+// Gebraucht, um beim Einlesen sagen zu können, welche Einzelpunktzahl passen WÜRDE.
+function spanneZuGewicht(modul, gew) {
+    return (MODUL_SPANNEN[modul] || []).find(s => Math.abs(s.gew - Number(gew)) < 0.001) || null;
+}
+function spannenTextZuGewicht(modul, gew) {
+    const s = spanneZuGewicht(modul, gew);
+    if (!s) return '';
+    const hoechst = (MODUL_SPANNEN[modul] || [])[0];
+    if (s === hoechst) return s.ab + ' und mehr';
+    if (s.bis === s.ab) return String(s.ab);
+    return s.ab + ' bis ' + s.bis;
+}
+
+/* PRÜFT EINE MODUL-ZUSAMMENFASSUNG IN SICH.
+   Einzelpunkte und gewichtete Punkte einer Zeile hängen über die Tabelle der
+   Richtlinien zusammen. Passen sie nicht zueinander, wurde eine der beiden Zahlen
+   falsch gelesen – das lässt sich feststellen, OHNE die Einzelkriterien zu kennen.
+   Anlass: Ein Gutachten kam mit „Modul 4: 25 Einzelpunkte, 10,00 gewichtete Punkte"
+   herein. 25 Einzelpunkte ergeben 30,00; zu 10,00 gehören 3 bis 7 Einzelpunkte.
+   Rückgabe: Liste der unstimmigen Zeilen, jeweils mit BEIDEN Lesarten. */
+function modulZeilenPruefung(extracted) {
+    if (!extracted || !extracted.raws || !extracted.weights) return [];
+    const namen = ['Modul 1 Mobilität', 'Modul 2 Kognitive Fähigkeiten', 'Modul 3 Verhaltensweisen',
+                   'Modul 4 Selbstversorgung', 'Modul 5 Krankheitsbed. Anforderungen',
+                   'Modul 6 Alltagsgestaltung'];
+    const funde = [];
+    for (let m = 0; m < 6; m++) {
+        const einzel = extracted.raws[m];
+        const gew = extracted.weights[m];
+        if (einzel === null || einzel === undefined || einzel === '' ) continue;
+        if (gew === null || gew === undefined || gew === '') continue;
+        const passtZuEinzel = gewichtetePunkte(m + 1, Number(einzel));
+        if (Math.abs(passtZuEinzel - Number(gew)) < 0.001) continue;
+        funde.push({
+            modul: namen[m],
+            einzel: Number(einzel),
+            gewichtet: Number(gew),
+            gewichtetZuEinzel: passtZuEinzel,
+            einzelZuGewichtet: spannenTextZuGewicht(m + 1, gew)
+        });
+    }
+    return funde;
+}
+
 // Modul 5 ist der Fall, in dem die breiten Spannen im Schriftstück erklärt werden müssen.
 function m5Gewichtet(einzel) { return gewichtetePunkte(5, einzel); }
 function m5SpannenText(einzel) { return spannenText(5, einzel); }
