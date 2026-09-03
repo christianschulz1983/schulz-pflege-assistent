@@ -35,7 +35,8 @@ pflege-app/
   js/befund.js        Befunderhebung (Erstantrag, Höherstufung)
   js/erfassung.js     Pflegepersonen, Aufenthalte, Versorgung, Übernahme in Modul 5
   js/hoeherstufung.js Dokumentvorlage der Anträge und Deckblatt
-  js/arztberichte.js  Mehrfach-Upload ärztlicher Unterlagen mit Zusammenführung
+  js/arztberichte.js  Mehrfach-Upload ärztlicher Unterlagen in die Erfassungstabellen
+  js/unterlagen.js    Unterlagen als dokumentierten Eintrag in die Notizen
   js/nummerierung.js  Nummerierung des Gutachtens (4.x.y bzw. 5.x.y bei Medicproof)
   js/selbsttest.js    Selbsttest (Knopf oben rechts)
   befund_katalog.js   Befundkatalog, acht Gruppen (nicht von Hand ändern)
@@ -170,6 +171,18 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Die interne Kennung in `data-nr` bleibt immer 4.x.y – daran hängt das Wiederfinden
    bereits erzeugter Begründungen.
 
+15. **Unterlagen zur Akte** (`js/unterlagen.js`): Neben den Notizen steht in **allen**
+   Vorgangsarten ein Upload für Arztberichte, Entlassungsberichte, Befunde, Verordnungen,
+   **Pflegetagebücher** und sonstige Schriftstücke. Je Unterlage entsteht ein Eintrag mit
+   Verfasser, Profession, Einrichtung, Erstellungsdatum, bei stationärer Behandlung
+   Aufenthalt von–bis samt Grund, den Diagnosen, einer Zusammenfassung und dem
+   Pflegerelevanten. **Fehlende Angaben bleiben leer** – niemals „unbekannt" einsetzen,
+   eine fehlende Angabe ist eine Information, eine erfundene nicht. Angehängt wird an die
+   Notizen (`haengeAnNotizen`), **nie überschreibend**: Die Mitschrift des Erstgesprächs
+   ist die Hauptquelle der erzeugten Texte. Nichts ist vorausgewählt.
+   Nicht zu verwechseln mit `js/arztberichte.js` – das überträgt Diagnosen, Hilfsmittel
+   und Therapien in die **Erfassungstabellen** von Erstantrag und Höherstufung.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -214,7 +227,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 646 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 671 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

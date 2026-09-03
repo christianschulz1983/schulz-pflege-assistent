@@ -12,6 +12,21 @@ function renderNBASection(prefix) {
                         Notieren Sie hier alle Anmerkungen aus dem Erstgespräch – unmittelbar neben der Einschätzung der einzelnen Module. Diese Mitschrift wird beim Erzeugen der Begründung berücksichtigt: sie fließt in die modulbezogene Argumentation ein und erscheint zusätzlich als zusammenfassender Fließtext.
                     </p>
                     <textarea id="erstgespraech-notes" class="field-input" style="min-height:160px;font-size:13px;line-height:1.6;padding:14px" placeholder="Mitschrift des Erstgesprächs / allgemeine Angaben / Anamnese ..." oninput="erstgespraechNotes = this.value; autoResize(this)"></textarea>
+
+                    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+                        <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:10px">
+                            <b>Unterlagen zur Akte.</b> Arztberichte, Entlassungsberichte, Befunde,
+                            Verordnungen, Pflegetagebücher und sonstige Schriftstücke. Jede Unterlage
+                            wird als Eintrag dokumentiert – von wem, welche Profession, wann erstellt,
+                            bei einem Krankenhausaufenthalt von wann bis wann und warum, dazu die
+                            Diagnosen und eine Zusammenfassung. Nichts wird ungefragt eingetragen:
+                            Sie haken an, was in die Notizen soll.
+                        </p>
+                        <button class="btn btn-secondary" onclick="unterlagenWaehlen()">
+                            📎 Unterlagen einlesen</button>
+                        <input type="file" id="unterlagenFiles" accept=".pdf,image/*" multiple
+                               onchange="leseUnterlagen(event)" style="display:none">
+                    </div>
                 </div>
             </div>` : ''}
 
