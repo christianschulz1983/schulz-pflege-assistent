@@ -290,17 +290,24 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
             const anl = (typeof anlagenVerweisHtml === 'function') ? anlagenVerweisHtml(l.nr) : '';
             return `<div class="crit" data-nr="${esc(l.nr)}" data-vals="${esc(lagenSchluessel(l))}">`
                  + `<div class="ct">${esc(zeigeNr(l.nr, org))}: ${esc(l.titel)}</div>`
-                 + `<div>Erstgutachten: „${esc(l.eText)}“ · Anhörungsgutachten: „${esc(l.zText)}“ · Meine Beurteilung: „${esc(l.bText)}“</div>`
+                 // Wie in der Vorlage des Verfassers: nur die Bewertung, gegen die sich die
+                 // Stellungnahme richtet – das ist im Anhörungsverfahren die des
+                 // ZWEITGUTACHTENS. Die eigene Beurteilung steht nicht in der Kopfzeile;
+                 // sie ergibt sich aus der Begründung und steht in der Gegenüberstellung.
+                 + `<div>Gutachterliche Bewertung: „${esc(l.zText)}“</div>`
                  + body + kipp + anl + `</div>`;
         }).join('')
-        : `<p>Nach dem Anhörungsgutachten sind keine Einzelkriterien strittig geblieben.</p>`;
+        : `<p>Nach dem Zweitgutachten sind keine Einzelkriterien strittig geblieben.</p>`;
 
     // Der Verweis auf das Verhältnis zur ursprünglichen Stellungnahme steht IMMER –
     // er wird gerechnet und angehängt, nicht der KI überlassen. Der Standardtext ohne
     // KI enthält dieselbe Gegenüberstellung bereits im Fließtext.
-    const verweis = anhoerungVerweisSatz(analyse, org);
-    const allgemein = (allgemeinText && allgemeinText.trim())
-        ? nummernImText(allgemeinText.trim(), org).split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
+    const kiText = (allgemeinText && allgemeinText.trim()) ? allgemeinText.trim() : '';
+    // Nur anhängen, wenn der Text den Bezug nicht ohnehin schon herstellt.
+    const verweis = (kiText && anhoerungVerweisVorhanden(kiText))
+        ? '' : anhoerungVerweisSatz(analyse, org);
+    const allgemein = kiText
+        ? nummernImText(kiText, org).split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
           + (verweis ? `<p class="anh-verweis">${esc(verweis)}</p>` : '')
         : anhoerungAllgemeinStandard(analyse, org, begut, zweitDatum, origPts, zweitPts, pgSatz, origPG, zweitPG, notizenAnh);
 
@@ -349,7 +356,7 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
 
     <h2>Allgemeine Angaben</h2>
     <div id="stmt-notes" data-sig="${esc(anhoerungSignatur(analyse, notizenAnh))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${allgemein}</div>
-    <p>Die nachfolgende Übersicht stellt die Ergebnisse des Erstgutachtens, des Anhörungsgutachtens und meiner Beurteilung einander gegenüber:</p>
+    <p>Die nachfolgende Übersicht stellt die Ergebnisse des Erstgutachtens, des Zweitgutachtens und meiner Beurteilung einander gegenüber:</p>
 
     <h2>Gegenüberstellung des Gutachtens und der abweichenden Bepunktung</h2>
     <table class="cmp">
@@ -392,18 +399,37 @@ function anhoerungSignatur(analyse, notizen) {
 function anhoerungVerweisSatz(analyse, org) {
     const a = analyse || (typeof schwellenAnalyse === 'function' ? schwellenAnalyse() : null);
     if (!a || (!a.gefolgt.length && !a.strittig.length)) return '';
-    const nr = l => (typeof zeigeNr === 'function') ? zeigeNr(l.nr, org) : l.nr;
-    const zahlwort = n => n === 1 ? 'einem Punkt' : n + ' Punkten';
     // Bewusst ohne den Namen der Organisation: „ist der Medicproof GmbH gefolgt" wäre
-    // grammatisch falsch. Das Anhörungsgutachten ist als Handelnder eindeutig.
-    const kopf = 'Im Vergleich zur ursprünglichen pflegefachlichen Stellungnahme ';
-    const gefolgt = 'folgt ihr das Anhörungsgutachten in ' + zahlwort(a.gefolgt.length)
-                  + ' (' + a.gefolgt.map(nr).join(', ') + ')';
-    const strittig = 'in ' + zahlwort(a.strittig.length) + ' blieb es bei der bisherigen '
-                   + 'Wertung (' + a.strittig.map(nr).join(', ') + ')';
-    if (a.gefolgt.length && a.strittig.length) return kopf + gefolgt + '; ' + strittig + '.';
-    if (a.gefolgt.length) return kopf + gefolgt + '.';
-    return kopf + 'folgt ihr das Anhörungsgutachten in keinem Punkt; ' + strittig + '.';
+    // grammatisch falsch. Das Zweitgutachten ist als Handelnder eindeutig.
+    //
+    // Und bewusst OHNE Nummernliste. In den Vorlagen des Verfassers steht der Verweis im
+    // Fließtext mit zwei bis drei benannten Beispielen; eine Reihe aus zwanzig Nummern
+    // ist genau das Abzählen, das dieser Abschnitt nicht enthalten soll.
+    const gesamt = a.gefolgt.length + a.strittig.length;
+    const zahlwort = n => n === 1 ? 'einem' : String(n);
+    if (!a.gefolgt.length) {
+        return 'Den in der pflegefachlichen Stellungnahme beanstandeten Kriterien ist das '
+             + 'Zweitgutachten in keinem Punkt gefolgt.';
+    }
+    if (!a.strittig.length) {
+        return 'Das Zweitgutachten folgt der pflegefachlichen Stellungnahme in allen '
+             + gesamt + ' beanstandeten Kriterien.';
+    }
+    return 'Das Zweitgutachten folgt der pflegefachlichen Stellungnahme in '
+         + zahlwort(a.gefolgt.length) + ' von ' + gesamt + ' beanstandeten Kriterien; in den '
+         + 'übrigen bleibt es bei der bisherigen Wertung.';
+}
+
+/* Steht der Verweis schon im Text der KI? Dann wird er nicht ein zweites Mal angehängt –
+   zwei Sätze mit derselben Aussage direkt hintereinander lesen sich schlecht.
+   Bewusst eng geprüft: Es genügt nicht, dass das Wort „Stellungnahme" vorkommt; es muss
+   auch das Verhältnis zum Zweitgutachten benannt sein. */
+function anhoerungVerweisVorhanden(text) {
+    const t = String(text || '').toLowerCase();
+    if (!t) return false;
+    const nenntStellungnahme = t.includes('stellungnahme');
+    const nenntVerhaeltnis = /gefolgt|folgt\s|folgte|übereinstimmung|ueberstimmung/.test(t);
+    return nenntStellungnahme && nenntVerhaeltnis;
 }
 
 function anhoerungAllgemeinStandard(a, org, begut, zweitDatum, origPts, zweitPts, pgSatz, origPG, zweitPG, notizen) {
@@ -428,7 +454,7 @@ function anhoerungAllgemeinStandard(a, org, begut, zweitDatum, origPts, zweitPts
     // Der Abstand zur Schwelle wird nur genannt, wenn die Angabe des Gutachtens zu seinen
     // eigenen Kriterien passt. Sonst wäre die Aussage nicht belastbar.
     if (a.naechsteSchwelle !== null && !a.abweichung) {
-        p += `<p>Das Anhörungsgutachten bleibt mit ${esc(f2(a.basis.total))} gewichteten Punkten um `
+        p += `<p>Das Zweitgutachten bleibt mit ${esc(f2(a.basis.total))} gewichteten Punkten um `
            + `${esc(f2(a.fehlendePunkte))} Punkte unter der für den nächsten Pflegegrad maßgeblichen Schwelle `
            + `von ${esc(f2(a.naechsteSchwelle))} Punkten.`;
         if (a.kipper.length) {

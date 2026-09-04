@@ -210,6 +210,43 @@ function zitatGedeckt(zitat, quelle) {
 }
 
 // Liefert alle Zitate einer Begründung, die sich NICHT im BRi-Text des Kriteriums finden.
+/* ÜBERHOLTE BEGRIFFE. „Pflegestufe" gibt es seit 2017 nicht mehr; im Schriftstück an den
+   Widerspruchsausschuss ist das ein peinlicher Fehler. Die KI greift trotz Anweisung
+   gelegentlich darauf zurück. Der Begriff wird NICHT still ersetzt – der Berater soll
+   sehen, wo er steht und selbst entscheiden, so wie bei den Zitaten.
+   Rückgabe: Anzahl der gefundenen Stellen. */
+const UEBERHOLTE_BEGRIFFE = [
+    { wort: /Pflegestufen?/g, statt: 'Pflegegrad', seit: 'Pflegestufen wurden 2017 durch Pflegegrade ersetzt' }
+];
+
+function ueberholteBegriffeImText(text) {
+    const t = String(text || '');
+    const funde = [];
+    UEBERHOLTE_BEGRIFFE.forEach(b => {
+        const treffer = t.match(b.wort);
+        if (treffer) funde.push({ wort: treffer[0], statt: b.statt, seit: b.seit, anzahl: treffer.length });
+    });
+    return funde;
+}
+
+function markiereUeberholteBegriffe(wurzel) {
+    if (!wurzel) return 0;
+    // Vorhandene Markierungen zuerst entfernen, damit sie sich beim erneuten Erstellen
+    // nicht häufen.
+    wurzel.querySelectorAll('.begriff-warnung').forEach(el => el.remove());
+    const funde = ueberholteBegriffeImText(wurzel.innerText || '');
+    if (!funde.length) return 0;
+    const box = document.createElement('div');
+    box.className = 'zitat-warnung begriff-warnung';
+    box.setAttribute('data-warn', '1');
+    box.innerText = '⚠ Bitte prüfen: ' + funde.map(f =>
+        '„' + f.wort + '" kommt ' + f.anzahl + '× vor – richtig ist „' + f.statt + '" (' + f.seit + ')'
+    ).join(' · ') + '. Bitte im Text ändern, bevor das Schriftstück hinausgeht.';
+    const erstes = wurzel.querySelector('.stmt');
+    if (erstes) erstes.insertBefore(box, erstes.firstChild); else wurzel.insertBefore(box, wurzel.firstChild);
+    return funde.reduce((s, f) => s + f.anzahl, 0);
+}
+
 function unbelegteZitate(nr, text) {
     const b = briFor(nr);
     if (!b || !text) return [];
@@ -408,6 +445,8 @@ async function generateAppealText() {
             const w = document.getElementById('appeal-veraltet');
             if (w) w.innerHTML = '';
         }
+        // Überholte Begriffe markieren, bevor sie zum Ausschuss gehen.
+        if (docEl && typeof markiereUeberholteBegriffe === 'function') markiereUeberholteBegriffe(docEl);
         // Auf nicht belegte BRi-Zitate hinweisen – die müssen vor dem Versand geprüft werden.
         const warnAnzahl = (docEl ? docEl.querySelectorAll('.zitat-warnung[data-warn]').length : 0);
         if (warnAnzahl) {
