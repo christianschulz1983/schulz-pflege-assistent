@@ -347,6 +347,105 @@ async function selbsttest() {
             reviewData = merk;
         }
 
+        // ---------- 9k. Anhörung: Form nach den Vorlagen des Verfassers ----------
+        // Gemeldet: Im Kriterienblock stand „Erstgutachten: … · Anhörungsgutachten: … ·
+        // Meine Beurteilung: …". In den Vorlagen (Deckner, Nebeling) steht dort nur
+        // „Gutachterliche Bewertung: „…“" – und es heißt Zweitgutachten, nicht
+        // Anhörungsgutachten.
+        if (typeof buildAnhoerung === 'function') {
+            const mO = JSON.parse(JSON.stringify(stateOrig));
+            const mE = JSON.parse(JSON.stringify(stateEigene));
+            const mZ = JSON.parse(JSON.stringify(stateZweit));
+            const mM = appModus;
+            try {
+                appModus = 'anhoerung';
+                const kid = nr => ITEMS.find(i => i.nr === nr).id;
+                stateOrig.extracted = null; delete stateZweit.extracted;
+                ITEMS.forEach(i => {
+                    const l = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0;
+                    stateOrig.values[i.id] = JSON.parse(JSON.stringify(l));
+                    stateEigene.values[i.id] = JSON.parse(JSON.stringify(l));
+                    stateZweit.values[i.id] = JSON.parse(JSON.stringify(l));
+                });
+                // 4.1.1 strittig, 4.2.5 gefolgt
+                stateOrig.values[kid('4.1.1')] = 0; stateZweit.values[kid('4.1.1')] = 1; stateEigene.values[kid('4.1.1')] = 2;
+                stateOrig.values[kid('4.2.5')] = 0; stateZweit.values[kid('4.2.5')] = 2; stateEigene.values[kid('4.2.5')] = 2;
+
+                const roh = buildAnhoerung('N', {}, '');
+                const txt = roh.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+                pruefeWahr('Anhörung: Kriterienblock nennt die gutachterliche Bewertung',
+                    txt.includes('4.1.1: Positionswechsel im Bett Gutachterliche Bewertung:'));
+                pruefeWahr('Anhörung: keine Dreierzeile mehr im Kriterienblock',
+                    !txt.includes('Meine Beurteilung:'));
+                pruefeWahr('Anhörung: Schriftstück sagt Zweitgutachten',
+                    txt.includes('des Zweitgutachtens'));
+                pruefeWahr('Anhörung: Schriftstück sagt nicht Anhörungsgutachten',
+                    !/Anhörungsgutachten/.test(txt));
+
+                // Der gerechnete Verweis: kurz, ohne Nummernliste
+                const v = anhoerungVerweisSatz(schwellenAnalyse(), 'Medizinischer Dienst');
+                pruefeWahr('Verweis nennt die Stellungnahme', v.includes('pflegefachlichen Stellungnahme'));
+                pruefeWahr('Verweis zählt keine Kriterien auf', !/4\.\d\.\d/.test(v));
+                pruefeWahr('Verweis nennt ein Verhältnis', /von \d+ beanstandeten Kriterien|in keinem Punkt|in allen/.test(v));
+
+                // Steht der Bezug schon im KI-Text, wird er nicht doppelt angehängt
+                const mitBezug = 'Der Medizinische Dienst ist der pflegefachlichen Stellungnahme in '
+                               + 'wesentlichen Punkten gefolgt.';
+                const dokMit = buildAnhoerung('N', {}, mitBezug).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+                pruefeWahr('Kein doppelter Verweis, wenn der Text ihn schon enthält',
+                    !dokMit.includes('beanstandeten Kriterien'));
+                const ohneBezug = 'Die Bewertung ist nicht nachvollziehbar.';
+                const dokOhne = buildAnhoerung('N', {}, ohneBezug).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+                pruefeWahr('Verweis wird angehängt, wenn er fehlt',
+                    dokOhne.includes('pflegefachlichen Stellungnahme'));
+                pruefeWahr('Erkennung: Text mit Bezug', anhoerungVerweisVorhanden(mitBezug));
+                pruefeWahr('Erkennung: Text ohne Bezug', !anhoerungVerweisVorhanden(ohneBezug));
+                pruefeWahr('Erkennung: leerer Text', !anhoerungVerweisVorhanden(''));
+            } finally {
+                stateOrig.values = mO.values; stateEigene.values = mE.values;
+                stateZweit.values = mZ.values; appModus = mM;
+            }
+
+            // Die Anweisung muss den Aufbau der Vorlagen tragen
+            const ap = generateBegruendungenAnhoerung.toString();
+            pruefeWahr('Anweisung: Aufbau in drei Absätzen', ap.includes('ABSATZ 1') && ap.includes('ABSATZ 3'));
+            pruefeWahr('Anweisung: höchstens drei Beispiele',
+                ap.includes('HÖCHSTENS DREI Kriterien'));
+            pruefeWahr('Anweisung: Beispiele mit Namen, nicht als Nummernreihe',
+                ap.includes('mit NAMEN und Nummer'));
+            pruefeWahr('Anweisung: Pflegestufe verboten', ap.includes('niemals „Pflegestufe"'));
+            pruefeWahr('Anweisung: Zweitgutachten statt Anhörungsgutachten',
+                ap.includes('Schreibe „Zweitgutachten"'));
+        }
+
+        // ---------- 9l. Überholte Begriffe im fertigen Schriftstück ----------
+        if (typeof ueberholteBegriffeImText === 'function') {
+            const f = ueberholteBegriffeImText('Dem Gutachten fehlen 12,5 Punkte bis zur nächsten Pflegestufe.');
+            pruefe('Pflegestufe wird gefunden', f.length, 1);
+            pruefe('Pflegestufe: richtige Alternative', f[0] && f[0].statt, 'Pflegegrad');
+            pruefe('Mehrfachnennung wird gezählt',
+                (ueberholteBegriffeImText('Pflegestufe 1 und Pflegestufen allgemein')[0] || {}).anzahl, 2);
+            pruefe('Sauberer Text meldet nichts',
+                ueberholteBegriffeImText('Es geht um den Pflegegrad 2.').length, 0);
+            pruefe('Leerer Text meldet nichts', ueberholteBegriffeImText('').length, 0);
+
+            // Markierung im Dokument
+            const huelle = document.createElement('div');
+            huelle.innerHTML = '<div class="stmt"><p>Bis zur nächsten Pflegestufe fehlen Punkte.</p></div>';
+            const n = markiereUeberholteBegriffe(huelle);
+            pruefe('Markierung zählt die Stellen', n, 1);
+            pruefeWahr('Markierung erscheint im Dokument',
+                huelle.querySelectorAll('.begriff-warnung[data-warn]').length === 1);
+            pruefeWahr('Markierung nennt die richtige Wortwahl',
+                huelle.innerText.includes('richtig ist „Pflegegrad"'));
+            // Beim erneuten Erstellen darf sie sich nicht häufen
+            markiereUeberholteBegriffe(huelle);
+            pruefe('Markierung häuft sich nicht', huelle.querySelectorAll('.begriff-warnung').length, 1);
+            const sauber = document.createElement('div');
+            sauber.innerHTML = '<div class="stmt"><p>Pflegegrad 2.</p></div>';
+            pruefe('Sauberes Dokument bleibt unmarkiert', markiereUeberholteBegriffe(sauber), 0);
+        }
+
         // ---------- 9j. Modulzeilen in sich prüfen ----------
         // Gemeldet: In der Prüfansicht stand „Modul 4: 25 Einzelpunkte, 10,00 gewichtete
         // Punkte". Das kann nicht sein – 25 Einzelpunkte ergeben 30,00; zu 10,00 gehören
@@ -623,31 +722,33 @@ async function selbsttest() {
             });
             const MD = 'Medizinischer Dienst Nord';
             let s = anhoerungVerweisSatz(bau(['4.1.1', '4.2.5'], ['4.4.8', '4.5.14']), MD);
-            pruefeWahr('Verweis nennt die ursprüngliche Stellungnahme',
-                s.includes('ursprünglichen pflegefachlichen Stellungnahme'));
-            pruefeWahr('Verweis nennt die gefolgten Kriterien',
-                s.includes('in 2 Punkten (4.1.1, 4.2.5)'));
-            pruefeWahr('Verweis nennt die strittig gebliebenen',
-                s.includes('4.4.8, 4.5.14') && s.includes('bei der bisherigen Wertung'));
+            pruefeWahr('Verweis nennt die Stellungnahme',
+                s.includes('pflegefachlichen Stellungnahme'));
+            pruefeWahr('Verweis nennt das Verhältnis',
+                s.includes('2 von 4 beanstandeten Kriterien')
+                && s.includes('bleibt es bei der bisherigen Wertung'));
+            // In den Vorlagen des Verfassers steht hier KEINE Nummernreihe. Zwanzig
+            // Kriteriumsnummern hintereinander sind genau das Abzählen, das dieser
+            // Abschnitt nicht enthalten soll.
+            pruefeWahr('Verweis zählt keine Kriterien auf', !/\d\.\d\.\d/.test(s));
             pruefeWahr('Verweis nennt die Organisation nicht (Grammatikfalle)',
                 !/Medizinische[rn]? Dienst|Medicproof/.test(s));
             pruefeWahr('Verweis doppelt die Stellungnahme nicht',
                 s.split('pflegefachlichen Stellungnahme').length === 2);
 
             pruefeWahr('Verweis im Singular richtig',
-                anhoerungVerweisSatz(bau(['4.1.1'], []), MD).includes('in einem Punkt'));
+                anhoerungVerweisSatz(bau(['4.1.1'], ['4.4.8']), MD).includes('in einem von 2'));
             pruefeWahr('Verweis, wenn in nichts gefolgt wurde',
-                anhoerungVerweisSatz(bau([], ['4.1.1']), MD).includes('in keinem Punkt'));
+                anhoerungVerweisSatz(bau([], ['4.1.1']), MD).includes('in keinem Punkt gefolgt'));
+            pruefeWahr('Verweis, wenn in allem gefolgt wurde',
+                anhoerungVerweisSatz(bau(['4.1.1', '4.2.5'], []), MD).includes('in allen 2'));
             pruefe('Ohne Vergleichsmaterial kein Verweis',
                 anhoerungVerweisSatz(bau([], []), MD), '');
-            // Bei Medicproof trägt auch dieser Satz die Nummerierung des Gutachtens.
-            pruefeWahr('Verweis folgt der Nummerierung des Gutachtens',
-                anhoerungVerweisSatz(bau(['4.1.1'], []), 'Medicproof GmbH').includes('5.1.1'));
 
-            // Die KI darf die Zahlen nicht zusätzlich schreiben – sonst steht es doppelt.
+            // Die KI soll die Beispiele selbst benennen – aber höchstens drei, mit Namen.
             const ap = generateBegruendungenAnhoerung.toString();
-            pruefeWahr('KI zählt die Kriterien nicht selbst auf',
-                ap.includes('ZÄHLE DIE KRITERIEN NICHT AUF'));
+            pruefeWahr('KI nennt höchstens drei Beispiele',
+                ap.includes('HÖCHSTENS DREI Kriterien') && ap.includes('Zähle NIEMALS alle auf'));
         }
 
         // ---------- 9f. Kopfzeile und Druckbild ----------
@@ -1336,8 +1437,12 @@ async function selbsttest() {
             const crits = Array.from(el.querySelectorAll('.crit[data-nr]')).map(c => c.getAttribute('data-nr'));
             pruefe('Anhörung: nur strittige Kriterien', crits.sort(), ['4.4.2', '4.4.3']);
             pruefeWahr('Anhörung: gefolgtes Kriterium fehlt zu Recht', crits.indexOf('4.4.1') === -1);
-            pruefeWahr('Anhörung: alle drei Stände je Kriterium',
-                /Erstgutachten: .{1,40} · Anhörungsgutachten: .{1,40} · Meine Beurteilung:/.test(text));
+            // Die drei Stände stehen in der GEGENÜBERSTELLUNG, nicht im Kriterienblock.
+            // Dort steht nach der Vorlage des Verfassers nur die gutachterliche Bewertung.
+            // Dieser Fall läuft mit Medicproof – die Überschrift trägt dort 5.4.2.
+            pruefeWahr('Anhörung: Kriterienblock nur mit gutachterlicher Bewertung',
+                /[45]\.4\.2:[^]{0,80}Gutachterliche Bewertung:/.test(text)
+                && !text.includes('Meine Beurteilung:'));
             pruefeWahr('Anhörung: Fazit nennt beide Gutachten',
                 text.includes('Die vorliegenden Gutachten des Medicproof GmbH vom 29.01.2026'));
             pruefeWahr('Anhörung: kein „Pflegegrad 0" im Dokument', !/Pflegegrad 0/.test(text));

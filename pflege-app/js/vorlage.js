@@ -36,6 +36,8 @@ const STELLUNGNAHME_CSS = `
 /* Rechnerische Wirkung einer Änderung in Modul 5. Gehört in den Versand – Modul 5 wird
    je Gruppe gewertet, und ohne diesen Satz wirkt die Punktzahl widersprüchlich. */
 .stmt .m5-wirkung{margin:5px 0 0;}
+/* Gerechneter Verweis auf das Verhältnis zur ursprünglichen Stellungnahme. */
+.stmt .anh-verweis{margin:0 0 10px;}
 .stmt ul.aa{margin:8px 0 8px 24px;}
 .stmt ul.aa li{margin:3px 0;}
 .stmt .stmt-footer{margin-top:34px;border-top:1px solid #ccc;padding-top:8px;display:flex;justify-content:space-between;font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#333;}

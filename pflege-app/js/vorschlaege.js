@@ -567,7 +567,7 @@ Eine nummerierte Aufzählung (1., 2., 3.) ist hier zulässig, wenn sie die Argum
 DIE SECHS ERWIDERUNGSMUSTER. Zu jedem Kriterium ist angegeben, welche in Betracht kommen.
 Verwende nur die genannten und nur, soweit das Material sie trägt:
 A – Der Befund ist im Zweitgutachten bestätigt, die Wertung blieb dennoch unverändert.
-    Muster: „Das Anhörungsgutachten bestätigt im Befund: „…“. Es bleibt unklar, wie … wenn …“
+    Muster: „Das Zweitgutachten bestätigt im Befund: „…“. Es bleibt unklar, wie … wenn …“
 B – Die Wertung stützt sich auf die Selbsteinschätzung der versicherten Person statt auf den Befund.
     Muster: „… wird lediglich mit dem Zusatz „wie kenntlich gemacht“ begründet – eine reine Übernahme
     einer Selbsteinschätzung, die durch die objektive Befundlage widerlegt wird.“
@@ -599,15 +599,18 @@ ZWINGEND:
 
     prompt += `RECHENERGEBNIS (belastbar, nicht zu verändern):\n`
         + `- Erstgutachten: ${calculateInternal('orig').total.toFixed(2).replace('.', ',')} Punkte\n`
-        + `- Anhörungsgutachten: ${analyse.basis.total.toFixed(2).replace('.', ',')} Punkte\n`
+        + `- Zweitgutachten: ${analyse.basis.total.toFixed(2).replace('.', ',')} Punkte\n`
         + `- Eigene Beurteilung: ${analyse.gesamt.total.toFixed(2).replace('.', ',')} Punkte\n`;
     if (analyse.naechsteSchwelle !== null) {
         prompt += `- Bis zur nächsten Schwelle (${String(analyse.naechsteSchwelle).replace('.', ',')} Punkte) fehlen dem `
-                + `Anhörungsgutachten ${String(analyse.fehlendePunkte).replace('.', ',')} Punkte.\n`;
+                + `Zweitgutachten ${String(analyse.fehlendePunkte).replace('.', ',')} Punkte.\n`;
     }
     if (analyse.gefolgt.length) {
-        prompt += `- GEFOLGT ist der Medizinische Dienst in: `
-                + analyse.gefolgt.map(l => l.nr + ' (' + l.zText + ')').join(', ') + '\n';
+        // Mit TITEL, nicht nur Nummer: In der Vorlage des Verfassers werden zwei bis drei
+        // Kriterien beispielhaft benannt („wie dem Treffen von Entscheidungen (4.2.6)"),
+        // nicht als Nummernliste abgezählt.
+        prompt += `- GEFOLGT ist das Zweitgutachten der Stellungnahme in ${analyse.gefolgt.length} Kriterien: `
+                + analyse.gefolgt.map(l => l.titel + ' (' + l.nr + ')').join(', ') + '\n';
     }
     if (analyse.kipper.length) {
         prompt += `- Allein die Korrektur folgender Kriterien würde den Pflegegrad ändern: `
@@ -631,7 +634,7 @@ ZWINGEND:
     strittig.forEach(l => {
         const b = briFor(l.nr);
         prompt += `--- Kriterium ${l.nr}: ${l.titel} ---\n`;
-        prompt += `Erstgutachten: „${l.eText}"\nAnhörungsgutachten: „${l.zText}"\nMeine Beurteilung: „${l.bText}"\n`;
+        prompt += `Erstgutachten: „${l.eText}"\nZweitgutachten: „${l.zText}"\nMeine Beurteilung: „${l.bText}"\n`;
         prompt += `Lage: ${VERGLEICH_LAGEN[l.lage].titel} – ${VERGLEICH_LAGEN[l.lage].text}\n`;
         prompt += `Passende Erwiderungsmuster: ${erwiderungsMuster(l, analyse).join(', ')}\n`;
         if (l.kipptAllein) prompt += `Bereits dieses eine Kriterium würde den Pflegegrad ändern.\n`;
@@ -647,22 +650,47 @@ ZWINGEND:
     });
 
     if (mitAllgemein) {
+        /* Aufbau und Tonfall folgen den Vorlagen des Verfassers (Deckner, Nebeling).
+           Dort steht KEINE Nummernliste, sondern Fließtext, in dem zwei bis drei
+           Kriterien beispielhaft mit ihrem Namen benannt werden. Der tragende Gedanke
+           ist immer derselbe: Der Medizinische Dienst folgt der Stellungnahme in
+           mehreren Punkten – das bestätigt ihre Tragfähigkeit –, aber gerade nicht in
+           den entscheidenden, sodass die Schwelle knapp unterschritten bleibt. */
         prompt += 'ZUSÄTZLICHE AUFGABE – Abschnitt „Allgemeine Angaben":\n'
                 + laengenVorgabeAllgemein('Allgemeine Angaben') + '\n'
-                + 'ZWECK: Das AUFZEIGEN VON LÜCKEN UND WIDERSPRÜCHEN im Anhörungsgutachten – mehr nicht.\n'
-                + 'Verfasse ihn NEU, in 2 bis 3 knappen Absätzen:\n'
-                + '- Nenne beide Gutachten mit Datum, Punktzahl und Pflegegrad (nur diese Zahlen).\n'
-                + '- Halte fest, dass der Medizinische Dienst der pflegefachlichen Stellungnahme in Teilen\n'
-                + '  gefolgt ist, und dass dies ihre Tragfähigkeit bestätigt. ZÄHLE DIE KRITERIEN NICHT AUF\n'
-                + '  und nenne KEINE Anzahl – die genaue Gegenüberstellung von ursprünglicher Stellungnahme\n'
-                + '  und Anhörungsgutachten setzt die App selbst als eigenen Satz ans Ende des Abschnitts.\n'
-                + '- Arbeite heraus, dass er in den entscheidenden Punkten nicht gefolgt ist, und nenne den\n'
-                + '  Abstand zur Schwelle mit den oben genannten Zahlen.\n'
-                + '- Baue meine Anmerkungen zum Anhörungsverfahren vollständig ein.\n'
+                + 'ZWECK: Das AUFZEIGEN VON LÜCKEN UND WIDERSPRÜCHEN im Zweitgutachten – mehr nicht.\n'
+                + 'Verfasse ihn NEU, als zusammenhängenden Fließtext in 3 knappen Absätzen. Halte dich\n'
+                + 'an Aufbau und Tonfall der folgenden Vorlage; die Formulierungen stammen aus meinen\n'
+                + 'eigenen Stellungnahmen und sind bewusst so gewählt:\n\n'
+                + 'ABSATZ 1 – die Diskrepanz benennen. Muster:\n'
+                + '  „Die vorliegenden Gutachten des <Organisation> vom <Datum 1> und vom <Datum 2>\n'
+                + '   weisen mit einer Bewertung von <Punkte> gewichteten Punkten und <der erneuten\n'
+                + '   Ablehnung eines Pflegegrades / der Feststellung des Pflegegrades N> eine fachlich\n'
+                + '   nicht nachvollziehbare Diskrepanz zwischen der Befunderhebung und der\n'
+                + '   abschließenden Bewertung auf."\n'
+                + '  Nenne dabei auch die Durchführungsart des Zweitgutachtens, wenn sie von der des\n'
+                + '  Erstgutachtens abweicht (etwa Aktenlage statt Hausbesuch).\n\n'
+                + 'ABSATZ 2 – worin gefolgt wurde. Muster:\n'
+                + '  „Es ist auffällig, dass der Medizinische Dienst im Zweitgutachten in wesentlichen\n'
+                + '   Modulpunkten – wie <Kriteriumsname (Nummer)>, <Kriteriumsname (Nummer)> und\n'
+                + '   <Kriteriumsname (Nummer)> – den fachlich fundierten Korrekturhinweisen der\n'
+                + '   pflegefachlichen Stellungnahme folgt. Diese Übereinstimmung unterstreicht die\n'
+                + '   Validität der dort erhobenen Befunde."\n'
+                + '  ZWINGEND: Nenne HÖCHSTENS DREI Kriterien, und zwar mit NAMEN und Nummer aus der\n'
+                + '  Liste oben. Zähle NIEMALS alle auf – eine lange Nummernreihe gehört nicht in\n'
+                + '  diesen Abschnitt. Wurde in keinem Punkt gefolgt, schreibe das in einem Satz.\n\n'
+                + 'ABSATZ 3 – worin nicht gefolgt wurde. Muster:\n'
+                + '  „Dennoch lässt die Auswertung den Schluss zu, dass den Änderungen der\n'
+                + '   pflegefachlichen Stellungnahme nicht vollständig gefolgt wurde, sodass die für\n'
+                + '   den Pflegegrad N maßgebliche Hürde von <Schwelle> Punkten knapp unterschritten\n'
+                + '   bleibt." Nutze dafür die oben genannten Zahlen.\n'
+                + '  Baue meine Anmerkungen zum Anhörungsverfahren hier vollständig ein.\n\n'
+                + 'WORTWAHL: Es heißt PFLEGEGRAD, niemals „Pflegestufe" – Pflegestufen gibt es seit\n'
+                + '2017 nicht mehr. Schreibe „Zweitgutachten", nicht „Anhörungsgutachten".\n'
                 + 'STRENG VERBOTEN in diesem Abschnitt – das gehört in „Befund und Stellungnahme":\n'
                 + 'jede Begründung, warum eine andere Wertung richtig wäre; jeder Bezug auf die\n'
                 + 'Begutachtungs-Richtlinien und jedes Zitat daraus; jede Stufenbezeichnung; jeder\n'
-                + 'Ableitungssatz; das Abzählen einzelner Kriterien über die reine Nennung hinaus.\n\n';
+                + 'Ableitungssatz; das Abzählen einzelner Kriterien über die drei Beispiele hinaus.\n\n';
     }
 
     const schema = {

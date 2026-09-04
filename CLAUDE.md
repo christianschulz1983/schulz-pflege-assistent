@@ -104,7 +104,18 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    In den **Allgemeinen Angaben** steht **immer** ein Verweis darauf, wie sich das
    Anhörungsgutachten zur ursprünglichen Stellungnahme verhält – worin ihm gefolgt wurde
    und worin nicht. Dieser Satz wird von `anhoerungVerweisSatz()` **gerechnet** und
-   angehängt; die KI ist ausdrücklich angewiesen, die Kriterien NICHT selbst aufzuzählen.
+   angehängt – aber nur, wenn der KI-Text den Bezug nicht ohnehin schon herstellt
+   (`anhoerungVerweisVorhanden()`). Der Satz enthält **keine Nummernreihe**; in den Vorlagen
+   des Verfassers werden zwei bis drei Kriterien beispielhaft mit **Namen** benannt, nicht
+   zwanzig Nummern abgezählt. Die KI ist entsprechend angewiesen (höchstens drei Beispiele).
+9b. **Form der Anhörung folgt den Vorlagen** (Deckner, Nebeling im Drive des Verfassers).
+   Im Kriterienblock steht **nur** „Gutachterliche Bewertung: „…“" – gemeint ist die des
+   **Zweitgutachtens**, gegen das sich die Stellungnahme richtet. Keine Dreierzeile mit
+   „Meine Beurteilung"; die drei Stände stehen in der Gegenüberstellung. Im Schriftstück und
+   in den KI-Anweisungen heißt es **Zweitgutachten**, nicht „Anhörungsgutachten" (in der
+   Bedienoberfläche bleibt der Verfahrensbegriff stehen). Die Allgemeinen Angaben folgen dem
+   Dreiklang der Vorlagen: Diskrepanz benennen – worin gefolgt wurde (max. drei Beispiele mit
+   Namen) – worin nicht, mit dem Abstand zur Schwelle.
 9a. **Grundlage der Anhörung – zwei Wege** (`js/grundlage.js`). **Regelweg: „Fall laden".**
    Die Falldatei enthält alle 65 Kriterien exakt; nichts wird geraten. **Ausweichweg für
    Altfälle:** Erstgutachten einlesen, danach die damalige Stellungnahme als PDF. Das geht,
@@ -190,6 +201,12 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Nicht zu verwechseln mit `js/arztberichte.js` – das überträgt Diagnosen, Hilfsmittel
    und Therapien in die **Erfassungstabellen** von Erstantrag und Höherstufung.
 
+16. **Überholte Begriffe** (`ueberholteBegriffeImText`, `markiereUeberholteBegriffe` in
+   `js/dokument.js`): „Pflegestufe" gibt es seit 2017 nicht mehr. Die KI greift trotz
+   Anweisung gelegentlich darauf zurück. Das fertige Schriftstück wird darauf geprüft und
+   die Stelle **markiert** – nach dem Muster der Zitatprüfung, am Bildschirm sichtbar, im
+   Ausdruck ausgeblendet. **Nicht still ersetzen**: Der Berater soll sehen, wo es steht.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -234,7 +251,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 687 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 714 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
