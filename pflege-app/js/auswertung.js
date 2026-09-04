@@ -218,6 +218,52 @@ function renderAuswertung() {
     }
 }
 
+/* NAME DER FALLDATEI: „Vorname, Nachname, Bezeichnung.json".
+   Vorgabe des Verfassers. Vorher hieß sie „Frau_Stephanie_Kaftan_Pflegegradassistent.json" –
+   die Anrede half nicht beim Suchen, und die Vorgangsart fehlte ganz, obwohl zu einer
+   Person nacheinander Widerspruch und Anhörung entstehen. */
+const VORGANG_BEZEICHNUNG = {
+    widerspruch:   'Widerspruch',
+    hoeherstufung: 'Höherstufung',
+    erstantrag:    'Erstantrag',
+    anhoerung:     'Anhörungsschreiben'
+};
+
+// Namenszusätze, die zum Nachnamen gehören: „Ludwig van Beethoven" -> „van Beethoven".
+const NAMENSZUSAETZE = ['von', 'van', 'vom', 'der', 'den', 'zu', 'zur', 'zum', 'de', 'del', 'della', 'di', 'da', 'du', 'la', 'le', 'ten', 'ter'];
+
+/* Zerlegt das Feld „Betreffend" in Vor- und Nachnamen.
+   Erkannt werden „Frau Stephanie Kaftan", „Kaftan, Stephanie" und „Stephanie Kaftan".
+   Mehrere Vornamen bleiben beim Vornamen; das letzte Wort ist der Nachname. */
+function fallNamensteile(roh) {
+    let s = String(roh == null ? '' : roh).replace(/\s+/g, ' ').trim();
+    if (!s) return { vorname: '', nachname: '' };
+    // „Kaftan, Stephanie" umdrehen – aber nicht „Frau Kaftan, Stephanie" falsch behandeln
+    const komma = s.match(/^([^,]+),\s*(.+)$/);
+    if (komma && !/^(herr|frau)\b/i.test(s)) s = (komma[2] + ' ' + komma[1]).trim();
+    s = s.replace(/^(herrn|herr|frau)\s+/i, '').trim();
+    if (!s) return { vorname: '', nachname: '' };
+    const teile = s.split(' ').filter(Boolean);
+    if (teile.length === 1) return { vorname: '', nachname: teile[0] };
+    let ab = teile.length - 1;
+    while (ab > 1 && NAMENSZUSAETZE.indexOf(teile[ab - 1].toLowerCase()) !== -1) ab--;
+    return { vorname: teile.slice(0, ab).join(' '), nachname: teile.slice(ab).join(' ') };
+}
+
+// Zeichen, die Windows im Dateinamen nicht erlaubt. Kommas sind erlaubt und gewollt.
+function dateinameSicher(s) {
+    return String(s == null ? '' : s).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function fallDateiname(betreffend, modus) {
+    const n = fallNamensteile(betreffend);
+    const bez = VORGANG_BEZEICHNUNG[modus] || VORGANG_BEZEICHNUNG.widerspruch;
+    const teile = [n.vorname, n.nachname, bez].map(dateinameSicher).filter(Boolean);
+    // Ohne Namen bleibt wenigstens die Vorgangsart übrig – nie eine namenlose Datei.
+    if (teile.length === 1) teile.unshift('Fall');
+    return teile.join(', ') + '.json';
+}
+
 // Speichert den Fall. Wie beim Word-Dokument über einen „Speichern unter"-Dialog, damit
 // der Ordner frei wählbar ist und wiedergefunden wird. Kennt der Browser den Dialog nicht,
 // landet die Datei wie bisher im Download-Ordner.
@@ -235,8 +281,7 @@ async function saveCase() {
                 erfassung: (typeof erfassungSichern === 'function') ? erfassungSichern() : null,
                 anlagen: (typeof anlagenSichern === 'function') ? anlagenSichern() : null};
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
-    const name=(document.getElementById('stam-betreffend').value||'Fall').replace(/\s/g,'_');
-    const dateiname=`${name}_Pflegegradassistent.json`;
+    const dateiname=fallDateiname(document.getElementById('stam-betreffend').value, appModus);
     if (typeof speichereDatei === 'function') {
         // Eigene Kennung: der Ordner für Falldateien wird getrennt von dem der
         // Word-Dokumente gemerkt. Vorgabe ist der Download-Ordner – dort liegen die

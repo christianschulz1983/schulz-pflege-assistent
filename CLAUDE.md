@@ -62,6 +62,13 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Zitatprüfung in `js/dokument.js` deckt das auf; sie darf nicht umgangen werden.
 5. **Stilvorlagen nur aus regulären Widersprüchen** („PS_<Nr>_<Name>"), niemals aus
    Anhörungsschreiben – das ist ein anderer Dokumenttyp.
+6a. **Name der Falldatei:** „Vorname, Nachname, Bezeichnung.json" – Bezeichnung ist
+   Widerspruch, Erstantrag, Höherstufung oder **Anhörungsschreiben**
+   (`fallDateiname()` in `js/auswertung.js`). Keine Anrede, kein Zusatz
+   „Pflegegradassistent". Zu einer Person entstehen nacheinander mehrere Vorgänge –
+   deshalb gehört die Vorgangsart in den Namen. `fallNamensteile()` trennt Vor- und
+   Nachname; sie heißt bewusst NICHT `namensteile` – das gibt es in
+   `js/namenspruefung.js` bereits mit anderer Rückgabe.
 6. **Formatvorgaben:** Name immer „Herr/Frau Vorname Nachname". Alle Datumsangaben tt.mm.jjjj.
    Organisation „Medizinischer Dienst <Region>" oder „Medicproof GmbH". Nie „Pflegegrad 0",
    immer „kein Pflegegrad". Schrift Calibri 11 pt, blaue Überschriften 14 pt, Briefkopf 9 pt.
@@ -251,7 +258,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 714 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 730 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
