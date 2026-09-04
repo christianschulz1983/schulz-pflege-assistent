@@ -347,6 +347,56 @@ async function selbsttest() {
             reviewData = merk;
         }
 
+        // ---------- 9m. Name der Falldatei ----------
+        // Vorgabe: „Vorname, Nachname, Bezeichnung.json" statt
+        // „Frau_Sabine_Musterfrau_Pflegegradassistent.json".
+        if (typeof fallDateiname === 'function') {
+            pruefe('Falldatei: Anrede fällt weg',
+                fallDateiname('Frau Sabine Musterfrau', 'widerspruch'), 'Sabine, Musterfrau, Widerspruch.json');
+            pruefe('Falldatei: Höherstufung',
+                fallDateiname('Herr Peter Muster', 'hoeherstufung'), 'Peter, Muster, Höherstufung.json');
+            pruefe('Falldatei: Erstantrag',
+                fallDateiname('Frau Greta Testfrau', 'erstantrag'), 'Greta, Testfrau, Erstantrag.json');
+            pruefe('Falldatei: Anhörung heißt Anhörungsschreiben',
+                fallDateiname('Herr Fritz Beispielmann', 'anhoerung'), 'Fritz, Beispielmann, Anhörungsschreiben.json');
+
+            // Namensformen, die in den vorhandenen Dateien tatsächlich vorkommen
+            pruefe('Falldatei: mehrere Vornamen',
+                fallDateiname('Herr Karl Otto Emil Mustermann', 'widerspruch'),
+                'Karl Otto Emil, Mustermann, Widerspruch.json');
+            pruefe('Falldatei: Doppelvorname mit Bindestrich',
+                fallDateiname('Herr Hans-Peter Muster', 'widerspruch'),
+                'Hans-Peter, Muster, Widerspruch.json');
+            pruefe('Falldatei: Form „Nachname, Vorname"',
+                fallDateiname('Musterfrau, Sabine', 'widerspruch'), 'Sabine, Musterfrau, Widerspruch.json');
+            pruefe('Falldatei: ohne Anrede',
+                fallDateiname('Sabine Musterfrau', 'widerspruch'), 'Sabine, Musterfrau, Widerspruch.json');
+            pruefe('Falldatei: Namenszusatz bleibt beim Nachnamen',
+                fallDateiname('Frau Lena von der Linde', 'widerspruch'),
+                'Lena, von der Linde, Widerspruch.json');
+
+            // Randfälle: nie eine unbrauchbare Datei erzeugen
+            pruefe('Falldatei: nur ein Name', fallDateiname('Musterfrau', 'widerspruch'),
+                'Musterfrau, Widerspruch.json');
+            pruefe('Falldatei: ohne Namen', fallDateiname('', 'widerspruch'), 'Fall, Widerspruch.json');
+            pruefe('Falldatei: ohne Vorgangsart bleibt Widerspruch',
+                fallDateiname('Sabine Musterfrau', undefined), 'Sabine, Musterfrau, Widerspruch.json');
+            pruefe('Falldatei: unzulässige Zeichen entfallen',
+                fallDateiname('Frau A/B C:D', 'widerspruch'), 'AB, CD, Widerspruch.json');
+
+            // Zerlegung getrennt geprüft
+            pruefe('Namensteile: Anrede und Nachname',
+                [fallNamensteile('Frau Sabine Musterfrau').vorname, fallNamensteile('Frau Sabine Musterfrau').nachname],
+                ['Sabine', 'Musterfrau']);
+            pruefe('Namensteile: leer bleibt leer',
+                [fallNamensteile('').vorname, fallNamensteile('').nachname], ['', '']);
+            // Die Namensprüfung hat ihr eigenes namensteile() und liefert eine LISTE.
+            // Beide dürfen sich nicht in die Quere kommen – deshalb heißt das hier
+            // fallNamensteile. Ein Namenskonflikt hatte pruefeName() lahmgelegt.
+            pruefeWahr('Namensprüfung hat ihre eigene Zerlegung behalten',
+                Array.isArray(namensteile('Frau Erika Mahl')));
+        }
+
         // ---------- 9k. Anhörung: Form nach den Vorlagen des Verfassers ----------
         // Gemeldet: Im Kriterienblock stand „Erstgutachten: … · Anhörungsgutachten: … ·
         // Meine Beurteilung: …". In den Vorlagen (Vorlagen A und B) steht dort nur
@@ -2523,15 +2573,16 @@ async function selbsttest() {
                 window.Blob = eBlob; URL.createObjectURL = eUrl; HTMLAnchorElement.prototype.click = eClick;
                 if (eDialog) window.showSaveFilePicker = eDialog; else delete window.showSaveFilePicker;
             }
+            // Name nach der Vorgabe des Verfassers: „Vorname, Nachname, Bezeichnung.json"
             pruefe('Fall speichern: Dateiname wird vorgeschlagen', dialogName,
-                'Herr_Speicher_Test_Pflegegradassistent.json');
+                'Speicher, Test, Widerspruch.json');
             pruefeWahr('Fall speichern nutzt den Speichern-unter-Dialog',
                 saveCase.toString().includes('speichereDatei'));
             pruefe('Fall speichern: Dialog beginnt im Download-Ordner', dialogStart, 'downloads');
             pruefeWahr('Speichern wird nachgewiesen',
-                leseSpeicherungen().some(e => e.name === 'Herr_Speicher_Test_Pflegegradassistent.json'));
+                leseSpeicherungen().some(e => e.name === 'Speicher, Test, Widerspruch.json'));
             pruefeWahr('Nachweis erscheint in der Auswertung',
-                speicherungenHtml().includes('Herr_Speicher_Test_Pflegegradassistent.json'));
+                speicherungenHtml().includes('Speicher, Test, Widerspruch.json'));
             pruefeWahr('Word-Dokument behält den Dokumentenordner',
                 exportAppealWord.toString().indexOf("'downloads'") === -1);
             const d = json ? JSON.parse(json) : {};
