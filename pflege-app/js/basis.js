@@ -149,11 +149,29 @@ const ITEMS = [
     { id:64, m:6, nr:"4.6.6", title:"Kontaktpflege zu Personen außerhalb des direkten Umfelds", opts:["selbständig","überw. selbst.","überw. unselbst.","unselbständig"] }
 ];
 
-let stateOrig = { special:0, values:{} };
-let stateEigene = { special:0, values:{} };
+/* KONTINENZ – Voraussetzung für die Kriterien 4.4.11 und 4.4.12.
+   BRi vom 21.08.2024, Seite 103: „Dabei ist zu beachten, dass die Einzelpunkte für die
+   Kriterien F 4.4.11 und F 4.4.12 in die Ermittlung des Summenwertes für Modul 4 nur
+   eingehen, wenn laut gutachterlicher Einschätzung die antragstellende Person
+   ‚überwiegend inkontinent' oder ‚komplett inkontinent' ist oder eine künstliche
+   Ableitung von Stuhl beziehungsweise Harn erfolgt."
+   null bedeutet „keine Angabe" – dann wird wie bisher gezählt und in der Ansicht
+   nachgefragt. Ein stilles Wegrechnen von Punkten wäre schlimmer als die Nachfrage. */
+const KONTINENZ_STUFEN = [
+    'ständig kontinent',
+    'überwiegend kontinent',
+    'überwiegend inkontinent',
+    'komplett inkontinent',
+    'künstliche Ableitung'
+];
+// Ab dieser Stufe zählen 4.4.11 und 4.4.12 mit.
+const KONTINENZ_ZAEHLT_AB = 2;
+
+let stateOrig = { special:0, values:{}, kontinenz:{ harn:null, stuhl:null } };
+let stateEigene = { special:0, values:{}, kontinenz:{ harn:null, stuhl:null } };
 // Dritter Bewertungsstand: das Zweitgutachten aus dem Anhörungsverfahren. Bleibt in allen
 // anderen Vorgangsarten leer und wirkt sich dort nirgends aus.
-let stateZweit = { special:0, values:{} };
+let stateZweit = { special:0, values:{}, kontinenz:{ harn:null, stuhl:null } };
 
 // Zentraler Zugriff auf die drei Bewertungsstände. „orig" = Vorgutachten,
 // „zweit" = Anhörungsgutachten, alles Übrige = eigene Einschätzung.

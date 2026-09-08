@@ -62,6 +62,10 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Zitatprüfung in `js/dokument.js` deckt das auf; sie darf nicht umgangen werden.
 5. **Stilvorlagen nur aus regulären Widersprüchen** („PS_<Nr>_<Name>"), niemals aus
    Anhörungsschreiben – das ist ein anderer Dokumenttyp.
+6b. **Genitiv der Gutachtenorganisation** (`orgGenitiv()` in `js/vorlage.js`): Es heißt
+   „des Medizinischen Dienstes Nord", nicht „des Medizinischer Dienst Nord". Der Artikel
+   gehört zur Funktion, weil er von der Firmierung abhängt: „der Medicproof GmbH".
+   Nie wieder `des ${org}` in eine Vorlage schreiben.
 6a. **Name der Falldatei:** „Vorname, Nachname, Bezeichnung.json" – Bezeichnung ist
    Widerspruch, Erstantrag, Höherstufung oder **Anhörungsschreiben**
    (`fallDateiname()` in `js/auswertung.js`). Keine Anrede, kein Zusatz
@@ -96,11 +100,14 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    hinter der Bezeichnung; die Angaben beginnen bei 217 px (`.k` in `STELLUNGNAHME_CSS`).
    Zwischen beiden Feldern steht ein Leerzeichen – der Flex-Satz überspringt es, aber
    Word kennt kein Flex und bräuchte es sonst.
-   Im Druck gilt `@page{margin:0}`, damit der Browser keine Kopf-/Fußzeile
-   („about:blank", Datum, Seitenzahl) in den Seitenrand setzt. Die Ränder erzeugt eine
-   Tabelle mit leerem `thead`/`tfoot` (`printAppealText`) – die wiederholt der Browser
-   auf **jeder** Seite. Ein Innenabstand am Text kann das nicht: Er greift oben nur auf
-   Seite 1. Niemals wieder einen Seitenrand in `@page` eintragen.
+   **Im Druck setzt die App die Seiten selbst** (`seitenAufteilen()` in `js/dokument.js`).
+   `@page{margin:0}` verhindert die Kopf-/Fußzeile des Browsers („about:blank", Datum) –
+   damit fällt aber auch dessen Seitenzahl weg. Deshalb misst die App die Blöcke, verteilt
+   sie auf A4-Seiten und schreibt in jede Seite eine eigene Fußzeile „Seite n von m".
+   Das löst zugleich die Umbrüche: `.crit`, `.data-block` und Tabellen werden nie
+   zerschnitten, und eine Überschrift wandert mit dem folgenden Block auf die nächste
+   Seite – „Allgemeine Angaben" steht nie allein unten. Niemals wieder einen Seitenrand
+   in `@page` eintragen.
 9. **Anhörungsverfahren** (`js/anhoerung.js`, `js/vergleich.js`): Vierter Vorgang. Beginnt
    mit „Fall laden" (Widerspruchsfall) – Erstgutachten und eigene Bewertung stehen damit
    fest; neu eingelesen wird nur das Anhörungsgutachten in `stateZweit`. Vorlage: zwei
@@ -227,6 +234,11 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
   bekam 5,00 statt 7,50. Der Selbsttest prüft **jede einzelne Punktzahl** jedes Moduls gegen
   eine getrennt ausgeschriebene Solltabelle. Grenzen nie an zwei Stellen führen – die
   Sprungmarken der Spalte „fehlende Punkte" kommen aus derselben Tabelle.
+- **Modul 4, Kriterien 4.4.11 und 4.4.12** gehen in die Summe **nur ein**, wenn die Person
+  „überwiegend inkontinent" oder „komplett inkontinent" ist oder eine künstliche Ableitung
+  besteht (BRi 21.08.2024, Seite 103). Umgesetzt in `zaehltMit()` (`js/berechnung.js`) über
+  `state.kontinenz`. **Ohne Angabe wird wie bisher gezählt** und in der Ansicht nachgefragt –
+  ein stilles Wegrechnen von Punkten wäre der schlimmere Fehler.
 - Modul 5 wird je Gruppe summiert und dann **einmal** bepunktet, nicht je Kriterium.
   Gerechnet wird das ausschließlich in `m5Gruppen()` in `js/berechnung.js`.
   Die gewichteten Punkte liegen in **breiten Spannen** (`m5Gewichtet`): 0 → 0, 1 → 5,
@@ -258,7 +270,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 730 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 773 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

@@ -91,6 +91,23 @@ function loadVerfasser() {
 }
 
 // Liefert Name und Qualifikationszeilen für den Briefkopf.
+/* GENITIV DER GUTACHTENORGANISATION, mit Artikel.
+   Gemeldet: Im Schriftstück stand „das Gutachten des Medizinischer Dienst Nord". Richtig
+   ist „des Medizinischen Dienstes Nord". Der Artikel gehört dazu, weil er von der
+   Organisation abhängt – „der Medicproof GmbH", aber „des Medizinischen Dienstes".
+   Die Regionsbezeichnung dahinter bleibt unverändert; sie wird nicht mitgebeugt
+   („des Medizinischen Dienstes Berlin-Brandenburg"). */
+function orgGenitiv(org) {
+    const s = String(org == null ? '' : org).replace(/\s+/g, ' ').trim();
+    if (!s) return 'des Medizinischen Dienstes';
+    // „Medizinischer Dienst <Region>" und Schreibweisen wie „Medizinische Dienst"
+    const md = s.match(/^Medizinische[rn]?\s+Dienst(?:es)?\b\s*(.*)$/i);
+    if (md) return ('des Medizinischen Dienstes ' + (md[1] || '')).replace(/\s+/g, ' ').trim();
+    // Weiblich, weil die Firmierung weiblich ist: „die Medicproof GmbH"
+    if (/\bGmbH\b/i.test(s) || /\bAG\b/.test(s) || /\bKG\b/.test(s)) return 'der ' + s;
+    return 'des ' + s;
+}
+
 function getVerfasser() {
     const nSel = document.getElementById('verf-name-sel')?.value || 'Christian Schulz';
     const nFrei = (document.getElementById('verf-name-frei')?.value || '').trim();

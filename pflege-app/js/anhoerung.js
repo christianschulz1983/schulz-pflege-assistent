@@ -350,7 +350,7 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
       ${dataRow('Gesamtpunkte', zweitPts)}
     </div>
 
-    <p>${df('name', name)} erhält den Widerspruch gegen den Bescheid vom ${df('bescheid', bescheid || '—')} der ${df('kasse', kasse || 'Kasse')} aufrecht. Diese pflegefachliche Stellungnahme dient der Unterstützung des Rechtsbeistands von ${df('name', name)} bei der Präzisierung der Begründung des Widerspruchs. Dazu habe ich die Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} und vom ${df('zweitdatum', zweitDatum || '—')} gewürdigt.</p>
+    <p>${df('name', name)} erhält den Widerspruch gegen den Bescheid vom ${df('bescheid', bescheid || '—')} der ${df('kasse', kasse || 'Kasse')} aufrecht. Diese pflegefachliche Stellungnahme dient der Unterstützung des Rechtsbeistands von ${df('name', name)} bei der Präzisierung der Begründung des Widerspruchs. Dazu habe ich die Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} und vom ${df('zweitdatum', zweitDatum || '—')} gewürdigt.</p>
 
     <hr>
 
@@ -373,7 +373,7 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
     <hr>
 
     <h2>Fazit</h2>
-    <p>Die vorliegenden Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} mit ${df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten sowie vom ${df('zweitdatum', zweitDatum || '—')} mit ${df('zpgfazit', pgSatz(zweitPG))} und ${df('zpts', zweitPts)} Punkten berücksichtigen die tatsächlichen Einschränkungen von ${df('name', name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
+    <p>Die vorliegenden Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} mit ${df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten sowie vom ${df('zweitdatum', zweitDatum || '—')} mit ${df('zpgfazit', pgSatz(zweitPG))} und ${df('zpts', zweitPts)} Punkten berücksichtigen die tatsächlichen Einschränkungen von ${df('name', name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
     ${(typeof anlagenVerzeichnisHtml === 'function') ? anlagenVerzeichnisHtml() : ''}
   </div>`;
 }
@@ -439,7 +439,7 @@ function anhoerungAllgemeinStandard(a, org, begut, zweitDatum, origPts, zweitPts
     // Text etwas anderes als in der Tabelle.
     // „führte zu kein Pflegegrad" wäre falsch – im Dativ heißt es „zu keinem Pflegegrad".
     const dativ = v => { const s = pgSatz(v); return /^kein/i.test(s) ? 'keinem Pflegegrad' : s; };
-    let p = `<p>Das Gutachten des ${esc(org)} vom ${esc(begut || '—')} führte zu ${esc(dativ(origPG))} `
+    let p = `<p>Das Gutachten ${esc(orgGenitiv(org))} vom ${esc(begut || '—')} führte zu ${esc(dativ(origPG))} `
           + `bei ${esc(origPts)} gewichteten Punkten. Das im Anhörungsverfahren erstellte Gutachten vom `
           + `${esc(zweitDatum || '—')} kommt zu ${esc(dativ(zweitPG))} bei ${esc(zweitPts)} gewichteten Punkten.</p>`;
     if (a.gefolgt.length) {

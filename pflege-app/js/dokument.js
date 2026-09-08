@@ -142,12 +142,12 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
       ${dataRow('Gesamtpunkte', origPts)}
     </div>
 
-    <p>${df('name', name)} erhebt Widerspruch gegen den Bescheid vom ${df('bescheid', bescheid || '—')} der ${df('kasse', kasse || 'Kasse')}. Diese pflegefachliche Stellungnahme dient der Unterstützung des Rechtsbeistands von ${df('name', name)} bei der Begründung des Widerspruchs. Dazu habe ich ${df('name', name)} persönlich befragt und Befunde erhoben sowie das Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} gewürdigt.</p>
+    <p>${df('name', name)} erhebt Widerspruch gegen den Bescheid vom ${df('bescheid', bescheid || '—')} der ${df('kasse', kasse || 'Kasse')}. Diese pflegefachliche Stellungnahme dient der Unterstützung des Rechtsbeistands von ${df('name', name)} bei der Begründung des Widerspruchs. Dazu habe ich ${df('name', name)} persönlich befragt und Befunde erhoben sowie das Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} gewürdigt.</p>
 
     <hr>
 
     <h2>Allgemeine Angaben</h2>
-    <p>Im Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} erfolgte die Einstufung mit ${df('opts', origPts)} gewichteten Punkten, woraus sich ${istKeinPG(origPG) ? df('opgsatz', 'kein Pflegegrad') : 'ein ' + df('opgsatz', pgSatz(origPG))} ergeben hat. Die Verteilung der gewichteten Punkte auf die einzelnen Module ist der nachfolgenden Übersicht zu entnehmen.</p>
+    <p>Im Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} erfolgte die Einstufung mit ${df('opts', origPts)} gewichteten Punkten, woraus sich ${istKeinPG(origPG) ? df('opgsatz', 'kein Pflegegrad') : 'ein ' + df('opgsatz', pgSatz(origPG))} ergeben hat. Die Verteilung der gewichteten Punkte auf die einzelnen Module ist der nachfolgenden Übersicht zu entnehmen.</p>
     <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${notesBullets}</div>
     <p>Ich bin in mehreren dieser Module zu abweichenden Einschätzungen gekommen. Dies ergibt eine höhere Punktzahl in den Modulen und in der Folge eine höhere Gesamtpunktzahl. Die nachfolgende Übersicht stellt die Ergebnisse des Vorgutachtens und meiner Beurteilung einander gegenüber:</p>
 
@@ -166,7 +166,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     <hr>
 
     <h2>Fazit</h2>
-    <p>Das vorliegende Gutachten des ${df('org', org)} vom ${df('begut', begut || '—')} ${istKeinPG(origPG) ? 'mit der Feststellung ' + df('opgfazit', 'keines Pflegegrades') : 'mit einem ' + df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
+    <p>Das vorliegende Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} ${istKeinPG(origPG) ? 'mit der Feststellung ' + df('opgfazit', 'keines Pflegegrades') : 'mit einem ' + df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
   </div>`;
 }
 
@@ -625,22 +625,113 @@ function printAppealText() {
        thead/tfoot leistet es: Der Browser wiederholt beide auf jeder gedruckten Seite,
        und die leeren Zeilen darin wirken als oberer und unterer Rand. */
     printWindow.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Pflegefachliche Stellungnahme - ${title}</title><style>${STELLUNGNAHME_CSS}
-        @page{size:A4;margin:0;}
-        html,body{margin:0;padding:0;}
-        #appeal-document, .stmt{max-width:none;border:none;border-radius:0;}
-        #appeal-document{padding:0;}
-        table.druckrahmen{width:100%;border-collapse:collapse;}
-        table.druckrahmen > thead > tr > td,
-        table.druckrahmen > tfoot > tr > td,
-        table.druckrahmen > tbody > tr > td{padding:0;border:0;}
-        .rand-oben{height:20mm;}
-        .rand-unten{height:16mm;}
-        .druckinhalt{padding:0 20mm;}
-    </style></head><body><table class="druckrahmen">
-        <thead><tr><td><div class="rand-oben"></div></td></tr></thead>
-        <tfoot><tr><td><div class="rand-unten"></div></td></tr></tfoot>
-        <tbody><tr><td><div class="druckinhalt"><div id="appeal-document">${kopie.innerHTML}</div></div></td></tr></tbody>
-      </table><script>window.onload=function(){window.print();}<\/script></body></html>`);
+${DRUCK_CSS}
+    </style></head><body>
+      <div id="mess">${kopie.innerHTML}</div>
+      <div id="seiten"></div>
+      <script>${seitenAufteilen.toString()}
+      window.onload=function(){
+        try { seitenAufteilen(document.getElementById('mess'), document.getElementById('seiten')); }
+        catch (e) { console.warn('Seitenaufteilung fehlgeschlagen', e);
+                    document.getElementById('mess').style.display=''; }
+        window.print();
+      };<\/script></body></html>`);
     printWindow.document.close();
+}
+
+/* DRUCKBILD.
+   Zwei Anforderungen der Kollegin: Seitenzahlen, und zusammenhängende Abschnitte sollen
+   nicht mitten durchgeschnitten werden („Allgemeine Angaben" allein unten auf der Seite).
+
+   Beides zusammen lässt sich mit reinem CSS nicht lösen: Seitenzahlen könnte nur die
+   Kopf-/Fußzeile des Browsers liefern – und die bringt „about:blank" und den Titel mit,
+   die ausdrücklich weg sollten. Deshalb setzt die App die Seiten selbst: Sie misst die
+   Blöcke, verteilt sie auf A4-Seiten und schreibt in jede Seite eine eigene Fußzeile.
+   Das gibt beides – gezählte Seiten und volle Kontrolle über die Umbrüche. */
+const DRUCK_CSS = `
+        @page{size:A4;margin:0;}
+        html,body{margin:0;padding:0;background:#fff;}
+        #mess{position:absolute;left:-10000px;top:0;width:170mm;}
+        #appeal-document,.stmt{max-width:none;border:none;border-radius:0;padding:0;margin:0;}
+        .seite{width:210mm;min-height:296mm;box-sizing:border-box;padding:20mm 20mm 16mm;
+               position:relative;break-after:page;page-break-after:always;background:#fff;}
+        .seite:last-child{break-after:auto;page-break-after:auto;}
+        .seiten-fuss{position:absolute;left:20mm;right:20mm;bottom:8mm;text-align:center;
+                     font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#555;}
+        /* Falls die Aufteilung einmal nicht greift, bleibt der Fließtext lesbar. */
+        .stmt .crit,.stmt .data-block,.stmt table.cmp{break-inside:avoid;page-break-inside:avoid;}
+        .stmt h1,.stmt h2{break-after:avoid;page-break-after:avoid;}
+        .stmt p{orphans:3;widows:3;}
+`;
+
+/* Verteilt die Blöcke des Schriftstücks auf A4-Seiten und nummeriert sie.
+   Wird als Quelltext in das Druckfenster übertragen (siehe printAppealText), damit sie
+   sich hier prüfen und dort ausführen lässt.
+
+   Regeln:
+   - Ein Block wird nie zerschnitten: .crit (ein Kriterium mit seiner Begründung),
+     .data-block, Tabellen und Überschriften.
+   - Eine Überschrift wandert mit dem folgenden Block zusammen auf die nächste Seite –
+     „Allgemeine Angaben" steht sonst allein unten.
+   - Ein Block, der für sich allein höher ist als eine Seite, bekommt eine eigene Seite
+     und darf dort umbrechen. Ihn zu erzwingen würde ihn abschneiden. */
+function seitenAufteilen(quelle, ziel, hoeheMm) {
+    const proMm = 3.7795275591;                     // 1 mm in px bei 96 dpi
+    const nutzbar = (hoeheMm || 253) * proMm;        // 296mm - 20 oben - 16 unten - Fußzeile
+    const mmZuPx = el => {
+        const s = getComputedStyle(el);
+        return el.getBoundingClientRect().height
+             + parseFloat(s.marginTop || 0) + parseFloat(s.marginBottom || 0);
+    };
+    // Einheiten bilden: Überschrift + folgender Block gehören zusammen.
+    const einheiten = [];
+    const stmts = Array.from(quelle.querySelectorAll('.stmt'));
+    const quellen = stmts.length ? stmts : [quelle];
+    quellen.forEach((stmt, idx) => {
+        const kinder = Array.from(stmt.children);
+        const gruppe = [];
+        for (let i = 0; i < kinder.length; i++) {
+            const el = kinder[i];
+            const istUeberschrift = /^H[1-3]$/.test(el.tagName);
+            if (istUeberschrift && i + 1 < kinder.length) {
+                gruppe.push([el, kinder[i + 1]]); i++;
+            } else gruppe.push([el]);
+        }
+        einheiten.push({ stmt: stmt, gruppen: gruppe,
+                         eigeneSeite: stmt.classList.contains('deckblatt') || idx > 0 });
+    });
+
+    let seite = null, genutzt = 0;
+    const neueSeite = vorlage => {
+        seite = document.createElement('div');
+        seite.className = 'seite';
+        const huelle = document.createElement('div');
+        huelle.className = vorlage ? vorlage.className : 'stmt';
+        seite.appendChild(huelle);
+        ziel.appendChild(seite);
+        genutzt = 0;
+        return huelle;
+    };
+
+    einheiten.forEach((block, bi) => {
+        let huelle = (bi === 0 || block.eigeneSeite) ? neueSeite(block.stmt) : seite.firstChild;
+        block.gruppen.forEach(gruppe => {
+            const hoehe = gruppe.reduce((s, el) => s + mmZuPx(el), 0);
+            if (genutzt > 0 && genutzt + hoehe > nutzbar) huelle = neueSeite(block.stmt);
+            gruppe.forEach(el => huelle.appendChild(el));
+            genutzt += hoehe;
+        });
+    });
+
+    quelle.remove();
+    // Fußzeile mit Seitenzahl – erst jetzt, weil die Gesamtzahl vorher nicht feststeht.
+    const seiten = Array.from(ziel.children);
+    seiten.forEach((s, i) => {
+        const f = document.createElement('div');
+        f.className = 'seiten-fuss';
+        f.textContent = 'Seite ' + (i + 1) + ' von ' + seiten.length;
+        s.appendChild(f);
+    });
+    return seiten.length;
 }
 
