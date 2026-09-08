@@ -310,6 +310,10 @@ function loadCase(e) {
             stateEigene = data.stateEigene;
             // Ältere Falldateien kennen das Zweitgutachten nicht – dann bleibt es leer.
             stateZweit = data.stateZweit || { special: 0, values: {} };
+            // Aeltere Falldateien kennen die Kontinenzangabe noch nicht.
+            [stateOrig, stateEigene, stateZweit].forEach(z => {
+                if (!z.kontinenz) z.kontinenz = { harn: null, stuhl: null };
+            });
             // Dateien lassen sich nicht mitspeichern; die Prüfansicht zeigt dann nur die Werte.
             if (typeof letzteProvided !== 'undefined') letzteProvided = null;
             if (typeof stellungnahmeVeraltet !== 'undefined') stellungnahmeVeraltet = false;

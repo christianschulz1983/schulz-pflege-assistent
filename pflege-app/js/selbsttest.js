@@ -854,14 +854,192 @@ async function selbsttest() {
             pruefeWahr('Druck: kein Seitenrand für die Browser-Kopfzeile',
                 druckHtml.includes('@page{size:A4;margin:0;}'));
             pruefeWahr('Druck: alter Seitenrand ist weg', !druckHtml.includes('@page{margin:14mm;}'));
-            pruefeWahr('Druck: oberer Rand wiederholt sich je Seite',
-                druckHtml.includes('<thead><tr><td><div class="rand-oben">'));
-            pruefeWahr('Druck: unterer Rand wiederholt sich je Seite',
-                druckHtml.includes('<tfoot><tr><td><div class="rand-unten">'));
-            pruefeWahr('Druck: seitliche Ränder vorhanden',
-                druckHtml.includes('.druckinhalt{padding:0 20mm;}'));
-            pruefeWahr('Druck: der Inhalt steht im Rahmen',
-                druckHtml.includes('<div class="druckinhalt"><div id="appeal-document">'));
+            // Die Ränder kamen früher aus einer Tabelle mit wiederholtem thead/tfoot.
+            // Seit die App die Seiten selbst setzt, stecken sie in .seite – zusammen mit
+            // der Seitenzahl, die die Tabellenlösung nicht liefern konnte.
+            pruefeWahr('Druck: Seiten mit eigenem Rand',
+                druckHtml.includes('.seite{width:210mm') && druckHtml.includes('padding:20mm 20mm 16mm'));
+            pruefeWahr('Druck: Platz für die Fußzeile', druckHtml.includes('.seiten-fuss{'));
+            pruefeWahr('Druck: Inhalt wird vor dem Aufteilen gemessen',
+                druckHtml.includes('id="mess"') && druckHtml.includes('id="seiten"'));
+            pruefeWahr('Druck: Aufteilung läuft vor dem Drucken',
+                druckHtml.includes("seitenAufteilen(document.getElementById('mess'), document.getElementById('seiten'))")
+                && druckHtml.indexOf("seitenAufteilen(document") < druckHtml.indexOf('window.print()'));
+        }
+
+        // ---------- 9o. Genitiv der Gutachtenorganisation ----------
+        // Rückmeldung der Kollegin: „des Medizinischer Dienst" – richtig ist
+        // „des Medizinischen Dienstes".
+        if (typeof orgGenitiv === 'function') {
+            pruefe('Genitiv: Medizinischer Dienst',
+                orgGenitiv('Medizinischer Dienst'), 'des Medizinischen Dienstes');
+            pruefe('Genitiv: mit Region',
+                orgGenitiv('Medizinischer Dienst Nord'), 'des Medizinischen Dienstes Nord');
+            pruefe('Genitiv: Region mit Bindestrich',
+                orgGenitiv('Medizinischer Dienst Berlin-Brandenburg'),
+                'des Medizinischen Dienstes Berlin-Brandenburg');
+            pruefe('Genitiv: bereits gebeugt geschrieben',
+                orgGenitiv('Medizinischen Dienstes Bayern'), 'des Medizinischen Dienstes Bayern');
+            // Weibliche Firmierung bekommt „der"
+            pruefe('Genitiv: Medicproof GmbH', orgGenitiv('Medicproof GmbH'), 'der Medicproof GmbH');
+            pruefe('Genitiv: unbekannte Organisation', orgGenitiv('Prüfdienst Nord'), 'des Prüfdienst Nord');
+            pruefe('Genitiv: ohne Angabe', orgGenitiv(''), 'des Medizinischen Dienstes');
+
+            // Und im fertigen Schriftstück – in allen Vorlagen
+            const merkOrg = document.getElementById('stam-organisation').value;
+            const merkModus = appModus;
+            try {
+                document.getElementById('stam-organisation').value = 'Medizinischer Dienst Nord';
+                const rein = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+                const proben = {
+                    widerspruch: () => { appModus = 'widerspruch'; return rein(buildStellungnahme('', {}, '')); },
+                    hoeherstufung: () => { appModus = 'hoeherstufung'; return rein(buildHoeherstufung('', {}, '')); },
+                    anhoerung: () => { appModus = 'anhoerung'; return rein(buildAnhoerung('', {}, '')); }
+                };
+                Object.keys(proben).forEach(name => {
+                    const t = proben[name]();
+                    pruefeWahr(name + ': Genitiv richtig gebeugt',
+                        t.includes('des Medizinischen Dienstes Nord'));
+                    pruefeWahr(name + ': kein „des Medizinischer Dienst"',
+                        !/des Medizinischer Dienst/.test(t));
+                });
+            } finally {
+                document.getElementById('stam-organisation').value = merkOrg;
+                appModus = merkModus;
+            }
+        }
+
+        // ---------- 9p. Druckbild: Seitenzahlen und Seitenumbrüche ----------
+        // Rückmeldung der Kollegin: Seitenangabe fehlt, und zusammenhängende Abschnitte
+        // werden umgebrochen („Allgemeine Angaben" allein unten auf der Seite).
+        if (typeof seitenAufteilen === 'function') {
+            const bau = (anzahlAbsaetze, hoehePx) => {
+                const q = document.createElement('div');
+                q.style.cssText = 'position:absolute;left:-10000px;top:0;width:600px';
+                let html = '<div class="stmt"><h2>Allgemeine Angaben</h2>';
+                for (let i = 0; i < anzahlAbsaetze; i++) {
+                    html += '<p style="height:' + hoehePx + 'px;margin:0">Absatz ' + (i + 1) + '</p>';
+                }
+                html += '</div>';
+                q.innerHTML = html;
+                document.body.appendChild(q);
+                const z = document.createElement('div');
+                z.style.cssText = 'position:absolute;left:-10000px;top:0';
+                document.body.appendChild(z);
+                return { q, z };
+            };
+
+            // 253 mm nutzbare Höhe ~ 956 px. Vier Absätze zu 300 px brauchen zwei Seiten.
+            let { q, z } = bau(4, 300);
+            let seiten = seitenAufteilen(q, z);
+            pruefe('Druck: Inhalt wird auf Seiten verteilt', seiten, 2);
+            pruefeWahr('Druck: jede Seite hat eine Fußzeile',
+                z.querySelectorAll('.seiten-fuss').length === 2);
+            const fuss = k => { const s2 = z.children[k]; const f = s2 && s2.querySelector('.seiten-fuss');
+                                return f ? f.textContent : null; };
+            pruefe('Druck: Seitenzahl auf Seite 1', fuss(0), 'Seite 1 von 2');
+            pruefe('Druck: Seitenzahl auf Seite 2', fuss(1), 'Seite 2 von 2');
+            // Die Überschrift darf nicht allein stehen bleiben
+            const ersteSeite = z.children[0] ? z.children[0].innerText : '';
+            pruefeWahr('Druck: Überschrift steht bei ihrem Absatz',
+                !/Allgemeine Angaben\s*$/.test(ersteSeite.trim()));
+            z.remove();
+
+            // Passt alles auf eine Seite, bleibt es eine Seite
+            ({ q, z } = bau(2, 200));
+            pruefe('Druck: kurzer Text bleibt eine Seite', seitenAufteilen(q, z), 1);
+            const einzelFuss = z.querySelector('.seiten-fuss');
+            pruefe('Druck: Fußzeile auch bei einer Seite',
+                einzelFuss ? einzelFuss.textContent : null, 'Seite 1 von 1');
+            z.remove();
+
+            // Ein Block, der höher ist als eine Seite, darf nicht verschluckt werden
+            ({ q, z } = bau(1, 2000));
+            pruefe('Druck: übergroßer Block bleibt erhalten', seitenAufteilen(q, z), 1);
+            pruefeWahr('Druck: sein Inhalt steht auf der Seite',
+                z.innerText.includes('Absatz 1'));
+            z.remove();
+
+            // Das Druckbild selbst
+            pruefeWahr('Druck: kein Seitenrand für die Browser-Kopfzeile',
+                DRUCK_CSS.includes('@page{size:A4;margin:0;}'));
+            pruefeWahr('Druck: Kriterienblöcke werden nicht zerschnitten',
+                DRUCK_CSS.includes('.stmt .crit') && DRUCK_CSS.includes('break-inside:avoid'));
+            pruefeWahr('Druck: Überschriften bleiben bei ihrem Text',
+                DRUCK_CSS.includes('.stmt h1,.stmt h2{break-after:avoid'));
+            pruefeWahr('Druck: keine Schusterjungen', DRUCK_CSS.includes('orphans:3;widows:3'));
+            pruefeWahr('Die Aufteilung wird ins Druckfenster übertragen',
+                printAppealText.toString().includes('seitenAufteilen.toString()'));
+        }
+
+        // ---------- 9n. Inkontinenzbedingung für 4.4.11 und 4.4.12 ----------
+        // BRi vom 21.08.2024, Seite 103: „Die Einzelpunkte für die Kriterien F 4.4.11 und
+        // F 4.4.12 gehen in die Ermittlung des Summenwertes für Modul 4 nur ein, wenn
+        // laut gutachterlicher Einschätzung die antragstellende Person ‚überwiegend
+        // inkontinent' oder ‚komplett inkontinent' ist oder eine künstliche Ableitung
+        // von Stuhl beziehungsweise Harn erfolgt."
+        if (typeof zaehltMit === 'function') {
+            const kid = nr => ITEMS.find(i => i.nr === nr).id;
+            const stand = (harn, stuhl) => {
+                const st = { special: 0, values: {}, kontinenz: { harn: harn, stuhl: stuhl } };
+                ITEMS.forEach(i => { st.values[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+                // Modul 4: 4.4.3=1, 4.4.4=1, 4.4.6=2, 4.4.10=2 -> 6 Punkte ohne Inkontinenz
+                st.values[kid('4.4.3')] = 1; st.values[kid('4.4.4')] = 1;
+                st.values[kid('4.4.6')] = 2; st.values[kid('4.4.10')] = 1;   // 4.4.10 hat 0/2/4/6
+                st.values[kid('4.4.11')] = 1;
+                st.values[kid('4.4.12')] = 1;
+                return st;
+            };
+            // ohne Inkontinenz: 4.4.11 und 4.4.12 zählen NICHT -> 1+1+2+2 = 6
+            pruefe('Kontinent: 4.4.11 und 4.4.12 zählen nicht',
+                calculateInternal(stand(0, 0)).raws[3], 6);
+            pruefe('Überwiegend kontinent: zählen weiterhin nicht',
+                calculateInternal(stand(1, 1)).raws[3], 6);
+            // überwiegend inkontinent: beide zählen -> 6 + 1 + 1 = 8
+            pruefe('Überwiegend inkontinent: beide zählen',
+                calculateInternal(stand(2, 2)).raws[3], 8);
+            pruefe('Komplett inkontinent: beide zählen',
+                calculateInternal(stand(3, 3)).raws[3], 8);
+            pruefe('Künstliche Ableitung: beide zählen',
+                calculateInternal(stand(4, 4)).raws[3], 8);
+            // getrennt: nur Harn inkontinent -> nur 4.4.11 zählt
+            pruefe('Nur Harninkontinenz: nur 4.4.11 zählt',
+                calculateInternal(stand(3, 0)).raws[3], 7);
+            pruefe('Nur Stuhlinkontinenz: nur 4.4.12 zählt',
+                calculateInternal(stand(0, 3)).raws[3], 7);
+            // Ohne Angabe wird wie bisher gezählt – kein stilles Wegrechnen
+            pruefe('Ohne Angabe wird wie bisher gezählt',
+                calculateInternal(stand(null, null)).raws[3], 8);
+
+            // Die Grenze wirkt sich auf die gewichteten Punkte aus: 8 -> 20, 6 -> 10
+            pruefe('Wirkung auf die gewichteten Punkte',
+                [calculateInternal(stand(3, 3)).weights[3], calculateInternal(stand(0, 0)).weights[3]],
+                [20, 10]);
+
+            // Der Hinweis muss erklären, was gerade passiert
+            const hinNicht = kontinenzHinweisText(stand(0, 0));
+            pruefeWahr('Hinweis nennt die nicht gezählten Kriterien',
+                hinNicht.includes('4.4.11') && hinNicht.includes('4.4.12')
+                && hinNicht.includes('zählt aber nicht mit'));
+            const hinOffen = kontinenzHinweisText(stand(null, null));
+            pruefeWahr('Hinweis fragt die fehlende Angabe nach',
+                hinOffen.includes('zählt die Bewertung mit') && hinOffen.includes('ergänzen'));
+            const leer = { special: 0, values: {}, kontinenz: { harn: null, stuhl: null } };
+            ITEMS.forEach(i => { leer.values[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+            pruefe('Ohne Bewertung kein Hinweis', kontinenzHinweisText(leer), '');
+
+            // Die Stufen nach der Richtlinie
+            pruefe('Fünf Kontinenzstufen', KONTINENZ_STUFEN.length, 5);
+            pruefe('Ab überwiegend inkontinent wird gezählt', KONTINENZ_ZAEHLT_AB, 2);
+            pruefeWahr('Stufen in der Reihenfolge der BRi',
+                KONTINENZ_STUFEN[0] === 'ständig kontinent'
+                && KONTINENZ_STUFEN[2] === 'überwiegend inkontinent'
+                && KONTINENZ_STUFEN[4] === 'künstliche Ableitung');
+
+            // Andere Kriterien bleiben unberührt
+            pruefeWahr('Andere Kriterien sind nicht betroffen',
+                zaehltMit(stand(0, 0), ITEMS.find(i => i.nr === '4.4.10'))
+                && zaehltMit(stand(0, 0), ITEMS.find(i => i.nr === '4.1.1')));
         }
 
         // ---------- 9e. Umrechnungstabellen aller sechs Module ----------
@@ -1208,8 +1386,16 @@ async function selbsttest() {
             pruefeWahr('Handkorrektur verwirft die Zusammenfassung', !stateZweit.extracted);
 
             // Ein neu eingelesenes Erstgutachten setzt die dritte Spalte zurück
-            pruefeWahr('Neues Erstgutachten leert das Anhörungsgutachten',
-                applyImportedData.toString().includes('stateZweit = { special: 0, values: {} }'));
+            // Nicht am Wortlaut der Zeile prüfen, sondern an der Wirkung – sonst
+            // scheitert die Prüfung an jeder Erweiterung des Zustands (zuletzt an der
+            // hinzugekommenen Kontinenzangabe).
+            const merkO2 = stateOrig, merkE2 = stateEigene, merkZ2 = stateZweit;
+            try {
+                stateZweit.values[k('4.4.1').id] = 3;
+                applyImportedData(normalizeImport({ values_orig: [], _localValues: true }));
+                pruefeWahr('Neues Erstgutachten leert das Anhörungsgutachten',
+                    Object.keys(stateZweit.values || {}).length === 0);
+            } finally { stateOrig = merkO2; stateEigene = merkE2; stateZweit = merkZ2; }
 
             stateZweit = merkZweit;
             protokollLeeren();
@@ -1470,7 +1656,7 @@ async function selbsttest() {
             pruefeWahr('Anhörung: Einleitung mit „aufrecht"',
                 text.includes('erhält den Widerspruch gegen den Bescheid vom 04.02.2026 der Debeka aufrecht'));
             pruefeWahr('Anhörung: Einleitung nennt beide Gutachten',
-                text.includes('die Gutachten des Medicproof GmbH vom 29.01.2026 und vom 08.04.2026'));
+                text.includes('die Gutachten der Medicproof GmbH vom 29.01.2026 und vom 08.04.2026'));
             pruefeWahr('Anhörung: Kopf nennt das Datum des Anhörungsschreibens',
                 text.includes('Datum Anhörungsschreiben: 21.04.2026'));
             pruefeWahr('Anhörung: Kopf nennt das Zweitgutachten',
@@ -1494,7 +1680,7 @@ async function selbsttest() {
                 /[45]\.4\.2:[^]{0,80}Gutachterliche Bewertung:/.test(text)
                 && !text.includes('Meine Beurteilung:'));
             pruefeWahr('Anhörung: Fazit nennt beide Gutachten',
-                text.includes('Die vorliegenden Gutachten des Medicproof GmbH vom 29.01.2026'));
+                text.includes('Die vorliegenden Gutachten der Medicproof GmbH vom 29.01.2026'));
             pruefeWahr('Anhörung: kein „Pflegegrad 0" im Dokument', !/Pflegegrad 0/.test(text));
             pruefeWahr('Anhörung: richtiger Fall nach „führte zu"',
                 !/führte zu kein Pflegegrad/.test(text));

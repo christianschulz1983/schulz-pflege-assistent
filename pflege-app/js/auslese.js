@@ -830,11 +830,12 @@ function applyImportedData(rev) {
     ensureDiagRows((rev.diagnoses || []).length);
     (rev.diagnoses || []).forEach((d, idx) => { setVal(`diag-icd-${idx + 1}`, d.icd); setVal(`diag-txt-${idx + 1}`, d.text); });
 
-    stateOrig = { special: rev.special || 0, values: {} };
-    stateEigene = { special: rev.special || 0, values: {} };
+    // Kontinenzangabe: unbekannt, bis sie erhoben ist (Voraussetzung fuer 4.4.11/4.4.12)
+    stateOrig = { special: rev.special || 0, values: {}, kontinenz: { harn: null, stuhl: null } };
+    stateEigene = { special: rev.special || 0, values: {}, kontinenz: { harn: null, stuhl: null } };
     // Ein neu eingelesenes Erstgutachten beginnt einen neuen Fall – ein etwaiges
     // Zweitgutachten aus einem früheren Anhörungsverfahren gehört nicht dazu.
-    stateZweit = { special: 0, values: {} };
+    stateZweit = { special: 0, values: {}, kontinenz: { harn: null, stuhl: null } };
     // Auch das Anzeigefeld leeren – sonst gehörte die Stellungnahme des vorigen Falls
     // beim nächsten Speichern zu diesem hier.
     if (typeof setzeStellungnahme === 'function') setzeStellungnahme(""); else appealDraft = "";

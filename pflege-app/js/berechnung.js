@@ -12,6 +12,42 @@ function nbaEinzelpunkte(st, id) {
     return Number.isFinite(p) ? p : 0;
 }
 
+/* MODUL 4, KRITERIEN 4.4.11 UND 4.4.12 – die Inkontinenzbedingung der BRi.
+   Sie zählen nur mit, wenn die Person „überwiegend inkontinent" oder „komplett
+   inkontinent" ist oder eine künstliche Ableitung besteht (BRi 21.08.2024, S. 103).
+   Fehlt die Angabe (null), wird wie bisher gezählt – und die Ansicht fragt nach.
+   Ein stilles Wegrechnen von Punkten wäre der schlimmere Fehler. */
+function inkontinenzKriterium(nr) {
+    if (nr === '4.4.11') return 'harn';
+    if (nr === '4.4.12') return 'stuhl';
+    return null;
+}
+
+function zaehltMit(st, item) {
+    const feld = inkontinenzKriterium(item && item.nr);
+    if (!feld) return true;
+    const k = (st && st.kontinenz) ? st.kontinenz[feld] : null;
+    if (k === null || k === undefined || k === '') return true;   // keine Angabe -> wie bisher
+    return Number(k) >= KONTINENZ_ZAEHLT_AB;
+}
+
+// Kriterien, die wegen der Inkontinenzbedingung NICHT mitzählen, obwohl sie bewertet sind.
+function nichtGezaehlteInkontinenz(st) {
+    return ITEMS.filter(i => inkontinenzKriterium(i.nr))
+                .filter(i => (Number(st.values[i.id]) || 0) > 0 && !zaehltMit(st, i));
+}
+
+// Kriterien, die bewertet sind, während die Angabe zur Kontinenz noch fehlt.
+function offeneKontinenzAngabe(st) {
+    return ITEMS.filter(i => {
+        const feld = inkontinenzKriterium(i.nr);
+        if (!feld) return false;
+        if ((Number(st.values[i.id]) || 0) <= 0) return false;
+        const k = (st && st.kontinenz) ? st.kontinenz[feld] : null;
+        return (k === null || k === undefined || k === '');
+    });
+}
+
 /* MODUL 5 WIRD JE GRUPPE GEWERTET, NICHT JE KRITERIUM.
    Die Häufigkeiten einer Gruppe werden zuerst zusammengezählt, dann bekommt die GRUPPE
    EINEN Punktwert. Deshalb kann sich ein einzelnes Kriterium ändern, ohne dass die
@@ -162,7 +198,8 @@ function calculateInternal(pref) {
     let s1=ITEMS.filter(i=>i.m===1).reduce((s,i)=>s+(Number(st.values[i.id])||0),0);
     let s2=ITEMS.filter(i=>i.m===2).reduce((s,i)=>s+(Number(st.values[i.id])||0),0);
     let s3=ITEMS.filter(i=>i.m===3).reduce((s,i)=>s+getV(i.id),0);
-    let s4=ITEMS.filter(i=>i.m===4).reduce((s,i)=>s+getV(i.id),0);
+    // 4.4.11 und 4.4.12 zählen nur bei entsprechender Kontinenzlage mit (siehe zaehltMit).
+    let s4=ITEMS.filter(i=>i.m===4).reduce((s,i)=>s+(zaehltMit(st,i)?getV(i.id):0),0);
     let s6=ITEMS.filter(i=>i.m===6).reduce((s,i)=>s+(Number(st.values[i.id])||0),0);
     // Modul 5 nach BRi: je Gruppe summieren, dann der GRUPPE EINEN Punktwert zuordnen.
     // Gerechnet wird in m5Gruppen() – der einzigen Stelle für diese Logik.
@@ -208,6 +245,8 @@ function calculate(pref) {
     showGroupPts('C', grp5.C.pkt, M5_BEREICHE.C);
     ITEMS.filter(i=>i.m&&i.m!==5).forEach(i=>{const el=document.getElementById('pts-'+pref+'-'+i.id);if(el)el.innerText=getV(i.id);});
     if(pref==='own'){ ITEMS.forEach(it=>applyVorgHighlight(it.id)); }
+
+    zeigeKontinenzHinweis(pref, st);
 
     const setEl = (id,v) => { const el=document.getElementById(id); if(el)el.innerText=v; };
     setEl('mod-w-'+pref+'-1',w1.toFixed(2)); setEl('mod-r-'+pref+'-1',s1);
@@ -284,6 +323,35 @@ function calculate(pref) {
             footEl.innerText='✓ Maximaler Pflegegrad erreicht';
         }
     }
+}
+
+/* Sagt an Ort und Stelle, was die Kontinenzangabe gerade bewirkt. Ohne diesen Satz
+   sähe es aus, als verschluckte die App Punkte – oder als zählte sie welche, die nach
+   den Richtlinien nicht zählen dürfen. */
+function kontinenzHinweisText(st) {
+    const nicht = nichtGezaehlteInkontinenz(st);
+    const offen = offeneKontinenzAngabe(st);
+    if (nicht.length) {
+        return nicht.map(i => i.nr).join(' und ') + ' ist bewertet, zählt aber nicht mit: '
+             + 'Nach den Begutachtungs-Richtlinien gehen diese Kriterien nur in Modul 4 ein, '
+             + 'wenn die Person überwiegend oder komplett inkontinent ist oder eine künstliche '
+             + 'Ableitung besteht.';
+    }
+    if (offen.length) {
+        return offen.map(i => i.nr).join(' und ') + ' ist bewertet. Solange die Kontinenz nicht '
+             + 'angegeben ist, zählt die Bewertung mit. Nach den Richtlinien darf sie das nur bei '
+             + 'überwiegender oder kompletter Inkontinenz oder künstlicher Ableitung – bitte '
+             + 'die Angabe oben ergänzen.';
+    }
+    return '';
+}
+
+function zeigeKontinenzHinweis(pref, st) {
+    const el = document.getElementById('kontinenz-hinweis-' + pref);
+    if (!el) return;
+    const txt = kontinenzHinweisText(st);
+    el.innerText = txt;
+    el.style.color = txt ? 'var(--red)' : 'var(--text-secondary)';
 }
 
 function updateLiveCompRows() {

@@ -198,6 +198,9 @@ function fillTable(pref) {
         table.innerHTML += `<tr class="module-header-row"><td colspan="5">${m}. ${modNames[m-1]}</td></tr>`;
         ITEMS.filter(i=>i.m===m).forEach(i=>{
             if(!st.values[i.id]) st.values[i.id] = (i.m===5 && i.group!=='D') ? {count:0,period:'W'} : 0;
+            // Vor 4.4.11 die Kontinenzangaben: davon hängt ab, ob 4.4.11 und 4.4.12
+            // überhaupt in die Summe des Moduls 4 eingehen (BRi S. 103).
+            if (i.nr === '4.4.11') table.innerHTML += kontinenzZeile(pref);
             table.innerHTML += renderRow(i, pref);
         });
         table.innerHTML += `
@@ -217,6 +220,41 @@ function fillTable(pref) {
             <td colspan="5" id="mod-hinweis-${m}" class="mod-hinweis"></td>
         </tr>` : ''}`;
     }
+}
+
+/* Die beiden Kontinenzangaben. Sie stehen unmittelbar vor 4.4.11, weil genau davon
+   abhängt, ob 4.4.11 und 4.4.12 in die Summe des Moduls 4 eingehen. Ohne Angabe wird
+   wie bisher gezählt; die Zeile sagt das ausdrücklich, damit niemand rätselt. */
+function kontinenzZeile(pref) {
+    const st = zustandZu(pref);
+    const k = st.kontinenz || (st.kontinenz = { harn: null, stuhl: null });
+    const wahl = (feld, beschriftung) => {
+        const wert = (k[feld] === null || k[feld] === undefined) ? '' : String(k[feld]);
+        return `<label style="display:flex;align-items:center;gap:8px;font-size:11px">
+            <span style="min-width:104px;color:var(--text-secondary)">${beschriftung}</span>
+            <select onchange="setzeKontinenz('${pref}','${feld}',this.value)"
+                    style="flex:1;font-size:11px;padding:4px 6px">
+                <option value="" ${wert === '' ? 'selected' : ''}>– keine Angabe –</option>
+                ${KONTINENZ_STUFEN.map((s, idx) =>
+                    `<option value="${idx}" ${wert === String(idx) ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
+            </select></label>`;
+    };
+    return `<tr class="kontinenz-row"><td colspan="5" style="padding:10px 14px;background:var(--bg-card2);border-bottom:1px solid var(--border)">
+        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:8px">
+            Voraussetzung für 4.4.11 und 4.4.12</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            ${wahl('harn', 'Harnkontinenz')}${wahl('stuhl', 'Stuhlkontinenz')}
+        </div>
+        <div id="kontinenz-hinweis-${pref}" style="font-size:11px;line-height:1.5;color:var(--text-secondary);margin-top:8px"></div>
+    </td></tr>`;
+}
+
+function setzeKontinenz(pref, feld, wert) {
+    const st = zustandZu(pref);
+    if (!st.kontinenz) st.kontinenz = { harn: null, stuhl: null };
+    st.kontinenz[feld] = (wert === '' ? null : Number(wert));
+    calculate(pref);
+    if (pref === 'own' && typeof stellungnahmeVeraltet !== 'undefined') stellungnahmeVeraltet = true;
 }
 
 function renderRow(i, pref) {

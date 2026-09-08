@@ -229,13 +229,13 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
 
     const zweck = istHoeher
         ? `Diese pflegefachliche Stellungnahme dient der Unterstützung von ${df('name', name)} bei der Beantragung einer Höherstufung. `
-          + `Zu diesem Zweck habe ich ${df('name', name)} persönlich befragt, pflegefachliche Befunde erhoben und das Gutachten des `
-          + `${df('org', org)} vom ${df('vgdatum', vorgutachtenDatum || '—')} hinzugezogen.`
+          + `Zu diesem Zweck habe ich ${df('name', name)} persönlich befragt, pflegefachliche Befunde erhoben und das Gutachten `
+          + `${df('org', orgGenitiv(org))} vom ${df('vgdatum', vorgutachtenDatum || '—')} hinzugezogen.`
         : `Diese pflegefachliche Stellungnahme dient der Unterstützung von ${df('name', name)} bei der Beantragung eines Pflegegrades. `
           + `Zu diesem Zweck habe ich ${df('name', name)} persönlich befragt und pflegefachliche Befunde erhoben.`;
 
     const einleitung = istHoeher
-        ? `<p>Im Gutachten des ${df('org', org)} vom ${df('vgdatum', vorgutachtenDatum || '—')} wurde ${df('name', name)} mit `
+        ? `<p>Im Gutachten ${df('org', orgGenitiv(org))} vom ${df('vgdatum', vorgutachtenDatum || '—')} wurde ${df('name', name)} mit `
           + `${df('opg', pgWert(altPG))} und ${df('opts', f2(rO.total))} gewichteten Punkten eingestuft. Die Bewertung erfolgte auf Basis der zu `
           + `diesem Zeitpunkt vorliegenden Einschränkungen in den sechs Begutachtungsmodulen. Seit der Begutachtung haben sich jedoch relevante `
           + `Veränderungen im Gesundheitszustand und in der Alltagskompetenz ergeben, die zu einer höheren pflegerischen Versorgungsnotwendigkeit `
