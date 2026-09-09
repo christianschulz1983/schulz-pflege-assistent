@@ -221,6 +221,23 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    die Stelle **markiert** – nach dem Muster der Zitatprüfung, am Bildschirm sichtbar, im
    Ausdruck ausgeblendet. **Nicht still ersetzen**: Der Berater soll sehen, wo es steht.
 
+17. **Jede Angabe nur an EINER Stelle erfassen** (`js/erfassung.js`). Die
+   Kompressionsversorgung stand in den **Hilfsmitteln** und noch einmal in der
+   **Behandlungspflege**; die App addierte beide Häufigkeiten und trieb 4.5.7 von 8 auf
+   18 pro Tag. Aufteilung jetzt:
+   - **Hilfsmittel:** eine Zeile je Hilfsmittel mit Nutzung (genutzt/ungenutzt), Anzahl,
+     Zeitraum und **Tätigkeit der Pflegeperson**. Dieses Freifeld ist der Schalter:
+     ausgefüllt = personelle Hilfe, leer = reine Auflistung. Ungenutztes zählt nie.
+     Ältere Falldateien kennen das Feld nicht – dort gilt weiter `durchfuehrung`.
+   - **Behandlungspflege:** nur die pflegerischen Maßnahmen (Verbände, Absaugen,
+     Injektionen, Messungen, Stoma, Katheter). Körpernahe Hilfsmittel stehen NICHT mehr
+     in der Auswahl; `doppelteErfassung()` warnt, wenn dort doch eines eingetragen wird.
+   Im Schriftstück ist die Hilfsmitteltabelle eine **einfache Aufzählung** (Hilfsmittel,
+   Nutzung, Tätigkeit) – die Häufigkeit steht in der Begründung zu 4.5.7.
+18. **Größe, Gewicht und BMI stehen nur einmal im Schriftstück** – in der Tabelle
+   „Körperlicher Befund". Die Katalogruppe „Ernährung" enthält dieselben vier Felder und
+   wird deshalb übersprungen (`BEFUND_GRUPPEN_DOPPELT` in `js/hoeherstufung.js`).
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -270,7 +287,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 773 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 793 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
