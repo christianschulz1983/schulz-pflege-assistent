@@ -867,6 +867,109 @@ async function selbsttest() {
                 && druckHtml.indexOf("seitenAufteilen(document") < druckHtml.indexOf('window.print()'));
         }
 
+        // ---------- 9q. Hilfsmittel und Behandlungspflege ohne Doppelerfassung ----------
+        // Gemeldet: Die Eingabemasken erfassen fast dasselbe. Nachgerechnet wurde dabei
+        // eine Doppelzählung: Die Kompressionsversorgung stand in beiden Tabellen, die
+        // App addierte beide Häufigkeiten und trieb 4.5.7 von 8 auf 18 pro Tag.
+        if (typeof doppelteErfassung === 'function') {
+            const merkErf = JSON.parse(JSON.stringify(erfassung));
+            try {
+                // Der gemeldete Fall, nach dem Umbau: alles einmal in den Hilfsmitteln
+                erfassung.hilfsmittel = [
+                    { bezeichnung: 'Kompressionskniestrümpfe', nutzung: 'genutzt', anzahl: '2', zeitraum: 'pro Tag', taetigkeit: 'An- und Ausziehen' },
+                    { bezeichnung: 'Kompressionslegging', nutzung: 'genutzt', anzahl: '2', zeitraum: 'pro Tag', taetigkeit: 'An- und Ausziehen' },
+                    { bezeichnung: 'Zehenkappen (Kompression)', nutzung: 'genutzt', anzahl: '2', zeitraum: 'pro Tag', taetigkeit: 'An- und Ausziehen' },
+                    { bezeichnung: 'Lymphomat', nutzung: 'genutzt', anzahl: '2', zeitraum: 'pro Tag', taetigkeit: 'Anlegen der Manschetten' },
+                    { bezeichnung: 'Schlafapnoemaske', nutzung: 'genutzt', anzahl: '4', zeitraum: 'pro Tag', taetigkeit: 'Aufsetzen, Sitzkorrektur' },
+                    { bezeichnung: 'Brille', nutzung: 'genutzt', anzahl: '1', zeitraum: 'pro Tag', taetigkeit: '' },
+                    { bezeichnung: 'Rollator', nutzung: 'genutzt', anzahl: '1', zeitraum: 'pro Tag', taetigkeit: 'Bereitstellen' },
+                    { bezeichnung: 'Aufstehhilfe', nutzung: 'ungenutzt', anzahl: '2', zeitraum: 'pro Tag', taetigkeit: 'Bereitstellen' }
+                ];
+                erfassung.behandlungspflege = [];
+                erfassung.arztbesuche = []; erfassung.medikation = [];
+                let z = modul5AusErfassung();
+                // 4.5.7: 2+2+2+2 = 8 (Kompression dreifach + Lymphomat). Maske zu 4.5.4.
+                pruefe('Hilfsmittel: 4.5.7 ohne Doppelzählung', z['4.5.7'] && z['4.5.7'].count, 8);
+                pruefe('Schlafapnoemaske zählt wie CPAP', z['4.5.4'] && z['4.5.4'].count, 4);
+                pruefeWahr('Brille ohne Tätigkeit zählt nicht',
+                    !Object.keys(z).some(nr => nr === '4.4.2'));
+                pruefeWahr('Rollator bleibt unbewertet (BRi)', (z['4.5.7'] || {}).count === 8);
+
+                // Ungenutztes zählt nie – auch mit Tätigkeit und Häufigkeit
+                erfassung.hilfsmittel = [{ bezeichnung: 'Aufstehhilfe', nutzung: 'ungenutzt',
+                    anzahl: '3', zeitraum: 'pro Tag', taetigkeit: 'Bereitstellen' }];
+                pruefe('Ungenutztes Hilfsmittel zählt nicht',
+                    Object.keys(modul5AusErfassung()).length, 0);
+
+                // Ohne Tätigkeit keine personelle Hilfe
+                erfassung.hilfsmittel = [{ bezeichnung: 'Kompressionsstrümpfe', nutzung: 'genutzt',
+                    anzahl: '2', zeitraum: 'pro Tag', taetigkeit: '' }];
+                pruefe('Ohne Tätigkeit keine Wertung', Object.keys(modul5AusErfassung()).length, 0);
+                erfassung.hilfsmittel[0].taetigkeit = 'An- und Ausziehen';
+                pruefe('Mit Tätigkeit wird gewertet',
+                    (modul5AusErfassung()['4.5.7'] || {}).count, 2);
+
+                // Ältere Falldateien kennen das Feld nicht – dort gilt die Durchführung
+                erfassung.hilfsmittel = [{ bezeichnung: 'Kompressionsstrümpfe', anzahl: '2',
+                    zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' }];
+                pruefe('Alter Fall: Durchführung gilt weiter',
+                    (modul5AusErfassung()['4.5.7'] || {}).count, 2);
+                erfassung.hilfsmittel[0].durchfuehrung = 'selbständig';
+                pruefe('Alter Fall: selbständig zählt nicht',
+                    Object.keys(modul5AusErfassung()).length, 0);
+
+                // Warnung, wenn ein körpernahes Hilfsmittel doch unten steht
+                erfassung.hilfsmittel = [];
+                erfassung.behandlungspflege = [
+                    { art: 'Kompressionsstrümpfe anlegen', anzahl: '6', zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' },
+                    { art: 'Verbandswechsel', anzahl: '1', zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' }
+                ];
+                const doppelt = doppelteErfassung();
+                pruefe('Doppelte Erfassung wird erkannt', doppelt.length, 1);
+                pruefeWahr('Warnung nennt die Maßnahme',
+                    !!doppelt[0] && doppelt[0].includes('Kompression'));
+                erfassung.behandlungspflege = [{ art: 'Verbandswechsel', anzahl: '1', zeitraum: 'pro Tag', durchfuehrung: 'durch Pflegeperson' }];
+                pruefe('Reine Behandlungspflege meldet nichts', doppelteErfassung().length, 0);
+
+                // Die Auswahl der Behandlungspflege enthält keine körpernahen Hilfsmittel mehr
+                pruefeWahr('Auswahl ohne Kompression und CPAP',
+                    !BEHANDLUNGSPFLEGE_ART.some(a => HILFSMITTEL_MASSNAHMEN.test(a)));
+                pruefeWahr('Auswahl enthält weiter die Behandlungspflege',
+                    BEHANDLUNGSPFLEGE_ART.includes('Verbandswechsel')
+                    && BEHANDLUNGSPFLEGE_ART.includes('Absaugen'));
+            } finally {
+                Object.keys(erfassung).forEach(k => delete erfassung[k]);
+                Object.keys(merkErf).forEach(k => erfassung[k] = merkErf[k]);
+            }
+
+            // Die Spalten der Hilfsmitteltabelle
+            const hm = ERFASSUNG_TABELLEN.find(t => t.id === 'hilfsmittel');
+            pruefe('Hilfsmittel: Spalten',
+                hm.spalten.map(s => s.k), ['bezeichnung', 'nutzung', 'anzahl', 'zeitraum', 'taetigkeit']);
+            pruefe('Hilfsmittel: Nutzung mit zwei Stufen', HILFSMITTEL_NUTZUNG, ['genutzt', 'ungenutzt']);
+        }
+
+        // ---------- 9r. Größe und Gewicht nur einmal im Schriftstück ----------
+        if (typeof befundBlock === 'function') {
+            const merkTexte = JSON.parse(JSON.stringify(typeof befundTexte !== 'undefined' ? befundTexte : {}));
+            try {
+                befundTexte['groesse'] = '166';
+                befundTexte['gewicht'] = '125';
+                befundTexte['bmi'] = '45,4';
+                const block = befundBlock();
+                pruefeWahr('Ernährung erscheint nicht mehr als eigene Tabelle',
+                    !/>\s*Ernährung\s*</.test(block));
+                pruefeWahr('Größe steht nicht im Befundblock', !block.includes('166'));
+                pruefeWahr('Andere Befundgruppen bleiben erhalten',
+                    BEFUND_GRUPPEN.filter(g => BEFUND_GRUPPEN_DOPPELT.indexOf(g.id) === -1).length
+                    === BEFUND_GRUPPEN.length - 1);
+                pruefe('Nur die Ernährungsgruppe wird ausgelassen', BEFUND_GRUPPEN_DOPPELT, ['ernaehrung']);
+            } finally {
+                Object.keys(befundTexte).forEach(k => delete befundTexte[k]);
+                Object.keys(merkTexte).forEach(k => befundTexte[k] = merkTexte[k]);
+            }
+        }
+
         // ---------- 9o. Genitiv der Gutachtenorganisation ----------
         // Rückmeldung der Kollegin: „des Medizinischer Dienst" – richtig ist
         // „des Medizinischen Dienstes".

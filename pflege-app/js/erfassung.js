@@ -31,10 +31,19 @@ const THERAPIE_ART = ['Physiotherapie', 'Ergotherapie', 'Logopädie',
     'Dialyse', 'Chemotherapie', 'Tagespflege'];
 const APPLIKATION = ['oral', 'Augen- oder Ohrentropfen', 'Dosieraerosol oder Pulverinhalator',
     'Zäpfchen', 'Pflaster', 'Injektion', 'über PEG'];
-const BEHANDLUNGSPFLEGE_ART = ['Kompressionsstrümpfe anlegen', 'Kompressionsstrümpfe ablegen',
-    'Hörgerät einsetzen', 'Hörgerät herausnehmen', 'Verbandswechsel', 'Wundversorgung',
-    'Sauerstoffbrille auf- oder absetzen', 'CPAP-Maske auf- oder absetzen',
-    'Blutzucker messen', 'Blutdruck messen', 'Stoma versorgen', 'Einmalkatheterisierung'];
+const HILFSMITTEL_NUTZUNG = ['genutzt', 'ungenutzt'];
+
+/* Behandlungspflege: nur noch die eigentlichen pflegerischen Maßnahmen.
+   Körpernahe Hilfsmittel – Kompressionsversorgung, CPAP-Maske, Hörgerät – stehen jetzt
+   in der Hilfsmitteltabelle, zusammen mit der Tätigkeit der Pflegeperson. Standen sie
+   an beiden Stellen, hat die App die Häufigkeiten addiert. */
+const BEHANDLUNGSPFLEGE_ART = ['Verbandswechsel', 'Wundversorgung', 'Absaugen',
+    'Injektion verabreichen', 'Blutzucker messen', 'Blutdruck messen',
+    'Stoma versorgen', 'Einmalkatheterisierung', 'Abführmaßnahme',
+    'Therapiemaßnahme in häuslicher Umgebung'];
+
+// Maßnahmen, die zu einem körpernahen Hilfsmittel gehören und deshalb dort hingehören.
+const HILFSMITTEL_MASSNAHMEN = /kompression|cpap|hörgerät|hoergeraet|sauerstoffbrille|schlafapnoe|prothese|orthese|bandage/i;
 
 const ERFASSUNG_TABELLEN = [
     {
@@ -63,15 +72,20 @@ const ERFASSUNG_TABELLEN = [
     },
     {
         id: 'hilfsmittel', titel: 'Hilfsmittel',
-        hinweis: 'Nur Hilfsmittel mit personeller Hilfe fließen in Modul 5 ein (körpernahe Hilfsmittel zu 4.5.7). '
-               + 'Nicht gewertet werden laut BRi: Brille, Zahnprothese (gehört zu 4.4.2) sowie Gehhilfen wie '
-               + 'Rollator, Gehstock oder Rollstuhl.',
+        /* Eine Zeile je Hilfsmittel – hier steht ALLES dazu, auch was die Pflegeperson
+           damit tut und wie oft. Vorher gab es dieselbe Angabe ein zweites Mal in der
+           Behandlungspflege; die App hat beides addiert und 4.5.7 damit verdoppelt. */
+        hinweis: 'Eine Zeile je Hilfsmittel. Das Feld „Tätigkeit der Pflegeperson" ist der Schalter: '
+               + 'Steht dort etwas, liegt personelle Hilfe vor und das Hilfsmittel fließt in Modul 5 ein '
+               + '(körpernahe Hilfsmittel zu 4.5.7). Bleibt es leer, wird nur aufgelistet. '
+               + 'Ungenutzte Hilfsmittel zählen nie. Nicht gewertet werden laut BRi: Brille, '
+               + 'Zahnprothese (gehört zu 4.4.2) sowie Gehhilfen wie Rollator, Gehstock oder Rollstuhl.',
         spalten: [
             { k: 'bezeichnung', l: 'Hilfsmittel', typ: 'text' },
+            { k: 'nutzung', l: 'Nutzung', typ: 'select', opt: HILFSMITTEL_NUTZUNG, b: '130px' },
             { k: 'anzahl', l: 'Anzahl', typ: 'number', b: '80px' },
             { k: 'zeitraum', l: 'Zeitraum', typ: 'select', opt: HAEUFIGKEIT_ZEITRAUM, b: '120px' },
-            { k: 'durchfuehrung', l: 'Durchführung', typ: 'select', opt: DURCHFUEHRUNG, b: '170px' },
-            { k: 'anmerkung', l: 'Anmerkung', typ: 'text' }
+            { k: 'taetigkeit', l: 'Tätigkeit der Pflegeperson', typ: 'text' }
         ]
     },
     {
@@ -99,7 +113,11 @@ const ERFASSUNG_TABELLEN = [
     },
     {
         id: 'behandlungspflege', titel: 'Behandlungspflege',
-        hinweis: 'An- und Ablegen zählen jeweils als eigene Maßnahme. '
+        hinweis: 'Nur die eigentlichen pflegerischen Maßnahmen: Verbände, Wundversorgung, '
+               + 'Absaugen, Injektionen, Messungen, Stoma, Katheter. '
+               + 'Körpernahe Hilfsmittel – Kompressionsversorgung, CPAP-Maske, Hörgerät – gehören '
+               + 'in die Tabelle „Hilfsmittel", dort mit der Tätigkeit der Pflegeperson. '
+               + 'An- und Ablegen zählen jeweils als eigene Maßnahme. '
                + 'Nur Maßnahmen „durch Pflegeperson" fließen in Modul 5 ein.',
         spalten: [
             { k: 'art', l: 'Maßnahme', typ: 'select', opt: BEHANDLUNGSPFLEGE_ART, frei: true },
@@ -182,6 +200,7 @@ function renderErfassung() {
                     gesetzte Werte werden dabei überschrieben.
                 </p>
                 <div id="erf-modul5-hinweis" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
+                <div id="erf-doppelt-hinweis" style="margin-bottom:12px"></div>
                 <button class="btn btn-primary" onclick="uebernehmeModul5(true)">↧ Modul 5 übernehmen</button>
             </div>
         </div>`;
@@ -305,13 +324,20 @@ function modul5AusErfassung() {
     // Hilfsmittel: nur mit personeller Hilfe. Laut BRi zählen Brille, Zahnprothese und
     // Gehhilfen hier NICHT – Zahnprothesen gehören zu 4.4.2, Gehhilfen begründen nichts.
     (erfassung.hilfsmittel || []).forEach(z => {
-        if (z.durchfuehrung !== 'durch Pflegeperson') return;
+        // Der Schalter ist die eingetragene Tätigkeit: Steht dort etwas, hilft eine Person.
+        // Ältere Fälle kennen das Feld nicht – dort gilt weiterhin die Durchführung.
+        const hilft = (z.taetigkeit || '').trim()
+            ? true : (z.taetigkeit === undefined && z.durchfuehrung === 'durch Pflegeperson');
+        if (!hilft) return;
+        if ((z.nutzung || '') === 'ungenutzt') return;   // ungenutzt begründet keinen Aufwand
         const b = (z.bezeichnung || '').toLowerCase();
         if (/brille|zahnprothese|gebiss|rollator|gehstock|walking|rollstuhl|gehhilfe/.test(b)) return;
         let nr = '4.5.7';
         if (/katheter/.test(b)) nr = '4.5.10';
         else if (/stoma/.test(b)) nr = '4.5.9';
-        else if (/sauerstoff|cpap/.test(b)) nr = '4.5.4';
+        // „Schlafapnoemaske" ist dasselbe Gerät wie „CPAP-Maske" – ohne dieses Wort landete
+        // dieselbe Sache je nach Schreibweise in zwei verschiedenen Kriterien.
+        else if (/sauerstoff|cpap|schlafapnoe/.test(b)) nr = '4.5.4';
         addieren(nr, z.anzahl, z.zeitraum);
     });
     (erfassung.behandlungspflege || []).forEach(z => {
@@ -329,6 +355,17 @@ function modul5AusErfassung() {
     return ziel;
 }
 
+/* Warnt vor doppelter Erfassung. Anlass: Die Kompressionsversorgung stand in den
+   Hilfsmitteln UND in der Behandlungspflege; die App hat beide Häufigkeiten addiert und
+   4.5.7 damit von 8 auf 18 pro Tag getrieben. Körpernahe Hilfsmittel gehören nur noch
+   in die Hilfsmitteltabelle – wer sie trotzdem unten einträgt, wird darauf hingewiesen. */
+function doppelteErfassung() {
+    return (erfassung.behandlungspflege || [])
+        .filter(z => HILFSMITTEL_MASSNAHMEN.test((z.art || '') + ' ' + (z.beschreibung || '')))
+        .map(z => (z.art || '').trim() || (z.beschreibung || '').trim())
+        .filter(Boolean);
+}
+
 function zeigeModul5Vorschau() {
     const el = document.getElementById('erf-modul5-hinweis');
     if (!el) return;
@@ -338,6 +375,16 @@ function zeigeModul5Vorschau() {
         ? 'Bereit zur Übernahme: ' + nrs.map(nr => nr + ' = ' + z[nr].count + '× '
             + (z[nr].period === 'D' ? 'pro Tag' : z[nr].period === 'W' ? 'pro Woche' : 'pro Monat')).join(' · ')
         : 'Noch keine Angaben mit personeller Unterstützung erfasst.';
+
+    const warn = document.getElementById('erf-doppelt-hinweis');
+    if (!warn) return;
+    const doppelt = doppelteErfassung();
+    warn.innerHTML = doppelt.length
+        ? '<div class="hinweis-warnung">In der Behandlungspflege steht ' + escapeHtml(doppelt.join(', '))
+          + '. Körpernahe Hilfsmittel gehören in die Tabelle „Hilfsmittel" – dort mit der Tätigkeit '
+          + 'der Pflegeperson. Stehen sie an beiden Stellen, werden die Häufigkeiten addiert und '
+          + 'Modul 5 fällt zu hoch aus.</div>'
+        : '';
 }
 
 function uebernehmeModul5(mitMeldung) {

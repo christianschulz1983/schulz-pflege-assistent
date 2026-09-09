@@ -23,9 +23,16 @@ function haeufigkeitText(z) {
 }
 
 // Befundeinträge mit Angabe, gruppiert nach den Überschriften des Katalogs
+/* Gruppen, die im Schriftstück NICHT noch einmal als Tabelle erscheinen, weil ihre
+   Angaben dort schon stehen. „Ernährung" enthält Körpergröße, Gewicht, BMI und
+   Ernährungszustand – genau die vier Felder der Tabelle „Körperlicher Befund".
+   Vorher standen sie zweimal im Dokument. */
+const BEFUND_GRUPPEN_DOPPELT = ['ernaehrung'];
+
 function befundBlock() {
     let html = '';
     BEFUND_GRUPPEN.forEach(g => {
+        if (BEFUND_GRUPPEN_DOPPELT.indexOf(g.id) !== -1) return;
         const zeilen = [];
         // Modul 3: nur die tatsächlich erfassten Problemlagen, nicht alle dreizehn Kriterien
         if (g.sonder === 'psyche') {
@@ -285,9 +292,12 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
     <h2>Aktuelle Situation</h2>
     <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${notesBlock}</div>
 
-    ${tabellenBlock('Hilfsmittel', ['Hilfsmittel', 'Häufigkeit', 'Durchführung', 'Anmerkung'],
+    ${/* Einfache Aufzählung: welche Hilfsmittel liegen vor, werden sie genutzt, und was
+          tut die Pflegeperson damit. Die Häufigkeit steht dort, wo sie hingehört – in der
+          Begründung zum Kriterium 4.5.7. */''}
+    ${tabellenBlock('Hilfsmittel', ['Hilfsmittel', 'Nutzung', 'Tätigkeit der Pflegeperson'],
         (erfassung.hilfsmittel || []).filter(z => (z.bezeichnung || '').trim())
-            .map(z => [z.bezeichnung, haeufigkeitText(z), z.durchfuehrung || '', z.anmerkung || '']))}
+            .map(z => [z.bezeichnung, z.nutzung || '', z.taetigkeit || z.anmerkung || '']))}
 
     <h2>Körperlicher Befund</h2>
     <table class="cmp"><thead><tr><th>Körpergröße (cm)</th><th>Gewicht (kg)</th><th>BMI</th><th>Status</th></tr></thead>
