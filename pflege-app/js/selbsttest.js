@@ -2881,7 +2881,193 @@ async function selbsttest() {
                 Object.keys(zh).sort(), ['4.5.10', '4.5.7']);
             pruefeWahr('Modul 5: selbständige Maßnahmen zählen nicht',
                 !Object.keys(z).some(nr => nr === '4.5.14' && z[nr].count > 2));
+
+            // ---------- 13b. Medikation: eine Zeile je Applikationsort (BRi F 4.5.1) ----------
+            const medSp = ERFASSUNG_TABELLEN.find(t => t.id === 'medikation').spalten.map(s => s.k);
+            pruefe('Medikation: Spalten je Applikationsort', medSp,
+                ['applikation', 'praeparate', 'anzahl', 'zeitraum', 'unterstuetzung']);
+            pruefeWahr('Medikation: kein Feld mehr für einzelne Medikamente', medSp.indexOf('bezeichnung') === -1);
+            pruefeWahr('Augen und Ohren sind getrennte Applikationsorte',
+                APPLIKATION.indexOf('Augentropfen') > -1 && APPLIKATION.indexOf('Ohrentropfen') > -1
+                && !APPLIKATION.some(a => /Augen- oder Ohren/.test(a)));
+            pruefe('Fünf Abstufungen der Unterstützung', MEDIKATION_HILFE,
+                ['selbständig', 'Erinnerung', 'Bereitstellen', 'Stellen', 'Gabe durch Pflegeperson']);
+
+            // Die Zahl der Präparate darf die Bewertung NICHT verändern
+            erfassung.arztbesuche = []; erfassung.hilfsmittel = []; erfassung.behandlungspflege = [];
+            erfassung.medikation = [{ applikation: 'oral (Tabletten, Tropfen, Säfte)', praeparate: '1',
+                anzahl: '3', zeitraum: 'pro Tag', unterstuetzung: 'Gabe durch Pflegeperson' }];
+            // Kurzform, die auch dann noch etwas liefert, wenn gar nichts gezählt wurde -
+            // sonst reisst eine kaputte Funktion den ganzen Testlauf ab.
+            const med5 = () => { const x = modul5AusErfassung()['4.5.1']; return x ? x.count + x.period : 'fehlt'; };
+            const einPraeparat = med5();
+            erfassung.medikation[0].praeparate = '9';
+            pruefe('Zahl der Präparate verändert die Bewertung nicht', med5(), einPraeparat);
+            pruefe('Gezählt wird die Applikationshäufigkeit', einPraeparat, '3D');
+
+            // Jede Unterstützungsart außer „selbständig" zählt
+            MEDIKATION_HILFE.forEach(h => {
+                erfassung.medikation = [{ applikation: 'oral (Tabletten, Tropfen, Säfte)', anzahl: '2',
+                    zeitraum: 'pro Tag', unterstuetzung: h }];
+                const gezaehlt = !!modul5AusErfassung()['4.5.1'];
+                pruefe('Medikation „' + h + '" zählt' + (h === 'selbständig' ? ' nicht' : ''),
+                    gezaehlt, h !== 'selbständig');
+            });
+
+            // BRi: „Werden Medikamente verabreicht, ist das Stellen nicht gesondert zu berücksichtigen."
+            erfassung.medikation = [
+                { applikation: 'oral (Tabletten, Tropfen, Säfte)', anzahl: '3', zeitraum: 'pro Tag',
+                  unterstuetzung: 'Gabe durch Pflegeperson' },
+                { applikation: 'oral (Tabletten, Tropfen, Säfte)', anzahl: '1', zeitraum: 'pro Woche',
+                  unterstuetzung: 'Stellen' }
+            ];
+            pruefe('Neben der Gabe wird das Stellen nicht zusätzlich gezählt', med5(), '3D');
+            // Ohne Gabe ist das Stellen für sich eine Maßnahme
+            erfassung.medikation = [{ applikation: 'oral (Tabletten, Tropfen, Säfte)', anzahl: '1',
+                zeitraum: 'pro Woche', unterstuetzung: 'Stellen' }];
+            pruefe('Ohne Gabe zählt das Stellen für sich', med5(), '1W');
+            // Ein anderer Applikationsort bleibt davon unberührt
+            erfassung.medikation = [
+                { applikation: 'oral (Tabletten, Tropfen, Säfte)', anzahl: '3', zeitraum: 'pro Tag',
+                  unterstuetzung: 'Gabe durch Pflegeperson' },
+                { applikation: 'Augentropfen', anzahl: '2', zeitraum: 'pro Tag', unterstuetzung: 'Stellen' }
+            ];
+            pruefe('Stellen an einem anderen Ort zählt weiter', med5(), '5D');
+
+            // Alte Fälle: „durchfuehrung" wird weiter verstanden
+            erfassung.medikation = [
+                { bezeichnung: 'Metformin', applikation: 'oral', anzahl: '3', zeitraum: 'pro Tag',
+                  durchfuehrung: 'durch Pflegeperson' },
+                { bezeichnung: 'Vitamin D', applikation: 'oral', anzahl: '1', zeitraum: 'pro Tag',
+                  durchfuehrung: 'selbständig' }
+            ];
+            pruefe('Alte Fälle werden weiter richtig gewertet', med5(), '3D');
+            pruefe('Alte Durchführung wird als Gabe gelesen',
+                medikationHilfe({ durchfuehrung: 'durch Pflegeperson' }), 'Gabe durch Pflegeperson');
+            pruefe('Ohne jede Angabe keine Unterstützung', medikationHilfe({}), '');
+
+            // Ein alter Fall wird beim Laden in die heutige Form gebracht – sichtbar, nicht heimlich
+            const alterFall = { tabellen: { medikation: [
+                { bezeichnung: 'Metformin 850 mg', applikation: 'oral', anzahl: '2', zeitraum: 'pro Tag',
+                  durchfuehrung: 'durch Pflegeperson' },
+                { bezeichnung: 'Latanoprost', applikation: 'Augentr.', anzahl: '1', zeitraum: 'pro Tag',
+                  durchfuehrung: 'selbständig' },
+                { bezeichnung: 'Insulin', applikation: 's.c.', anzahl: '3', zeitraum: 'pro Tag',
+                  durchfuehrung: 'durch Pflegeperson' },
+                {}
+            ] }, extra: {} };
+            // Summe der Maßnahmen pro Tag – sie darf sich durch das Umstellen nicht ändern
+            const proTagSumme = () => { const x = modul5AusErfassung();
+                const f = { D: 1, W: 1 / 7, M: 1 / 30 };
+                return Math.round(Object.keys(x).reduce((s, k) => s + x[k].count * f[x[k].period], 0) * 100) / 100; };
+            erfassung = JSON.parse(JSON.stringify(alterFall.tabellen));
+            const summeVorher = proTagSumme();
+            const altZuordnung = Object.keys(modul5AusErfassung()).sort();
+            erfassungLaden(JSON.parse(JSON.stringify(alterFall)));
+            const um = erfassung.medikation;
+            pruefe('Alter Fall: Applikationsort aus der Liste', um[0].applikation, 'oral (Tabletten, Tropfen, Säfte)');
+            pruefe('Alter Fall: Augentropfen erkannt', um[1].applikation, 'Augentropfen');
+            pruefe('Alter Fall: Insulin als Injektion erkannt', um[2].applikation, 'Injektion');
+            pruefe('Alter Fall: Durchführung wird zur Unterstützung', um[0].unterstuetzung, 'Gabe durch Pflegeperson');
+            pruefeWahr('Alter Fall: alte Spalte ist weg', um.every(z => z.durchfuehrung === undefined));
+            pruefeWahr('Alter Fall: Medikamentennamen gehen nicht verloren',
+                medikationAlteNamen().join(', ') === 'Metformin 850 mg, Latanoprost, Insulin');
+            pruefe('Alter Fall: jede Zeile war ein Präparat', um[0].praeparate, '1');
+            pruefeWahr('Alter Fall: die leere Zeile bleibt leer', !Object.keys(um[3]).length);
+            pruefe('Alter Fall: keine Maßnahme geht verloren oder kommt hinzu', proTagSumme(), summeVorher);
+            /* Die Zuordnung wird dabei richtiger: Ein „s.c." verabreichtes Insulin landete früher
+               unter 4.5.1 Medikation, weil dort auf das Wort „Injektion" geprüft wurde. Jetzt zählt
+               es zu 4.5.2 Injektionen. Beide gehören zur Modul-5-Gruppe A, die als Summe bepunktet
+               wird – die Punkte bleiben also gleich, nur die Zeile stimmt. */
+            pruefe('Alter Fall: Insulin lag früher unter Medikation', altZuordnung, ['4.5.1']);
+            pruefe('Alter Fall: Insulin zählt jetzt zu den Injektionen',
+                Object.keys(modul5AusErfassung()).sort(), ['4.5.1', '4.5.2']);
+            pruefe('Beide gehören zur selben Modul-5-Gruppe – die Punkte bleiben gleich',
+                ITEMS.find(i => i.nr === '4.5.1').group, ITEMS.find(i => i.nr === '4.5.2').group);
+            pruefeWahr('Umstellen läuft nicht zweimal',
+                JSON.stringify(medikationUmstellen(um)) === JSON.stringify(um));
+
+            // Mehrere zählende Zeilen am selben Ort werden gemeldet, nicht heimlich verrechnet
+            erfassung.medikation = [
+                { applikation: 'oral (Tabletten, Tropfen, Säfte)', anzahl: '2', zeitraum: 'pro Tag',
+                  unterstuetzung: 'Gabe durch Pflegeperson' },
+                { applikation: 'oral (Tabletten, Tropfen, Säfte)', anzahl: '1', zeitraum: 'pro Tag',
+                  unterstuetzung: 'Erinnerung' }
+            ];
+            pruefe('Zwei zählende Zeilen am selben Ort werden gemeldet', medikationMehrfachOrt(),
+                ['oral (Tabletten, Tropfen, Säfte)']);
+            erfassung.medikation[1].unterstuetzung = 'Stellen';
+            pruefe('Gabe und Stellen am selben Ort sind kein Fall dafür', medikationMehrfachOrt(), []);
+            erfassung.medikation[1].unterstuetzung = 'selbständig';
+            pruefe('Selbständiges am selben Ort ist kein Fall dafür', medikationMehrfachOrt(), []);
+
+            // Aus Arztberichten: je Applikationsort eine Zeile, nicht je Präparat
+            const gruppiert = medikationGruppiert([
+                { bezeichnung: 'Metformin', applikation: 'oral', anzahl: '2', zeitraum: 'pro Tag' },
+                { bezeichnung: 'Ramipril', applikation: 'Tablette', anzahl: '1', zeitraum: 'pro Tag' },
+                { bezeichnung: 'ASS 100', applikation: '', anzahl: '1', zeitraum: 'pro Tag' },
+                { bezeichnung: 'Insulin', applikation: 's.c.', anzahl: '4', zeitraum: 'pro Tag' },
+                { bezeichnung: 'Latanoprost', applikation: 'Augentropfen', anzahl: '1', zeitraum: 'pro Tag' }
+            ]);
+            pruefe('Fünf Präparate ergeben drei Zeilen', (gruppiert || []).length, 3);
+            const oral = (gruppiert || []).find(z => /^oral/.test(z.applikation || ''));
+            pruefeWahr('Drei orale Präparate in einer Zeile',
+                !!oral && oral.praeparate === '3' && oral.anzahl === '2' && oral.zeitraum === 'pro Tag');
+            pruefeWahr('Insulin wird als Injektion erkannt',
+                (gruppiert || []).some(z => z.applikation === 'Injektion' && z.anzahl === '4'));
+            pruefeWahr('Augentropfen bleiben ein eigener Ort',
+                (gruppiert || []).some(z => z.applikation === 'Augentropfen'));
+            pruefeWahr('Wer hilft, wird aus einem Arztbericht nicht geraten',
+                (gruppiert || []).every(z => z.unterstuetzung === undefined));
+            erfassung.medikation = gruppiert;
+            pruefe('Zusammengefasste Zeilen zählen erst mit einer Unterstützung',
+                Object.keys(modul5AusErfassung()).length, 0);
+
             erfassungLaden(sicherungErf);
+        }
+
+        // ---------- 13c. Tippen darf die Schreibmarke nicht verlieren ----------
+        if (typeof erfZeileAnhaengen === 'function' && document.getElementById('erfassung-bereich')) {
+            const sicherungErf2 = JSON.parse(JSON.stringify(erfassungSichern()));
+            const modusVorTipp = appModus;
+            setzeModus('hoeherstufung');
+            erfassung = {}; erfassungExtra = {};
+            renderErfassung();
+
+            const feldVon = (tid, i, key) => document.querySelector('[data-erf="' + tid + '|' + i + '|' + key + '"]');
+            const feld = feldVon('behandlungspflege', 0, 'beschreibung');
+            pruefeWahr('Eingabefelder sind eindeutig auffindbar', !!feld);
+            if (feld) {
+                feld.focus();
+                // Erster Buchstabe in der letzten Zeile: dabei entsteht eine weitere Zeile
+                feld.value = 'V';
+                erfSetzen('behandlungspflege', 0, 'beschreibung', 'V');
+                pruefe('Nach dem ersten Buchstaben gibt es eine zweite Zeile',
+                    (erfassung.behandlungspflege || []).length, 2);
+                pruefeWahr('Die Schreibmarke bleibt im selben Feld', document.activeElement === feld);
+                pruefeWahr('Das Feld behält seinen Inhalt', feld.value === 'V');
+                pruefeWahr('Das Feld wurde nicht ersetzt',
+                    feldVon('behandlungspflege', 0, 'beschreibung') === feld);
+                // Weiterschreiben in derselben Zeile
+                feld.value = 'Verband';
+                erfSetzen('behandlungspflege', 0, 'beschreibung', 'Verband');
+                pruefe('Weiterschreiben landet in derselben Zeile',
+                    erfassung.behandlungspflege[0].beschreibung, 'Verband');
+                pruefe('Es entsteht keine dritte Zeile', (erfassung.behandlungspflege || []).length, 2);
+                pruefeWahr('Die Schreibmarke ist immer noch dort', document.activeElement === feld);
+                pruefeWahr('Die neue Zeile ist auch angezeigt', !!feldVon('behandlungspflege', 1, 'beschreibung'));
+            }
+            // Auch das berechnete Feld wird nachgezogen, ohne die Tabelle neu zu zeichnen
+            const tagFeld = feldVon('pflegepersonen', 0, 'tage');
+            if (tagFeld) {
+                tagFeld.focus();
+                erfSetzen('pflegepersonen', 0, 'tage', '5');
+                erfSetzen('pflegepersonen', 0, 'stunden', '4');
+                const wo = feldVon('pflegepersonen', 0, 'wochenstunden');
+                pruefe('Wochenstunden erscheinen im Feld', wo ? wo.value : null, '20');
+                pruefeWahr('Auch dabei bleibt die Schreibmarke stehen', document.activeElement === tagFeld);
+            }
+            erfassungLaden(sicherungErf2); setzeModus(modusVorTipp); renderErfassung();
         }
 
         // ---------- 14. Antragsvorlage (Höherstufung und Erstantrag) ----------
@@ -3320,11 +3506,14 @@ async function selbsttest() {
                     { id: 'stuerze', text: 'zwei Stürze', beleg: '' }                      // ohne Fundstelle
                 ],
                 medikation: [
-                    { bezeichnung: 'Metformin', applikation: 'oral', anzahl: '2', zeitraum: 'pro Tag',
-                      durchfuehrung: 'durch Pflegeperson', beleg: 'Metformin oral zweimal täglich' },
-                    { bezeichnung: 'Ramipril', applikation: 'unter die Zunge', anzahl: '1',
-                      zeitraum: 'pro Tag', beleg: 'Ramipril' },                            // Applikation unbekannt
-                    { bezeichnung: 'Ohne Fundstelle', applikation: 'oral' }                // ohne Beleg
+                    { applikation: 'oral (Tabletten, Tropfen, Säfte)', praeparate: '4', anzahl: '2',
+                      zeitraum: 'pro Tag', unterstuetzung: 'Gabe durch Pflegeperson',
+                      beleg: 'vier Tabletten, zweimal täglich gereicht' },
+                    { applikation: 'Augentropfen', praeparate: '1', anzahl: '1', zeitraum: 'pro Tag',
+                      unterstuetzung: 'hilft manchmal', beleg: 'Augentropfen' },   // Unterstützung unbekannt
+                    { applikation: 'unter die Zunge', anzahl: '1', zeitraum: 'pro Tag',
+                      beleg: 'sublingual' },                                       // Applikationsort unbekannt
+                    { applikation: 'Injektion' }                                   // ohne Beleg
                 ],
                 hilfsmittel: [
                     { bezeichnung: 'Rollator', nutzung: 'genutzt', beleg: 'nutzt einen Rollator' }
@@ -3335,11 +3524,13 @@ async function selbsttest() {
             pruefe('Seite übernommen', geprueft.befunde[1] ? geprueft.befunde[1].seite : null, 'links');
             pruefeWahr('Freitext übernommen',
                 !!geprueft.befunde[2] && geprueft.befunde[2].frei === true && geprueft.befunde[2].text === '172');
-            pruefe('Nicht Übernommenes wird benannt', geprueft.verworfen.length, 6);
+            pruefe('Nicht Übernommenes wird benannt', geprueft.verworfen.length, 7);
             pruefe('Nur brauchbare Tabellenzeilen', geprueft.erfassung.length, 3);
             const med = geprueft.erfassung.filter(z => z._tabelle === 'medikation');
             pruefeWahr('Unbekannte Auswahl wird verworfen, die Zeile bleibt',
-                med.length === 2 && med[1].applikation === undefined && med[1].bezeichnung === 'Ramipril');
+                med.length === 2 && med[1].unterstuetzung === undefined && med[1].applikation === 'Augentropfen');
+            pruefeWahr('Ohne gültigen Applikationsort keine Medikationszeile',
+                !med.some(z => z.applikation === 'unter die Zunge'));
             pruefeWahr('Jede Tabellenzeile trägt ihre Fundstelle',
                 geprueft.erfassung.every(z => !!z._beleg));
 
@@ -3376,7 +3567,7 @@ async function selbsttest() {
                 geprueft.befunde[0] ? geprueft.befunde[0].idx : -1);
             pruefe('Freitext steht in der Maske', befundTexte['groesse'], '172');
             pruefeWahr('Tabellenzeile angelegt',
-                (erfassung.medikation || []).some(z => z.bezeichnung === 'Metformin'));
+                (erfassung.medikation || []).some(z => z.applikation === 'oral (Tabletten, Tropfen, Säfte)'));
             pruefeWahr('Tabelle behält eine leere Zeile zum Weiterschreiben',
                 (erfassung.medikation || []).length > 0
                 && Object.keys(erfassung.medikation[erfassung.medikation.length - 1]).length === 0);

@@ -331,8 +331,9 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
     ${tabellenBlock('Arzt- und Therapiebesuche', ['Fachrichtung', 'Häufigkeit', 'Durchführung'],
         (erfassung.arztbesuche || []).filter(z => (z.fach || '').trim()).map(z => [z.fach, haeufigkeitText(z), z.begleitung || '']))}
 
-    ${tabellenBlock('Medikation', ['Medikament', 'Applikation', 'Häufigkeit', 'Durchführung'],
-        (erfassung.medikation || []).filter(z => (z.bezeichnung || '').trim()).map(z => [z.bezeichnung, z.applikation || '', haeufigkeitText(z), z.durchfuehrung || '']))}
+    ${tabellenBlock('Medikation', ['Applikationsort', 'Unterschiedliche Präparate', 'Häufigkeit', 'Unterstützung'],
+        (erfassung.medikation || []).filter(z => (z.applikation || z.bezeichnung || '').toString().trim())
+            .map(z => [z.applikation || z.bezeichnung || '', z.praeparate || '', haeufigkeitText(z), medikationHilfe(z)]))}
 
     ${tabellenBlock('Behandlungspflege', ['Maßnahme', 'Tätigkeitsbeschreibung', 'Häufigkeit', 'Durchführung'],
         (erfassung.behandlungspflege || []).filter(z => (z.art || '').trim()).map(z => [z.art, z.beschreibung || '', haeufigkeitText(z), z.durchfuehrung || '']))}

@@ -289,6 +289,39 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
      beim Öffnen ihren Zweck über `vorschlagOverlayZweck()` – sonst bleibt der
      Übernahmeknopf einer fremden Liste stehen.
 
+22. **Medikation: eine Zeile je Applikationsort, nicht je Medikament** (`js/erfassung.js`).
+   Die BRi (F 4.5.1) sagt es wörtlich: „Berücksichtigt wird der einzelne Applikationsort
+   (Ohren- und Augen zählen als jeweils ein Ort) und die Applikationshäufigkeit
+   (unabhängig von der Anzahl der dort applizierten Arzneimittel)." Daraus folgt:
+   - Spalten: Applikationsort · Unterschiedliche Präparate · Anzahl · Zeitraum ·
+     Unterstützung. Kein Feld für einzelne Medikamentennamen mehr.
+   - **Die Zahl der Präparate verändert die Bewertung NICHT.** Sie wird nur festgehalten.
+     Gezählt wird die Häufigkeit je Ort.
+   - **Augen und Ohren sind getrennte Orte.** Sie standen früher in einer Zeile – wer beides
+     bekam, verlor dadurch eine Maßnahme.
+   - „Werden Medikamente verabreicht, ist das Stellen nicht gesondert zu berücksichtigen":
+     Liegt zu einem Ort eine „Gabe durch Pflegeperson" vor, zählen „Stellen" und
+     „Bereitstellen" dort nicht zusätzlich (`medikationGezaehlt()` – die EINZIGE Stelle,
+     die entscheidet, was in Modul 5 eingeht).
+   - Unterstützung: selbständig · Erinnerung · Bereitstellen · Stellen · Gabe durch
+     Pflegeperson. **Alles außer „selbständig" zählt.**
+   - Arztberichte nennen jedes Präparat einzeln. `medikationGruppiert()` fasst sie beim
+     Übernehmen je Ort zusammen (höchste Häufigkeit, Zahl der Präparate mitgeführt) – einzeln
+     übernommen hätte die App die Häufigkeiten addiert und Modul 5 zu hoch gerechnet.
+     „Unterstützung" bleibt leer: Wer hilft, steht in keinem Arztbrief.
+   - Alte Fälle stellt `medikationUmstellen()` beim Laden um; die Medikamentennamen bleiben
+     in der Zeile stehen und werden unter der Tabelle genannt. **Häufigkeiten bleiben
+     unangetastet** – ein gespeicherter Fall darf seine Punkte nicht von selbst ändern.
+     Stehen danach mehrere zählende Zeilen am selben Ort, wird das gemeldet
+     (`medikationMehrfachOrt()`), nicht heimlich verrechnet.
+23. **Beim Tippen nie die Tabelle neu zeichnen** (`js/erfassung.js`). Die Erfassungstabellen
+   hängen beim Ausfüllen der letzten Zeile eine weitere an. Wurde dafür `renderErfassungTabelle()`
+   aufgerufen, ersetzte der Browser auch das gerade beschriebene Feld – nach dem **ersten
+   Buchstaben** sprang die Schreibmarke weg und man musste zurückklicken. Angehängt wird
+   deshalb nur die neue Zeile (`erfZeileAnhaengen()`), und berechnete Felder werden einzeln
+   nachgezogen (`erfFeldNachziehen()`). Jedes Feld trägt dafür `data-erf="tabelle|zeile|spalte"`.
+   Der Selbsttest prüft, dass `document.activeElement` das Feld bleibt.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -340,7 +373,7 @@ Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berate
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung aus dem Befundtext des Vorgutachtens vorbelegen (Regel 21).
-Der Selbsttest umfasst 893 Pruefungen.
+Der Selbsttest umfasst 944 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
