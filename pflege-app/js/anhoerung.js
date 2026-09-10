@@ -315,7 +315,7 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
     // (Breite von .k in STELLUNGNAHME_CSS).
     const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}:</span> <span>${esc(v || '')}</span></div>`;
 
-    return `<div class="stmt">
+    return `<div class="stmt" data-vorgang="anhoerung">
     <div class="stmt-head">
       <img class="stmt-logo" src="${FAMILIARA_LOGO}" alt="Familiara">
       <div class="stmt-address">Familiara GmbH<br>Wiesbadener Straße 3<br>12161 Berlin<br><br>Telefon 030 577 015 900<br>Fax 030 577 015 901<br><br>Geschäftsführer: Dr. med. Jörg A. Zimmermann<br><br>HRB 184522 B<br>Amtsgericht Berlin-Charlottenburg<br>Umsatzsteuer-ID: DE311459777<br><br>www.familiara.de<br>kontakt@familiara.de</div>

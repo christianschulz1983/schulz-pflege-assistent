@@ -238,6 +238,23 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    „Körperlicher Befund". Die Katalogruppe „Ernährung" enthält dieselben vier Felder und
    wird deshalb übersprungen (`BEFUND_GRUPPEN_DOPPELT` in `js/hoeherstufung.js`).
 
+19. **Ein Antrag stellt nichts gegenüber.** Im Erstantrag und im Höherstufungsantrag steht
+   im Kriterienblock **nur die eigene Einschätzung** – „4.1.1 Positionswechsel im Bett:
+   „überwiegend selbständig"", darunter die Begründung. Kein „Gutachterliche Bewertung",
+   kein „Bewertung im Vorgutachten", kein Ableitungssatz gegen eine fremde Wertung: Der
+   Erstantrag hat gar kein Gutachten, und der Höherstufungsantrag beschreibt eine
+   Verschlechterung. Die Gegenüberstellung steht in der **Tabelle**, nicht je Kriterium.
+   Für Modul 5 gilt `m5StandSatz()` statt `m5WirkungSatz()` – er nennt den erreichten
+   Stand statt eines Vorher/Nachher. Die KI-Anweisung ist entsprechend geteilt
+   (`istAntrag` in `buildBegruendungPrompt`). **Widerspruch und Anhörung bleiben, wie sie
+   sind** – dort ist die Gegenüberstellung der Zweck.
+20. **Nicht über die Vorgangsart hinweg zusammenführen.** Jede Vorlage schreibt
+   `data-vorgang` in ihr Wurzelelement. `mergeStellungnahme()` behält unveränderte
+   Kriterienblöcke im WORTLAUT – so wanderte die Gegenüberstellung aus einem früheren
+   Widerspruch in einen Höherstufungsantrag und blieb dort stehen. Bei gewechselter
+   Vorgangsart werden die Kriterienblöcke verworfen und neu aufgebaut; von Hand
+   überarbeitete „Allgemeine Angaben" bleiben erhalten.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -287,7 +304,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 793 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 817 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

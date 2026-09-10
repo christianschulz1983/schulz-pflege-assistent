@@ -112,7 +112,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     // (Breite von .k in STELLUNGNAHME_CSS).
     const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}:</span> <span>${esc(v || '')}</span></div>`;
 
-    return `<div class="stmt">
+    return `<div class="stmt" data-vorgang="widerspruch">
     <div class="stmt-head">
       <img class="stmt-logo" src="${FAMILIARA_LOGO}" alt="Familiara">
       <div class="stmt-address">Familiara GmbH<br>Wiesbadener Straße 3<br>12161 Berlin<br><br>Telefon 030 577 015 900<br>Fax 030 577 015 901<br><br>Geschäftsführer: Dr. med. Jörg A. Zimmermann<br><br>HRB 184522 B<br>Amtsgericht Berlin-Charlottenburg<br>Umsatzsteuer-ID: DE311459777<br><br>www.familiara.de<br>kontakt@familiara.de</div>
@@ -279,6 +279,20 @@ function mergeStellungnahme(existingHtml, freshHtml) {
     const parse = h => { const d = document.createElement('div'); d.innerHTML = h; return d; };
     const cur = parse(existingHtml);
     const fresh = parse(freshHtml);
+    /* NICHT über die Vorgangsart hinweg zusammenführen.
+       Die Vorlagen formulieren unterschiedlich: Der Widerspruch stellt der eigenen Wertung
+       die des Gutachters gegenüber, der Antrag nicht. Beim Zusammenführen bleiben
+       unveränderte Kriterienblöcke im WORTLAUT stehen – so wanderte die Gegenüberstellung
+       aus einem früheren Widerspruch in einen Höherstufungsantrag und blieb dort stehen.
+       Stammt der vorhandene Text aus einer anderen Vorgangsart, wird neu aufgebaut. */
+    const fEl = fresh.querySelector('[data-vorgang]');
+    const cEl = cur.querySelector('[data-vorgang]');
+    const fArt = fEl ? fEl.getAttribute('data-vorgang') : '';
+    const cArt = cEl ? cEl.getAttribute('data-vorgang') : '';
+    // Nur die Kriterienblöcke neu aufbauen. Von Hand überarbeitete „Allgemeine Angaben"
+    // bleiben erhalten – sie tragen die falsche Form nicht.
+    const artGewechselt = !!fArt && cArt !== fArt;
+    if (artGewechselt) cur.querySelectorAll('.crit[data-nr]').forEach(el => el.remove());
     // Inline-Datenfelder (Name, Daten, Kennzahlen) anhand von data-f übernehmen
     const vals = {};
     fresh.querySelectorAll('[data-f]').forEach(el => { const k = el.getAttribute('data-f'); if (!(k in vals)) vals[k] = el.innerHTML; });
