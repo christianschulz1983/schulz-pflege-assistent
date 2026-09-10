@@ -135,7 +135,7 @@ function buildDeckblatt() {
   </div>`;
 }
 
-function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
+function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamneseZusammenfassung) {
     const g = id => (document.getElementById(id)?.value || '').trim();
     const esc = escapeHtml;
     const f2 = n => Number(n).toFixed(2).replace('.', ',');
@@ -241,6 +241,16 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
         ? nummernImText(allgemeinText.trim(), org).split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
         : (notes ? `<p>${esc(notes).replace(/\n/g, '<br>')}</p>` : '');
 
+    /* Angaben laut Vorgutachten: die von der KI gekürzte Fassung, sonst der Rohtext.
+       Ohne Vorgutachten (Erstantrag) gibt es diesen Abschnitt gar nicht. */
+    const anamneseRoh = g('stam-anamnese');
+    const anamneseKurz = (anamneseZusammenfassung && anamneseZusammenfassung.trim())
+        ? anamneseZusammenfassung.trim() : '';
+    const anamneseBlock = anamneseRoh
+        ? (anamneseKurz || anamneseRoh).split(/\n\s*\n/)
+            .map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
+        : '';
+
     const zweck = istHoeher
         ? `Diese pflegefachliche Stellungnahme dient der Unterstützung von ${df('name', name)} bei der Beantragung einer Höherstufung. `
           + `Zu diesem Zweck habe ich ${df('name', name)} persönlich befragt, pflegefachliche Befunde erhoben und das Gutachten `
@@ -294,9 +304,13 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
 
     ${tabellenBlock('Diagnosen', ['ICD-10-Code', 'Diagnose', 'Erstdiagnose'], diagZeilen)}
 
+    ${/* „Anamnese" bleibt die große Überschrift. Darunter zwei untergeordnete Abschnitte:
+          was das Vorgutachten festgehalten hat (kurz zusammengefasst, Viertelseite) und
+          wie es heute aussieht (Drittelseite). Ohne Vorgutachten entfällt der erste. */''}
     <h2>Anamnese</h2>
-    <p>${esc(g('stam-anamnese') || '—').replace(/\n/g, '<br>')}</p>
-    <h2>Aktuelle Situation</h2>
+    ${anamneseRoh ? `<h3>Angaben laut Vorgutachten</h3>
+    <div id="stmt-anamnese" data-ai="${anamneseKurz ? '1' : '0'}">${anamneseBlock}</div>` : ''}
+    <h3>Aktuelle Situation</h3>
     <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${notesBlock}</div>
 
     ${/* Einfache Aufzählung: welche Hilfsmittel liegen vor, werden sie genutzt, und was

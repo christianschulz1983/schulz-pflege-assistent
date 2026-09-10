@@ -867,6 +867,84 @@ async function selbsttest() {
                 && druckHtml.indexOf("seitenAufteilen(document") < druckHtml.indexOf('window.print()'));
         }
 
+        // ---------- 9u. Anamnese im Antrag: zwei Unterabschnitte ----------
+        // Gewünscht: „Anamnese" bleibt die große Überschrift. Darunter „Angaben laut
+        // Vorgutachten" (kurze Zusammenfassung, Viertelseite) und „Aktuelle Situation"
+        // (aus Notizen und Unterschieden, Drittelseite).
+        if (typeof anamneseAufgabe === 'function') {
+            const mM = appModus, mAnam = document.getElementById('stam-anamnese').value;
+            try {
+                document.getElementById('stam-anamnese').value =
+                    'Frau Muster lebt allein im zweiten Obergeschoss ohne Aufzug. Die Tochter kommt täglich.';
+                ['erstantrag', 'hoeherstufung'].forEach(m => {
+                    appModus = m;
+                    const el = document.createElement('div');
+                    el.innerHTML = buildHoeherstufung('Notizen.', {}, '', 'Kurzfassung der KI.');
+                    const h2 = Array.from(el.querySelectorAll('h2')).map(x => x.innerText);
+                    const h3 = Array.from(el.querySelectorAll('h3')).map(x => x.innerText);
+                    pruefeWahr(m + ': Anamnese bleibt große Überschrift', h2.includes('Anamnese'));
+                    pruefe(m + ': zwei Unterüberschriften unter der Anamnese',
+                        h3.slice(0, 2), ['Angaben laut Vorgutachten', 'Aktuelle Situation']);
+                    pruefeWahr(m + ': Aktuelle Situation ist nicht mehr Hauptüberschrift',
+                        !h2.includes('Aktuelle Situation'));
+                    pruefe(m + ': gekürzte Fassung steht im Dokument',
+                        (el.querySelector('#stmt-anamnese') || {}).innerText, 'Kurzfassung der KI.');
+                });
+
+                // Ohne Vorgutachten (Erstantrag ohne eingelesenes Gutachten) entfällt der Abschnitt
+                document.getElementById('stam-anamnese').value = '';
+                appModus = 'erstantrag';
+                const el2 = document.createElement('div');
+                el2.innerHTML = buildHoeherstufung('Notizen.', {}, '', '');
+                pruefe('Ohne Vorgutachten nur die aktuelle Situation',
+                    Array.from(el2.querySelectorAll('h3')).map(x => x.innerText), ['Aktuelle Situation']);
+                pruefeWahr('Ohne Vorgutachten kein leerer Abschnitt', !el2.querySelector('#stmt-anamnese'));
+
+                // Ohne KI-Kurzfassung steht der Rohtext da – besser als eine Lücke
+                document.getElementById('stam-anamnese').value = 'Roher Anamnesetext aus dem Gutachten.';
+                const el3 = document.createElement('div');
+                el3.innerHTML = buildHoeherstufung('Notizen.', {}, '', '');
+                pruefe('Ohne Kurzfassung steht der Rohtext',
+                    (el3.querySelector('#stmt-anamnese') || {}).innerText,
+                    'Roher Anamnesetext aus dem Gutachten.');
+            } finally { appModus = mM; document.getElementById('stam-anamnese').value = mAnam; }
+
+            // Längen: Viertelseite für die Anamnese, Drittelseite für die aktuelle Situation
+            pruefe('Anamnese: Viertelseite', [LAENGE.anamneseWoerterMax, LAENGE.anamneseZeichenMax], [130, 900]);
+            const mM2 = appModus;
+            try {
+                appModus = 'hoeherstufung';
+                pruefe('Antrag: Einleitung auf Drittelseite',
+                    [allgemeinWortGrenze(), allgemeinZeichenGrenze()], [175, 1200]);
+                pruefeWahr('Antrag: Vorgabe nennt die Drittelseite',
+                    laengenVorgabeAllgemein('Aktuelle Situation').includes('DRITTEL A4-Seite'));
+                appModus = 'widerspruch';
+                pruefe('Widerspruch: Einleitung bleibt halbe Seite',
+                    [allgemeinWortGrenze(), allgemeinZeichenGrenze()], [260, 1800]);
+                pruefeWahr('Widerspruch: Vorgabe nennt die halbe Seite',
+                    laengenVorgabeAllgemein('Allgemeine Angaben').includes('HALBE A4-Seite'));
+            } finally { appModus = mM2; }
+
+            // Zu lange Texte werden erkannt
+            const langeAnamnese = 'Wort '.repeat(200);
+            const v = laengenVerstoesse({}, '', langeAnamnese);
+            pruefe('Zu lange Anamnese wird erkannt', v.length, 1);
+            pruefe('Sie wird als Anamnese benannt', v[0] && v[0].art, 'anamnese');
+            pruefe('Kurze Anamnese meldet nichts',
+                laengenVerstoesse({}, '', 'Kurz und knapp.').length, 0);
+
+            // Die Anweisung an die KI
+            const a = anamneseAufgabe('Rohtext');
+            pruefeWahr('Anweisung nennt die Viertelseite', a.includes('VIERTEL A4-Seite'));
+            pruefeWahr('Anweisung verbietet Bewertung und Verschlechterung',
+                a.includes('STRENG VERBOTEN') && a.includes('jede Aussage über eine Verschlechterung'));
+            pruefeWahr('Anweisung verbietet Erfinden', a.includes('Erfinde nichts'));
+            pruefeWahr('Anweisung übergibt den Rohtext', a.includes('Rohtext'));
+            pruefeWahr('Erzeugung fragt die Zusammenfassung ab',
+                generateBegruendungenAntrag.toString().includes('anamneseAufgabe(anamneseRoh)')
+                && generateBegruendungenAntrag.toString().includes('anamnese: { type: "STRING" }'));
+        }
+
         // ---------- 9s. Antrag ohne Gegenüberstellung ----------
         // Gemeldet: Im Erstantrag und im Höherstufungsantrag standen die Kriterien wie in
         // einem Widerspruch – „Gutachterliche Bewertung: X" und „somit ist Y ableitbar".

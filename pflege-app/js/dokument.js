@@ -1,7 +1,7 @@
 // Teil des Pflegegradassistenten für Berater. Diese Datei wurde aus der frueheren
 // Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
 // Wählt die Vorlage nach Vorgangsart: Widerspruch wie bisher, sonst die Antragsvorlage.
-function baueDokument(notes, begruendungen, allgemeinText) {
+function baueDokument(notes, begruendungen, allgemeinText, anamneseZusammenfassung) {
     // Die Anhörung hat eine eigene Vorlage: zwei Gutachtenblöcke, drei Spalten,
     // nur die strittig gebliebenen Kriterien.
     if (typeof appModus !== 'undefined' && appModus === 'anhoerung') {
@@ -10,7 +10,7 @@ function baueDokument(notes, begruendungen, allgemeinText) {
     }
     if (typeof appModus !== 'undefined' && appModus !== 'widerspruch'
         && typeof buildHoeherstufung === 'function') {
-        return buildHoeherstufung(notes, begruendungen, allgemeinText);
+        return buildHoeherstufung(notes, begruendungen, allgemeinText, anamneseZusammenfassung);
     }
     return buildStellungnahme(notes, begruendungen, allgemeinText);
 }
@@ -316,6 +316,20 @@ function mergeStellungnahme(existingHtml, freshHtml) {
             cN.setAttribute('data-ai', fN.getAttribute('data-ai') || '0');
         }
     }
+    /* „Angaben laut Vorgutachten": Der Abschnitt wird nur ersetzt, wenn eine neu erzeugte
+       Zusammenfassung vorliegt. Von Hand überarbeitete Fassungen bleiben stehen. */
+    const fA = fresh.querySelector('#stmt-anamnese'), cA = cur.querySelector('#stmt-anamnese');
+    if (fA && cA) {
+        if (!cA.innerHTML.trim() || fA.getAttribute('data-ai') === '1') cA.innerHTML = fA.innerHTML;
+    } else if (fA && !cA) {
+        // Der Abschnitt ist neu hinzugekommen (älteres Schriftstück) – dann mit aufnehmen.
+        const anker = cur.querySelector('#stmt-notes');
+        if (anker && anker.parentNode) {
+            const h = document.createElement('h3'); h.textContent = 'Angaben laut Vorgutachten';
+            anker.parentNode.insertBefore(h, anker);
+            anker.parentNode.insertBefore(fA.cloneNode(true), anker);
+        }
+    }
     // Begründungsblock kriteriengenau zusammenführen: bereits vorhandene (ggf. von Hand
     // überarbeitete) Begründungen bleiben erhalten, solange sich die Bewertung nicht geändert
     // hat. Neue Abweichungen kommen hinzu, weggefallene verschwinden.
@@ -409,6 +423,8 @@ async function generateAppealText() {
         const zuErzeugen = diffs.filter(d => bereitsDa[d.nr] !== schluessel(d));
         // „Allgemeine Angaben" nur neu verfassen, wenn sie fehlen oder sich Notizen/Abweichungen änderten
         let allgemeinText = '';
+        // Gekürzte Anamnese aus dem Vorgutachten (nur Erstantrag und Höherstufung)
+        let anamneseKurz = '';
         let brauchtAllgemein = true;
         if (vorhandenHtml) {
             const tmp2 = document.createElement('div'); tmp2.innerHTML = vorhandenHtml;
@@ -427,6 +443,7 @@ async function generateAppealText() {
                     : await generateBegruendungen(zuErzeugen, brauchtAllgemein);
                 begruendungen = erg.map || {};
                 allgemeinText = erg.allgemein || '';
+                anamneseKurz = erg.anamnese || '';
             } catch (e) {
                 console.warn("Texterstellung übersprungen:", e);
                 showToast("Texte konnten nicht erzeugt werden (" + e.message + "). Es werden die Standardtexte verwendet.", "error");
@@ -437,7 +454,7 @@ async function generateAppealText() {
             showToast("Ohne API-Schlüssel werden nur die Standardtexte eingesetzt. Für ausformulierte Begründungen und Allgemeine Angaben bitte oben rechts einen Google-API-Schlüssel eintragen.", "error");
         }
 
-        const fresh = baueDokument(notes, begruendungen, allgemeinText);
+        const fresh = baueDokument(notes, begruendungen, allgemeinText, anamneseKurz);
         const docEl = document.getElementById('appeal-document');
         const cont = document.getElementById('appeal-result-container');
         // Vorhandenen (ggf. vom Nutzer bearbeiteten) Stand ermitteln
