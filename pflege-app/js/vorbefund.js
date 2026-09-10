@@ -66,9 +66,10 @@ const VORBEFUND_SCHEMA = {
             stufe: { type: 'STRING' }, text: { type: 'STRING' }, beleg: { type: 'STRING' }
         }, required: ['id'] } },
         medikation: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
-            bezeichnung: { type: 'STRING' }, applikation: { type: 'STRING' },
-            anzahl: { type: 'STRING' }, zeitraum: { type: 'STRING' }, beleg: { type: 'STRING' }
-        }, required: ['bezeichnung'] } },
+            applikation: { type: 'STRING' }, praeparate: { type: 'STRING' },
+            anzahl: { type: 'STRING' }, zeitraum: { type: 'STRING' },
+            unterstuetzung: { type: 'STRING' }, beleg: { type: 'STRING' }
+        }, required: ['applikation'] } },
         hilfsmittel: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
             bezeichnung: { type: 'STRING' }, nutzung: { type: 'STRING' },
             anzahl: { type: 'STRING' }, zeitraum: { type: 'STRING' },
@@ -109,8 +110,13 @@ function vorbefundAnweisung() {
         vorbefundAufgabe(),
         '',
         'AUSSERDEM aus dem Text übernehmen, soweit dort genannt:',
-        '- medikation: Wirkstoff oder Handelsname, Applikation (oral, Injektion, Tropfen,',
-        '  Inhalation, äußerlich), Anzahl und Zeitraum („pro Tag", „pro Woche", „pro Monat").',
+        '- medikation: EINE Zeile je Applikationsort, NICHT je Medikament. Die einzelnen Präparate',
+        '  werden nicht benannt. „applikation" muss wörtlich einer dieser Orte sein:',
+        '  ' + APPLIKATION.map(a => '„' + a + '"').join(' | ') + '.',
+        '  „praeparate" ist die Anzahl unterschiedlicher Arzneimittel an diesem Ort, „anzahl" und',
+        '  „zeitraum" („pro Tag", „pro Woche", „pro Monat") sind die Häufigkeit der Applikation.',
+        '  „unterstuetzung" ist wörtlich eines von: ' + MEDIKATION_HILFE.map(h => '„' + h + '"').join(' | ')
+            + '. Steht dazu nichts im Text, lass das Feld LEER.',
         '- hilfsmittel: Bezeichnung, nutzung („genutzt" oder „ungenutzt"), Anzahl, Zeitraum und',
         '  taetigkeit – was die Pflegeperson damit tut. Bleibt die Tätigkeit unerwähnt, lass sie leer.',
         '- arztbesuche: Fachrichtung oder Therapie, Anzahl, Zeitraum („pro Woche", „pro Monat",',
@@ -207,6 +213,8 @@ function vorbefundPruefen(antwort) {
                 if (s.typ === 'number' && !(parseFloat(w.replace(',', '.')) > 0)) return;
                 zeile[s.k] = w;
             });
+            // Fiel die erste Spalte durch die Prüfung, bliebe eine Zeile ohne ihren Gegenstand übrig.
+            if (!zeile[schluessel]) return null;
             return zeile;
         }).filter(Boolean);
     };
@@ -295,7 +303,7 @@ function uebernehmeVorbefund() {
             if (!z) return;
             const werte = {};
             Object.keys(z).forEach(s => { if (s.charAt(0) !== '_') werte[s] = z[s]; });
-            vorbefundZeileAnhaengen(z._tabelle, werte);
+            erfHinzufuegen(z._tabelle, werte);
             n++;
         }
     });
@@ -307,17 +315,6 @@ function uebernehmeVorbefund() {
                 + 'und auf den heutigen Stand bringen.'
                 : 'Es wurde nichts ausgewählt.', n ? 'success' : 'error');
     return n;
-}
-
-/* Hängt eine Zeile an eine Erfassungstabelle an. Die Tabellen führen stets eine leere
-   Zeile am Ende mit – die wird gefüllt, statt eine zusätzliche zu erzeugen. */
-function vorbefundZeileAnhaengen(tid, werte) {
-    if (!erfassung[tid]) erfassung[tid] = [];
-    const liste = erfassung[tid];
-    const letzte = liste[liste.length - 1];
-    if (letzte && !Object.keys(letzte).length) liste[liste.length - 1] = werte;
-    else liste.push(werte);
-    if (Object.keys(liste[liste.length - 1]).length) liste.push({});
 }
 
 // ------------------------------------------------------------- Kennzeichnung

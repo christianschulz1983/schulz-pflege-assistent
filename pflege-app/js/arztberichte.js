@@ -131,8 +131,7 @@ async function berichtTeile(datei) {
 // ------------------------------------------------------------- Auswahlliste
 function zeigeBerichtFunde() {
     const box = document.getElementById('vorschlag-body');
-    const kopf = document.querySelector('#vorschlag-overlay .rh-title');
-    if (kopf) kopf.innerText = 'Gefundene Angaben aus den Unterlagen';
+    vorschlagOverlayZweck('Gefundene Angaben aus den Unterlagen', 'uebernehmeBerichtFunde()');
     const abschnitte = [
         ['diagnosen', 'Diagnosen', e => [e.icd, e.text, e.ed ? 'Erstdiagnose ' + e.ed : 'Erstdiagnose unbekannt']],
         ['krankenhaus', 'Krankenhausaufenthalte', e => [e.von, e.bis, e.grund]],
@@ -155,15 +154,18 @@ function zeigeBerichtFunde() {
                             <div class="vs-grund">${felder(e).filter(Boolean).map(escapeHtml).join(' · ')}</div>
                             <div class="vs-fund">Quelle: ${escapeHtml((e._quellen || []).join(', '))}</div>
                         </div>
-                    </label>`).join('')}`).join('');
+                    </label>`).join('')}
+                ${k === 'medikation' ? '<div style="font-size:11px;color:var(--text-muted);line-height:1.55;'
+                    + 'margin:4px 0 0 4px">Angehaktes wird zu einer Zeile je Applikationsort zusammengefasst – '
+                    + 'nach der BRi zählt der Ort und seine Häufigkeit, nicht die Zahl der Präparate.</div>' : ''}`).join('');
     }
-    const knopf = document.querySelector('#vorschlag-overlay .review-header .btn-primary');
-    if (knopf) knopf.setAttribute('onclick', 'uebernehmeBerichtFunde()');
     document.getElementById('vorschlag-overlay').classList.add('active');
 }
 
 function uebernehmeBerichtFunde() {
     const ziel = { diagnosen: 0, krankenhaus: 0, hilfsmittel: 0, medikation: 0, therapien: 0 };
+    // Medikamente werden gesammelt und erst am Ende je Applikationsort zusammengefasst.
+    const medikamente = [];
     document.querySelectorAll('#vorschlag-body input[type="checkbox"]').forEach(cb => {
         if (!cb.checked) return;
         const bereich = cb.getAttribute('data-bereich');
@@ -183,22 +185,24 @@ function uebernehmeBerichtFunde() {
             erfHinzufuegen('hilfsmittel', { bezeichnung: e.bezeichnung || '',
                 nutzung: 'genutzt', taetigkeit: e.seit ? 'vorhanden seit ' + e.seit : '' });
         } else if (bereich === 'medikation') {
-            erfHinzufuegen('medikation', { bezeichnung: e.bezeichnung || '', applikation: e.applikation || '',
-                anzahl: e.anzahl || '', zeitraum: e.zeitraum || '' });
+            medikamente.push(e);
         } else if (bereich === 'therapien') {
             erfHinzufuegen('arztbesuche', { fach: e.fach || '', anzahl: e.anzahl || '', zeitraum: e.zeitraum || '' });
         }
         ziel[bereich]++;
     });
+    // Je Applikationsort eine Zeile – nicht je Präparat (BRi F 4.5.1)
+    const zeilen = medikationGruppiert(medikamente);
+    zeilen.forEach(z => erfHinzufuegen('medikation', z));
     closeVorschlaege();
-    // Knopf und Überschrift der Auswahlliste wieder auf den Ursprungszweck stellen
-    const kopf = document.querySelector('#vorschlag-overlay .rh-title');
-    if (kopf) kopf.innerText = 'Vorgeschlagene Widerspruchspunkte';
-    const knopf = document.querySelector('#vorschlag-overlay .review-header .btn-primary');
-    if (knopf) knopf.setAttribute('onclick', 'uebernehmeVorschlaege()');
     if (typeof renderErfassung === 'function') renderErfassung();
     const summe = Object.values(ziel).reduce((a, b) => a + b, 0);
-    showToast(summe ? summe + ' Angabe(n) übernommen. Bitte in den Tabellen prüfen und ergänzen.'
+    const medHinweis = (ziel.medikation > zeilen.length)
+        ? ' ' + ziel.medikation + ' Medikamente stehen als ' + zeilen.length + ' Zeile(n) je Applikationsort '
+          + 'in der Tabelle – nach der BRi zählt der Ort, nicht die Zahl der Präparate. '
+          + 'Die Spalte „Unterstützung" ist offen: Wer hilft, steht in keinem Arztbrief.'
+        : '';
+    showToast(summe ? summe + ' Angabe(n) übernommen. Bitte in den Tabellen prüfen und ergänzen.' + medHinweis
                     : 'Es wurde nichts ausgewählt.', summe ? 'success' : 'error');
 }
 
@@ -213,10 +217,4 @@ function naechsteDiagZeile() {
     }
 }
 
-function erfHinzufuegen(tid, werte) {
-    if (!erfassung[tid]) erfassung[tid] = [];
-    // erste leere Zeile nutzen, sonst anhängen
-    const leer = erfassung[tid].findIndex(z => !Object.keys(z).some(k => (z[k] || '').toString().trim()));
-    if (leer >= 0) erfassung[tid][leer] = werte; else erfassung[tid].push(werte);
-    if (!erfassung[tid].some(z => !Object.keys(z).length)) erfassung[tid].push({});
-}
+// erfHinzufuegen() steht jetzt in js/erfassung.js – dort, wo die Tabellen liegen.

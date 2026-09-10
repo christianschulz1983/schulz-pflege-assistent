@@ -29,8 +29,18 @@ const ARZT_FACH = ['Hausarzt', 'Facharzt (bitte ergänzen)', 'Neurologe', 'Psych
 const THERAPIE_ART = ['Physiotherapie', 'Ergotherapie', 'Logopädie',
     'Medizinische Fußpflege bei Diabetes mellitus', 'Rehasport', 'Psychotherapie',
     'Dialyse', 'Chemotherapie', 'Tagespflege'];
-const APPLIKATION = ['oral', 'Augen- oder Ohrentropfen', 'Dosieraerosol oder Pulverinhalator',
-    'Zäpfchen', 'Pflaster', 'Injektion', 'über PEG'];
+/* Medikation: Eine Zeile je APPLIKATIONSORT, nicht je Medikament. Die BRi (F 4.5.1) sagt
+   das ausdrücklich: „Berücksichtigt wird der einzelne Applikationsort (Ohren- und Augen
+   zählen als jeweils ein Ort) und die Applikationshäufigkeit (unabhängig von der Anzahl
+   der dort applizierten Arzneimittel)." Augen und Ohren standen bisher in einer Zeile –
+   wer beides bekam, verlor dadurch eine Maßnahme. */
+const APPLIKATION = ['oral (Tabletten, Tropfen, Säfte)', 'über PEG', 'Augentropfen', 'Ohrentropfen',
+    'Dosieraerosol oder Pulverinhalator', 'Zäpfchen oder rektal', 'Medikamentenpflaster', 'Injektion'];
+
+/* Wie hilft die Pflegeperson? Alles außer „selbständig" ist personelle Unterstützung.
+   Zur Reihenfolge: Sie steigt vom geringsten zum größten Aufwand. */
+const MEDIKATION_HILFE = ['selbständig', 'Erinnerung', 'Bereitstellen', 'Stellen', 'Gabe durch Pflegeperson'];
+
 const HILFSMITTEL_NUTZUNG = ['genutzt', 'ungenutzt'];
 
 /* Behandlungspflege: nur noch die eigentlichen pflegerischen Maßnahmen.
@@ -102,13 +112,19 @@ const ERFASSUNG_TABELLEN = [
     },
     {
         id: 'medikation', titel: 'Medikation',
-        hinweis: 'Nur ärztlich verordnete Dauermedikation. Nur Gaben „durch Pflegeperson" fließen in Modul 5 ein.',
+        /* Eine Zeile je Applikationsort – die einzelnen Präparate werden nicht benannt.
+           Nach der BRi zählt die Häufigkeit je Ort, nicht die Zahl der Arzneimittel. */
+        hinweis: 'Nur ärztlich verordnete Dauermedikation. Eine Zeile je Applikationsort – nicht je '
+               + 'Medikament. Nach der BRi zählt die Applikationshäufigkeit, unabhängig davon, wie viele '
+               + 'Arzneimittel dort gegeben werden; Augen und Ohren zählen als je ein Ort. Die Zahl der '
+               + 'Präparate wird nur festgehalten und verändert die Bewertung nicht. Wird verabreicht, '
+               + 'wird das Stellen nicht zusätzlich gezählt. Alles außer „selbständig" fließt in Modul 5 ein.',
         spalten: [
-            { k: 'bezeichnung', l: 'Medikament', typ: 'text' },
-            { k: 'applikation', l: 'Applikation', typ: 'select', opt: APPLIKATION, b: '190px' },
+            { k: 'applikation', l: 'Applikationsort', typ: 'select', opt: APPLIKATION },
+            { k: 'praeparate', l: 'Unterschiedliche Präparate', typ: 'number', b: '110px' },
             { k: 'anzahl', l: 'Anzahl', typ: 'number', b: '80px' },
             { k: 'zeitraum', l: 'Zeitraum', typ: 'select', opt: HAEUFIGKEIT_ZEITRAUM, b: '120px' },
-            { k: 'durchfuehrung', l: 'Durchführung', typ: 'select', opt: DURCHFUEHRUNG, b: '160px' }
+            { k: 'unterstuetzung', l: 'Unterstützung', typ: 'select', opt: MEDIKATION_HILFE, b: '190px' }
         ]
     },
     {
@@ -234,19 +250,22 @@ function erfZeile(t, i, z) {
 }
 
 function erfFeld(t, i, s, wert) {
+    // Kennung, um genau dieses Feld später wiederzufinden, ohne die Tabelle neu zu zeichnen
+    const kenn = `data-erf="${t.id}|${i}|${s.k}"`;
     const bei = `oninput="erfSetzen('${t.id}',${i},'${s.k}',this.value)"`;
     if (s.berechnet) {
-        return `<input type="text" class="field-input" readonly style="background:var(--bg-card2)" value="${escapeHtml(wert || '')}">`;
+        return `<input type="text" class="field-input" ${kenn} readonly style="background:var(--bg-card2)" value="${escapeHtml(wert || '')}">`;
     }
     if (s.typ === 'select') {
         const opt = ['<option value=""></option>']
             .concat(s.opt.map(o => `<option ${wert === o ? 'selected' : ''}>${escapeHtml(o)}</option>`));
         if (s.frei && wert && !s.opt.includes(wert)) opt.push(`<option selected>${escapeHtml(wert)}</option>`);
-        return `<select class="field-input" onchange="erfSetzen('${t.id}',${i},'${s.k}',this.value)">${opt.join('')}</select>`
+        return `<select class="field-input" ${kenn} onchange="erfSetzen('${t.id}',${i},'${s.k}',this.value)">${opt.join('')}</select>`
              + (s.frei ? `<input type="text" class="field-input" style="margin-top:4px" placeholder="oder eigene Angabe"
+                    data-erf="${t.id}|${i}|${s.k}|frei"
                     value="${(!s.opt.includes(wert) && wert) ? escapeHtml(wert) : ''}" ${bei}>` : '');
     }
-    return `<input type="${s.typ}" class="field-input" value="${escapeHtml(wert == null ? '' : wert)}" ${bei}>`;
+    return `<input type="${s.typ}" class="field-input" ${kenn} value="${escapeHtml(wert == null ? '' : wert)}" ${bei}>`;
 }
 
 function erfSetzen(tid, i, key, wert) {
@@ -259,15 +278,33 @@ function erfSetzen(tid, i, key, wert) {
         const t = parseFloat(z.tage), s = parseFloat(z.stunden);
         if (t > 0 && s > 0) z.wochenstunden = String(Math.round(t * s * 10) / 10).replace('.', ',');
         else delete z.wochenstunden;
-        renderErfassungTabelle(tid);
+        erfFeldNachziehen(tid, i, 'wochenstunden', z.wochenstunden || '');
     }
     // Beim Ausfüllen der letzten Zeile eine weitere anbieten
     const t = ERFASSUNG_TABELLEN.find(x => x.id === tid);
     if (t && i === erfassung[tid].length - 1 && Object.keys(erfassung[tid][i]).length) {
         erfassung[tid].push({});
-        renderErfassungTabelle(tid);
+        erfZeileAnhaengen(t);
     }
     zeigeModul5Vorschau();
+}
+
+/* Schreibt einen berechneten Wert in sein Feld. Früher wurde dafür die ganze Tabelle neu
+   gezeichnet – dabei verschwand das Feld, in dem gerade getippt wurde, samt Schreibmarke. */
+function erfFeldNachziehen(tid, i, key, wert) {
+    const el = document.querySelector('[data-erf="' + tid + '|' + i + '|' + key + '"]');
+    if (el && el.value !== wert) el.value = wert;
+}
+
+/* Hängt NUR die neue letzte Zeile an. Das ist der eigentliche Punkt: Beim ersten Buchstaben
+   in der letzten Zeile entsteht eine weitere. Wurde dafür die Tabelle neu gezeichnet, ersetzte
+   der Browser auch das gerade beschriebene Eingabefeld – die Schreibmarke sprang weg und man
+   musste zurückklicken. Angehängt wird jetzt nur, was neu ist; alles Bestehende bleibt stehen. */
+function erfZeileAnhaengen(t) {
+    const body = document.getElementById('erf-body-' + t.id);
+    const i = (erfassung[t.id] || []).length - 1;
+    if (!body || i < 0) { renderErfassungTabelle(t.id); return; }
+    body.insertAdjacentHTML('beforeend', erfZeile(t, i, erfassung[t.id][i]));
 }
 
 function renderErfassungTabelle(tid) {
@@ -279,7 +316,17 @@ function renderErfassungTabelle(tid) {
 function erfZeileHinzu(tid) {
     if (!erfassung[tid]) erfassung[tid] = [];
     erfassung[tid].push({});
-    renderErfassungTabelle(tid);
+    const t = ERFASSUNG_TABELLEN.find(x => x.id === tid);
+    if (t) erfZeileAnhaengen(t);
+}
+
+/* Zeile in eine Tabelle eintragen (Arztberichte, Vorgutachten). Eine vorhandene leere Zeile
+   wird gefüllt, statt eine zusätzliche anzulegen; am Ende bleibt immer eine leere übrig. */
+function erfHinzufuegen(tid, werte) {
+    if (!erfassung[tid]) erfassung[tid] = [];
+    const leer = erfassung[tid].findIndex(z => !Object.keys(z).some(k => (z[k] || '').toString().trim()));
+    if (leer >= 0) erfassung[tid][leer] = werte; else erfassung[tid].push(werte);
+    if (!erfassung[tid].some(z => !Object.keys(z).length)) erfassung[tid].push({});
 }
 
 function erfZeileWeg(tid, i) {
@@ -288,6 +335,115 @@ function erfZeileWeg(tid, i) {
     if (!erfassung[tid].length) erfassung[tid] = [{}];
     renderErfassungTabelle(tid);
     zeigeModul5Vorschau();
+}
+
+/* Wie hilft die Pflegeperson bei der Medikation? Ältere Fälle kennen nur die Spalte
+   „durchfuehrung" mit „selbständig" / „durch Pflegeperson". Die bleiben lesbar und richtig
+   gewertet, ohne dass ein gespeicherter Fall umgeschrieben werden müsste. */
+function medikationHilfe(z) {
+    if (!z) return '';
+    if (z.unterstuetzung) return z.unterstuetzung;
+    if (z.durchfuehrung === 'durch Pflegeperson') return 'Gabe durch Pflegeperson';
+    if (z.durchfuehrung) return 'selbständig';
+    return '';
+}
+
+/* Ordnet eine frei formulierte Applikationsangabe einem Ort der Liste zu. Gebraucht bei der
+   Übernahme aus Arztberichten: dort steht „s.c." oder „Augentr." statt eines Listeneintrags. */
+function medikationOrt(applikation, bezeichnung) {
+    const s = ((applikation || '') + ' ' + (bezeichnung || '')).toLowerCase();
+    if (APPLIKATION.indexOf(applikation) > -1) return applikation;
+    if (/injekt|s\.c\.|subkutan|insulin|spritze/.test(s)) return 'Injektion';
+    if (/augentr|augen/.test(s)) return 'Augentropfen';
+    if (/ohrentr|ohren/.test(s)) return 'Ohrentropfen';
+    if (/inhalat|aerosol|spray|pulver/.test(s)) return 'Dosieraerosol oder Pulverinhalator';
+    if (/zäpfchen|zaepfchen|suppositor|rektal/.test(s)) return 'Zäpfchen oder rektal';
+    if (/pflaster|transderm/.test(s)) return 'Medikamentenpflaster';
+    if (/peg|magensonde/.test(s)) return 'über PEG';
+    return 'oral (Tabletten, Tropfen, Säfte)';
+}
+
+/* Alte Fälle: Bisher stand in der Medikationstabelle ein Medikament je Zeile, mit freier
+   Applikationsangabe und der Spalte „durchfuehrung". Beim Laden wird das in die heutige Form
+   gebracht – sonst stünden in der Maske leere Felder, während im Hintergrund noch die alten
+   Werte liegen. Der Medikamentenname BLEIBT in der Zeile stehen und wird unter der Tabelle
+   genannt; gelöscht wird nichts.
+   Die Häufigkeiten bleiben unangetastet: Ein gespeicherter Fall darf seine Punkte nicht von
+   selbst ändern. Stehen dadurch mehrere zählende Zeilen am selben Ort, weist die App darauf
+   hin und der Berater entscheidet. */
+function medikationUmstellen(liste) {
+    return (liste || []).map(z => {
+        if (!z || !Object.keys(z).length) return z;
+        if (z.unterstuetzung || !(z.bezeichnung || z.durchfuehrung)) return z;   // schon in heutiger Form
+        const neu = Object.assign({}, z);
+        neu.applikation = medikationOrt(z.applikation, z.bezeichnung);
+        const hilfe = medikationHilfe(z);
+        if (hilfe) neu.unterstuetzung = hilfe;
+        if (!neu.praeparate) neu.praeparate = '1';
+        delete neu.durchfuehrung;
+        return neu;
+    });
+}
+
+// Namen aus einem älteren Stand – sie haben in der Tabelle keine Spalte mehr, gehen aber nicht verloren.
+function medikationAlteNamen() {
+    return (erfassung.medikation || []).map(z => ((z && z.bezeichnung) || '').trim()).filter(Boolean);
+}
+
+/* Die Zeilen der Medikation, die tatsächlich in Modul 5 eingehen. Eine einzige Stelle, damit
+   Bewertung und Hinweis nicht auseinanderlaufen. Umgesetzt sind zwei Sätze der BRi (F 4.5.1):
+   nur mit personeller Unterstützung, und „Werden Medikamente verabreicht, ist das Stellen
+   nicht gesondert zu berücksichtigen." */
+function medikationGezaehlt() {
+    const gabeOrt = {};
+    (erfassung.medikation || []).forEach(z => {
+        if (medikationHilfe(z) === 'Gabe durch Pflegeperson') gabeOrt[(z && z.applikation) || ''] = true;
+    });
+    return (erfassung.medikation || []).filter(z => {
+        const hilfe = medikationHilfe(z);
+        if (!hilfe || hilfe === 'selbständig') return false;
+        if (!(parseFloat(z.anzahl) > 0) || !z.zeitraum) return false;
+        if (gabeOrt[z.applikation || ''] && (hilfe === 'Stellen' || hilfe === 'Bereitstellen')) return false;
+        return true;
+    });
+}
+
+/* Mehrere zählende Zeilen am selben Applikationsort werden addiert. Nach der BRi zählt aber
+   der Ort und seine Häufigkeit, nicht die Zahl der Arzneimittel – das ergibt zu viele Punkte.
+   Gemeldet, nicht heimlich korrigiert: Der Berater weiß, ob es zwei getrennte Vorgänge sind. */
+function medikationMehrfachOrt() {
+    const zaehler = {};
+    medikationGezaehlt().forEach(z => {
+        const ort = z.applikation || '';
+        if (ort) zaehler[ort] = (zaehler[ort] || 0) + 1;
+    });
+    return Object.keys(zaehler).filter(o => zaehler[o] > 1);
+}
+
+/* Fasst einzeln genannte Präparate zu Zeilen je Applikationsort zusammen. Ein Arztbrief nennt
+   jedes Medikament für sich; die Tabelle führt aber eine Zeile je Ort. Drei Tabletten zum
+   Frühstück sind nach der BRi EINE Maßnahme, nicht drei – einzeln übernommen hätte die App
+   die Häufigkeiten addiert und Modul 5 zu hoch gerechnet. Übernommen wird deshalb die
+   HÖCHSTE Häufigkeit des Ortes; die Zahl der Präparate wird mitgeführt.
+   Wer hilft, steht in keinem Arztbrief – „Unterstützung" bleibt leer und zählt damit nicht. */
+function medikationGruppiert(liste) {
+    const proTag = { 'pro Tag': 1, 'pro Woche': 1 / 7, 'pro Monat': 1 / 30 };
+    const orte = {};
+    const reihenfolge = [];
+    (liste || []).forEach(e => {
+        const ort = medikationOrt(e.applikation, e.bezeichnung);
+        if (!orte[ort]) { orte[ort] = { praeparate: 0, anzahl: '', zeitraum: '', proTag: -1 }; reihenfolge.push(ort); }
+        const g = orte[ort];
+        g.praeparate++;
+        const n = parseFloat(e.anzahl), f = proTag[e.zeitraum];
+        if (n > 0 && f && n * f > g.proTag) { g.proTag = n * f; g.anzahl = String(n); g.zeitraum = e.zeitraum; }
+    });
+    return reihenfolge.map(ort => {
+        const g = orte[ort];
+        const zeile = { applikation: ort, praeparate: String(g.praeparate) };
+        if (g.anzahl) { zeile.anzahl = g.anzahl; zeile.zeitraum = g.zeitraum; }
+        return zeile;
+    });
 }
 
 // ------------------------------------------------- Übernahme in Modul 5
@@ -317,8 +473,13 @@ function modul5AusErfassung() {
         const nr = (z.dauer3h === 'ja') ? '4.5.15' : (therapie ? '4.5.14' : '4.5.13');
         addieren(nr, z.anzahl, z.zeitraum);
     });
-    (erfassung.medikation || []).forEach(z => {
-        if (z.durchfuehrung !== 'durch Pflegeperson') return;
+    /* Medikation nach BRi F 4.5.1: Gezählt wird die Applikationshäufigkeit je Ort –
+       „unabhängig von der Anzahl der dort applizierten Arzneimittel". Die Spalte
+       „Unterschiedliche Präparate" verändert die Bewertung deshalb bewusst NICHT.
+       Und: „Werden Medikamente verabreicht, ist das Stellen nicht gesondert zu
+       berücksichtigen." Steht zu einem Ort eine Gabe, bleiben Stellen und Bereitstellen
+       dort also außen vor – sonst würde derselbe Vorgang zweimal gezählt. */
+    medikationGezaehlt().forEach(z => {
         addieren(z.applikation === 'Injektion' ? '4.5.2' : '4.5.1', z.anzahl, z.zeitraum);
     });
     // Hilfsmittel: nur mit personeller Hilfe. Laut BRi zählen Brille, Zahnprothese und
@@ -379,12 +540,25 @@ function zeigeModul5Vorschau() {
     const warn = document.getElementById('erf-doppelt-hinweis');
     if (!warn) return;
     const doppelt = doppelteErfassung();
-    warn.innerHTML = doppelt.length
+    const mehrfach = medikationMehrfachOrt();
+    const namen = medikationAlteNamen();
+    warn.innerHTML = (doppelt.length
         ? '<div class="hinweis-warnung">In der Behandlungspflege steht ' + escapeHtml(doppelt.join(', '))
           + '. Körpernahe Hilfsmittel gehören in die Tabelle „Hilfsmittel" – dort mit der Tätigkeit '
           + 'der Pflegeperson. Stehen sie an beiden Stellen, werden die Häufigkeiten addiert und '
           + 'Modul 5 fällt zu hoch aus.</div>'
-        : '';
+        : '')
+      + (mehrfach.length
+        ? '<div class="hinweis-warnung">Mehrere zählende Zeilen zum selben Applikationsort: '
+          + escapeHtml(mehrfach.join(', ')) + '. Die Häufigkeiten werden addiert. Nach der BRi zählt '
+          + 'aber der Ort und wie oft dort appliziert wird – nicht, wie viele Arzneimittel es sind. '
+          + 'Bitte prüfen, ob es wirklich getrennte Vorgänge sind, sonst zu einer Zeile zusammenfassen.</div>'
+        : '')
+      + (namen.length
+        ? '<div style="font-size:11px;color:var(--text-muted);line-height:1.55">Aus einem älteren Stand '
+          + 'übernommen: ' + escapeHtml(namen.join(', ')) + '. Die Tabelle führt jetzt Applikationsorte '
+          + 'statt einzelner Medikamente – die Namen bleiben gespeichert, werden aber nicht mehr benötigt.</div>'
+        : '');
 }
 
 function uebernehmeModul5(mitMeldung) {
@@ -409,4 +583,6 @@ function erfassungSichern() { return { tabellen: erfassung, extra: erfassungExtr
 function erfassungLaden(d) {
     erfassung = (d && d.tabellen) || {};
     erfassungExtra = (d && d.extra) || {};
+    // Fälle aus der Zeit vor der Umstellung auf Applikationsorte lesbar machen
+    if (erfassung.medikation) erfassung.medikation = medikationUmstellen(erfassung.medikation);
 }
