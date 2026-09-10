@@ -30,11 +30,33 @@ async function selbsttest() {
         eigen: JSON.parse(JSON.stringify(stateEigene)),
         notizen: erstgespraechNotes,
         entwurf: appealDraft,
+        /* Befunderhebung und Erfassungstabellen: Die Freigabe eines Imports leert sie (neuer
+           Fall), und der Test ruft die Freigabe mehrfach auf. Ohne diese Sicherung löschte ein
+           Selbsttest die Tabellen des Falls, an dem der Berater gerade arbeitet. */
+        befund: (typeof befundSichern === 'function') ? JSON.parse(JSON.stringify(befundSichern())) : null,
+        erfassung: (typeof erfassungSichern === 'function') ? JSON.parse(JSON.stringify(erfassungSichern())) : null,
+        modus: (typeof appModus !== 'undefined') ? appModus : null,
+        /* Stammdaten, Diagnosen und Anhörungsfelder – dieselben Felder, die „Fall speichern"
+           sichert. Der Test ruft die Freigabe eines Imports auf; die leert diese Felder und baut
+           die Diagnosezeilen neu. Ohne diese Sicherung verlor, wer mitten im Fall den Selbsttest
+           drückte, Name, Anamnese, Befundtext und alle Diagnosen. */
+        felder: (() => { const f = {};
+            document.querySelectorAll('[id^="stam-"], [id^="diag-"], [id^="anh-"]').forEach(el => { f[el.id] = el.value; });
+            return f; })(),
+        zweit: (typeof stateZweit !== 'undefined') ? JSON.parse(JSON.stringify(stateZweit)) : null,
+        anlagen: (typeof anlagenSichern === 'function') ? JSON.parse(JSON.stringify(anlagenSichern())) : null,
         // Der Test schreibt Probedateien; sein Nachweis darf nicht im echten stehen bleiben.
         speicherungen: (() => { try { return localStorage.getItem(SPEICHER_PROTOKOLL); } catch (e) { return null; } })()
     };
 
     try {
+        /* Der Test läuft immer vom Widerspruch aus – gleich, in welchem Vorgang der Berater
+           gerade steht. Einige Prüfungen setzen den Widerspruch voraus (Längengrenzen,
+           KI-Vorgaben); gestartet aus dem Höherstufungsantrag fielen sie sonst durch. Die
+           Abschnitte, die einen anderen Vorgang brauchen, stellen ihn selbst ein. Am Ende wird
+           der ursprüngliche Vorgang wiederhergestellt. */
+        if (typeof setzeModus === 'function') setzeModus('widerspruch');
+
         // ---------- 1. Daten vollständig geladen ----------
         pruefe('Kriterienkatalog (ITEMS)', typeof ITEMS !== 'undefined' ? ITEMS.length : 0, 65);
         pruefe('BRi-Texte', typeof BRI_KRITERIEN !== 'undefined' ? Object.keys(BRI_KRITERIEN).length : 0, 65);
@@ -56,12 +78,85 @@ async function selbsttest() {
         const m5 = () => calculateInternal('own').raws[4];
         const setzeM5 = (id, anzahl, zeitraum) => { stateEigene.values[id] = { count: anzahl, period: zeitraum }; };
 
+        /* Das Beispiel der BRi (S. 107) im Wortlaut: „erfolgt zum Beispiel täglich dreimal eine
+           Medikamentengabe, dreimal monatlich eine Injektion und zweimal wöchentlich eine
+           Wärmeanwendung, beträgt der Durchschnittswert 3,4 Maßnahmen pro Tag. Hieraus
+           resultiert ein Wert von zwei Punkten." Also 3 + 3/30 + 2/7 = 3,3857.
+           Die Nachkommastellen sind KEIN Schönheitsfehler, sondern vorgeschrieben: Fußnote 13
+           der BRi lautet „Bei allen Rechenschritten wird auf die 4. Stelle nach dem Komma
+           gerundet." Auf ganze Zahlen gerundet ergäbe das Beispiel 3 – und damit nur EINEN
+           Punkt statt zwei. Diese Prüfung hält das fest. */
+        const summeA = () => m5Gruppen(zustandZu('own')).A.summe;
+        leerenM5(); setzeM5(43, 3, 'D'); setzeM5(44, 3, 'M'); setzeM5(47, 2, 'W');
+        pruefe('Modul 5, Gruppe A: Beispiel der BRi ergibt 2 Punkte', m5(), 2);
+        pruefe('Modul 5: auf vier Nachkommastellen gerechnet (BRi Fußnote 13)', summeA(), 3.3857);
+        pruefeWahr('Der Durchschnittswert wird NICHT auf eine ganze Zahl gerundet',
+            summeA() !== Math.round(summeA()));
+        pruefe('Auf ganze Zahlen gerundet wäre es ein Punkt weniger',
+            (Math.round(summeA()) > 8 ? 3 : Math.round(summeA()) > 3 ? 2 : Math.round(summeA()) >= 1 ? 1 : 0), 1);
         leerenM5(); setzeM5(43, 3, 'D'); setzeM5(44, 3, 'M'); setzeM5(47, 1, 'W');
-        pruefe('Modul 5, Gruppe A (BRi-Beispiel 3,24/Tag)', m5(), 2);
+        pruefe('Modul 5, Gruppe A (3,2429/Tag)', m5(), 2);
         leerenM5(); setzeM5(52, 1, 'D'); setzeM5(50, 2, 'W');
-        pruefe('Modul 5, Gruppe B (BRi-Beispiel 1,29/Tag)', m5(), 2);
+        pruefe('Modul 5, Gruppe B (1,2857/Tag)', m5(), 2);
         leerenM5(); setzeM5(57, 1, 'M'); setzeM5(55, 1, 'W');
-        pruefe('Modul 5, Gruppe C (BRi-Beispiel 6,3)', m5(), 1);
+        pruefe('Modul 5, Gruppe C (6,3)', m5(), 1);
+        // Eine seltene Maßnahme darf nicht durch Runden verschwinden
+        leerenM5(); setzeM5(44, 1, 'M');
+        pruefeWahr('Eine monatliche Maßnahme bleibt in der Summe erhalten', summeA() > 0);
+
+        /* Gruppe C an der Grenze: Die BRi sagt „12,9 bis unter 60 = 3 Punkte". Physiotherapie
+           dreimal wöchentlich sind 3 × 4,3 = 12,9. Der Rechner führt das als 12,899999999999999 –
+           ohne die vorgeschriebene Rundung auf vier Stellen kam die App auf 2 statt 3 Punkte. */
+        const summeC = () => m5Gruppen(zustandZu('own')).C;
+        leerenM5(); setzeM5(56, 3, 'W');
+        pruefe('Gruppe C: Physiotherapie 3× pro Woche ergibt 12,9', summeC().summe, 12.9);
+        pruefe('Gruppe C: 12,9 sind 3 Punkte (BRi „12,9 bis unter 60")', summeC().pkt, 3);
+        leerenM5(); setzeM5(56, 2, 'W'); setzeM5(55, 1, 'W');
+        pruefe('Gruppe C: Physiotherapie 2× und Arzt 1× pro Woche ergeben 3 Punkte', summeC().pkt, 3);
+        leerenM5(); setzeM5(55, 1, 'W');
+        pruefe('Gruppe C: ein Arztbesuch pro Woche ist genau 4,3 – 1 Punkt', summeC().pkt, 1);
+        leerenM5(); setzeM5(55, 2, 'W');
+        pruefe('Gruppe C: zwei Arztbesuche pro Woche sind genau 8,6 – 2 Punkte', summeC().pkt, 2);
+        // Das Beispiel der BRi auf S. 108: monatlich ein ausgedehnter Besuch + wöchentlich ein Arztbesuch
+        leerenM5(); setzeM5(57, 1, 'M'); setzeM5(55, 1, 'W');
+        pruefe('Gruppe C: Beispiel der BRi ergibt 6,3', summeC().summe, 6.3);
+        // Jede Grenze aller drei Gruppen genau auf dem Grenzwert
+        [[1, 'D', 'A', 1], [3, 'D', 'A', 1], [4, 'D', 'A', 2], [8, 'D', 'A', 2], [9, 'D', 'A', 3]].forEach(([n, p, g, soll]) => {
+            leerenM5(); setzeM5(43, n, p);
+            pruefe('Gruppe A: ' + n + '× pro Tag ergibt ' + soll + ' Punkt(e)', m5Gruppen(zustandZu('own'))[g].pkt, soll);
+        });
+        [[1, 'W', 1], [7, 'W', 2], [3, 'D', 3]].forEach(([n, p, soll]) => {
+            leerenM5(); setzeM5(50, n, p);
+            pruefe('Gruppe B: ' + n + '× ' + (p === 'W' ? 'pro Woche' : 'pro Tag') + ' ergibt ' + soll + ' Punkt(e)',
+                m5Gruppen(zustandZu('own')).B.pkt, soll);
+        });
+        leerenM5();
+
+        // Kaufmännisch runden – auch dort, wo der Rechner knapp daneben liegt
+        pruefe('Runden: 31,25 wird 31,3', rundeKaufmaennisch(80 / Math.pow(1.6, 2), 1), 31.3);
+        pruefe('Runden: 2,5 wird 3', rundeKaufmaennisch(2.5, 0), 3);
+        pruefe('Runden: 2,4999 wird 2', rundeKaufmaennisch(2.4999, 0), 2);
+        pruefe('Runden: −2,5 wird −3 (spiegelbildlich)', rundeKaufmaennisch(-2.5, 0), -3);
+        pruefe('Runden: 1,005 wird 1,01', rundeKaufmaennisch(1.005, 2), 1.01);
+        pruefe('Runden: 3 × 4,3 auf vier Stellen', rundeKaufmaennisch(3 * 4.3, 4), 12.9);
+        pruefe('Anzeige: 1,005 erscheint als 1,01', zahlDE(1.005), '1,01');
+
+        // Im Schriftstück ganze Zahlen, wo es sie gibt
+        const m5T = (count, period) => m5HaeufigkeitText('4.5.13', { count: count, period: period });
+        pruefe('Einmal im Quartal steht als ganze Zahl da', m5T(m5Runden(1 / 3), 'M'), '1x im Quartal');
+        pruefe('Viermal im Quartal', m5T(m5Runden(4 / 3), 'M'), '4x im Quartal');
+        pruefe('Zweimal im Jahr', m5T(m5Runden(2 / 12), 'M'), '2x im Jahr');
+        pruefe('Ganze Zahl pro Woche bleibt, wie sie ist', m5T(2, 'W'), '2x pro Woche');
+        pruefeWahr('Keine vier Nachkommastellen im Schriftstück', !/\d,\d{3}/.test(m5T(m5Runden(3 / 7 * 30 + 1 / 3), 'M')));
+
+        // Zahlen werden deutsch geschrieben – mit Komma, nicht mit Punkt
+        pruefe('Gewichtete Punkte deutsch geschrieben', zahlDE(11.25), '11,25');
+        pruefe('Ganze Punktzahl mit zwei Stellen', zahlDE(10), '10,00');
+        pruefe('Häufigkeit ohne unnötige Nullen', haeufigkeitDE(3), '3');
+        pruefe('Häufigkeit mit Komma', haeufigkeitDE(3.3857), '3,39');
+        pruefe('Häufigkeit einstellig', haeufigkeitDE(0.3), '0,3');
+        pruefeWahr('Nirgends ein englischer Dezimalpunkt in der Modultabelle',
+            [zahlDE(3.75), zahlDE(7.5), zahlDE(47.5), haeufigkeitDE(0.33)].every(t => t.indexOf('.') === -1));
         leerenM5(); setzeM5(54, 1, 'D');
         pruefe('Modul 5, Beatmung (Faktor 60)', m5(), 6);
         leerenM5(); setzeM5(43, 3, 'D');
@@ -2837,14 +2932,15 @@ async function selbsttest() {
                 { fach: 'Kardiologe', anzahl: '1', zeitraum: 'im Quartal', begleitung: 'in Begleitung', dauer3h: 'nein' }
             ];
             let zq = modul5AusErfassung();
-            pruefe('Einmal im Quartal ergibt 0,33 pro Monat',
-                zq['4.5.13'] && zq['4.5.13'].count + zq['4.5.13'].period, '0.33M');
+            // BRi Fußnote 13: auf die 4. Nachkommastelle, nicht auf die zweite
+            pruefe('Einmal im Quartal ergibt 0,3333 pro Monat',
+                zq['4.5.13'] && zq['4.5.13'].count + zq['4.5.13'].period, '0.3333M');
             erfassung.arztbesuche = [
                 { fach: 'Augenarzt', anzahl: '2', zeitraum: 'im Jahr', begleitung: 'in Begleitung', dauer3h: 'nein' }
             ];
             zq = modul5AusErfassung();
-            pruefe('Zweimal im Jahr ergibt 0,17 pro Monat',
-                zq['4.5.13'] && zq['4.5.13'].count + zq['4.5.13'].period, '0.17M');
+            pruefe('Zweimal im Jahr ergibt 0,1667 pro Monat',
+                zq['4.5.13'] && zq['4.5.13'].count + zq['4.5.13'].period, '0.1667M');
             // Zusammen mit häufigeren Terminen wird korrekt aufsummiert
             erfassung.arztbesuche = [
                 { fach: 'Hausarzt', anzahl: '1', zeitraum: 'pro Monat', begleitung: 'in Begleitung', dauer3h: 'nein' },
@@ -2852,7 +2948,7 @@ async function selbsttest() {
             ];
             zq = modul5AusErfassung();
             pruefe('Monatlich und quartalsweise werden addiert',
-                zq['4.5.13'] && zq['4.5.13'].count + zq['4.5.13'].period, '1.33M');
+                zq['4.5.13'] && zq['4.5.13'].count + zq['4.5.13'].period, '1.3333M');
             // Ohne Begleitung weiterhin keine Wertung
             erfassung.arztbesuche = [
                 { fach: 'Urologe', anzahl: '4', zeitraum: 'im Jahr', begleitung: 'selbständig', dauer3h: 'nein' }
@@ -3568,7 +3664,8 @@ async function selbsttest() {
             pruefeWahr('Anweisung verbietet Raten',
                 /Erfinde nichts/.test(vorbefundAnweisung()) && /LASS IHN WEG/.test(vorbefundAnweisung()));
             pruefeWahr('Anweisung verlangt eine Fundstelle',
-                /Ohne Beleg keinen Vorschlag/.test(vorbefundAnweisung()));
+                /Ohne Beleg kein Eintrag/.test(vorbefundAnweisung())
+                && /Jede Zeile braucht „beleg"/.test(vorbefundAnweisung()));
 
             // 19d. Prüfung der KI-Antwort: nur Belegtes und nur Bekanntes wird angenommen
             const geprueft = vorbefundPruefen({
@@ -3642,9 +3739,12 @@ async function selbsttest() {
             // Mit Haken: zwei Befunde und eine Tabellenzeile
             vorbefundFunde = geprueft;
             zeigeVorbefundVorschlaege();
+            // Die Medikationszeile über ihre Tabelle suchen, nicht über die Position –
+            // die Reihenfolge der Tabellen ist kein Versprechen.
+            const medIdx = geprueft.erfassung.findIndex(z => z._tabelle === 'medikation');
             document.querySelectorAll('#vorschlag-body input[type="checkbox"]').forEach(c => {
                 const k = c.getAttribute('data-vb');
-                if (k === 'b0' || k === 'b2' || k === 'e0') c.checked = true;
+                if (k === 'b0' || k === 'b2' || k === 'e' + medIdx) c.checked = true;
             });
             const uebernommen = uebernehmeVorbefund();
             pruefe('Angehaktes wird übernommen', uebernommen, 3);
@@ -3708,6 +3808,195 @@ async function selbsttest() {
             vorbefundFunde = null;
         }
 
+        // ---------- 20. Versorgung beim Einlesen des Vorgutachtens (Höherstufungsantrag) ----------
+        // Erfundene Angaben, gebaut nach dem Aufbau eines echten Gutachtens (1.3, 1.4, 4.5.1).
+        if (typeof vorbefundImportAktiv === 'function') {
+            const merkModus20 = appModus, merkZiel20 = importZiel;
+            const merkBef20 = JSON.parse(JSON.stringify(befundSichern()));
+            const merkErf20 = JSON.parse(JSON.stringify(erfassungSichern()));
+            const merkReview20 = reviewData;
+            const merkOrig20 = JSON.parse(JSON.stringify(stateOrig));
+            const merkEigen20 = JSON.parse(JSON.stringify(stateEigene));
+
+            // 20a. Nur im Höherstufungsantrag und nur beim Vorgutachten
+            importZiel = 'orig';
+            ['widerspruch', 'erstantrag', 'anhoerung'].forEach(m => {
+                setzeModus(m);
+                pruefe('Einlesen ohne Versorgung im ' + m, vorbefundImportAktiv(), false);
+            });
+            setzeModus('hoeherstufung');
+            pruefe('Einlesen mit Versorgung im Höherstufungsantrag', vorbefundImportAktiv(), true);
+            importZiel = 'zweit';
+            pruefe('Nicht beim Zweitgutachten', vorbefundImportAktiv(), false);
+            importZiel = 'orig';
+            const anw20 = vorbefundImportAnweisung();
+            pruefeWahr('Anweisung nennt die Fundorte 1.3, 1.4 und 4.5.1',
+                /1\.3/.test(anw20) && /1\.4/.test(anw20) && /4\.5\.1/.test(anw20));
+            pruefeWahr('Schema bekommt das Feld „versorgung"',
+                !!vorbefundImportSchema({ properties: {} }).properties.versorgung);
+
+            // 20b. Die Antwort wird geprüft und in die Form der Maske gebracht
+            const versorgung20 = {
+                befunde: [
+                    { id: 'schuerzengriff', stufe: 'Bis zum hinteren Beckenkamm möglich',
+                      beleg: 'Schürzenbandgriff bds. nicht endständig möglich' },          // beidseits
+                    { id: 'groesse', text: '160', beleg: 'Größe: 160cm' },
+                    { id: 'gewicht', text: '80', beleg: 'Gewicht: 80kg' },
+                    { id: 'ernaehrungszustand', stufe: 'Übergewicht', beleg: 'optisch übergewichtig' }, // abgeleitet
+                    { id: 'atmung', stufe: 'Dyspnoe bei geringer Belastung', beleg: 'Luftnot nach wenigen Metern' }
+                ],
+                befund_weitere: [
+                    { gruppe: 'sonstiges', titel: 'Haut', text: 'Pigmentierung der Unterschenkel bds.',
+                      beleg: 'Pigmentierung der Unterschenkel bds.' },
+                    { gruppe: 'gibtsnicht', titel: 'Pflegezustand', text: 'unauffällig',
+                      beleg: 'Der Pflegezustand ist unauffällig.' }
+                ],
+                pflegepersonen: [
+                    { art: 'Pflegeperson', name: 'Otto Probe', geboren: '01.02.1940', tage: '2',
+                      wochenstunden: '10', unterstuetzung: 'Wäsche, Einkäufe', beleg: 'Otto Probe 2 10' },
+                    { art: 'Ambulanter Pflegedienst', name: 'Probepflege e.V.', tage: '1',
+                      unterstuetzung: 'Medikamente richten, Kompressionsstrümpfe', beleg: 'Ambulante Pflege' }
+                ],
+                krankenhaus: [ { von: '03.01.2026', bis: '10.01.2026', grund: 'Sturz', beleg: 'stationär wegen Sturz' } ],
+                hilfsmittel: [
+                    { bezeichnung: 'Rollator', nutzung: 'genutzt', beleg: 'Rollator' },
+                    { bezeichnung: 'Gehstock', nutzung: 'ungenutzt', beleg: 'Gehstock ungenutzt' },
+                    { bezeichnung: 'Kompressionsstrümpfe Kl. II', nutzung: 'genutzt', beleg: 'Kompressionsstrümpfe Kl. II' }
+                ],
+                arztbesuche: [
+                    { fach: 'Hausarzt', anzahl: '1', zeitraum: 'im Quartal', begleitung: 'in Begleitung', beleg: 'Hausarzt: 1 mal im Quartal' },
+                    { fach: 'Physiotherapie', anzahl: '1', zeitraum: 'pro Woche', begleitung: 'in Begleitung', beleg: 'Physiotherapie: 1 mal wöchentlich' }
+                ],
+                medikation: [
+                    { applikation: 'oral (Tabletten, Tropfen, Säfte)', anzahl: '1', zeitraum: 'pro Woche',
+                      unterstuetzung: 'Stellen', beleg: 'Hilfe beim Richten der Medikamente 1x wöchentlich' },
+                    { applikation: 'Augentropfen', unterstuetzung: 'selbständig', beleg: 'Augentropfen selbständig' }
+                ],
+                // Steht im Gutachten unter Behandlungspflege – gehört aber zum Hilfsmittel
+                behandlungspflege: [
+                    { art: 'Anziehen Kompressionsstrümpfe', anzahl: '1', zeitraum: 'pro Tag',
+                      durchfuehrung: 'durch Pflegeperson', beleg: 'Anziehen Kompressionsstrümpfe ab Kl. II: 1 mal täglich' },
+                    { art: 'Ausziehen Kompressionsstrümpfe', anzahl: '1', zeitraum: 'pro Tag',
+                      durchfuehrung: 'durch Pflegeperson', beleg: 'Ausziehen Kompressionsstrümpfe ab Kl. II: 1 mal täglich' }
+                ]
+            };
+            const rev20 = normalizeImport({ stam_betreffend: 'Frau Probe Beispiel', stam_pg_manual: '2',
+                stam_begutachtung: '17.06.2026', values_orig: [], diagnoses: [], versorgung: versorgung20 });
+            const vb20 = rev20.vorbefund || { befunde: [], erfassung: [], verworfen: [] };
+            const zeilenVon = tid => vb20.erfassung.filter(z => z._tabelle === tid);
+            pruefeWahr('Prüfansicht bekommt die Versorgung', !!rev20.vorbefund);
+            pruefeWahr('In der Prüfansicht ist alles vorausgewählt',
+                vb20.erfassung.every(z => z._an === true) && vb20.befunde.every(b => b._an === true));
+
+            // Kompressionsstrümpfe: EINE Zeile im Hilfsmittel, keine in der Behandlungspflege
+            const kompr = zeilenVon('hilfsmittel').filter(z => /kompression/i.test(z.bezeichnung));
+            pruefe('Kompressionsstrümpfe stehen genau einmal', kompr.length, 1);
+            pruefe('Nichts davon bleibt in der Behandlungspflege', zeilenVon('behandlungspflege').length, 0);
+            pruefeWahr('An- und Ausziehen ergeben 2× pro Tag',
+                !!kompr[0] && kompr[0].anzahl === '2' && kompr[0].zeitraum === 'pro Tag');
+            pruefeWahr('Die Tätigkeit nennt beides',
+                !!kompr[0] && /Anziehen/.test(kompr[0].taetigkeit || '') && /Ausziehen/.test(kompr[0].taetigkeit || ''));
+            pruefe('Ungenutzt bleibt ungenutzt',
+                (zeilenVon('hilfsmittel').find(z => z.bezeichnung === 'Gehstock') || {}).nutzung, 'ungenutzt');
+
+            // Pflegepersonen: Wochenstunden aus dem Gutachten, Stunden am Tag umgerechnet
+            const pp = zeilenVon('pflegepersonen').find(z => z.name === 'Otto Probe') || {};
+            pruefe('Geburtsdatum in der Form des Eingabefelds', pp.geboren, '1940-02-01');
+            pruefe('Wochenstunden aus dem Gutachten', pp.wochenstunden, '10');
+            pruefe('Stunden am Tag umgerechnet', pp.stunden, '5');
+            pruefeWahr('Pflegedienst ist eine eigene Zeile',
+                zeilenVon('pflegepersonen').some(z => z.art === 'Ambulanter Pflegedienst'));
+            pruefe('Krankenhaus: Datum umgewandelt', (zeilenVon('krankenhaus')[0] || {}).von, '2026-01-03');
+            pruefe('Arztbesuch im Quartal bleibt im Quartal',
+                (zeilenVon('arztbesuche').find(z => z.fach === 'Hausarzt') || {}).zeitraum, 'im Quartal');
+
+            // Befund: beidseits gilt für beide Seiten, Abgeleitetes nicht, Weiteres in seine Gruppe
+            const sg = vb20.befunde.filter(b => b.id === 'schuerzengriff');
+            pruefe('Beidseits ergibt rechts und links', sg.map(b => b.seite).sort(), ['links', 'rechts']);
+            pruefeWahr('Ernährungszustand wird nicht als Stufe gesetzt (kommt aus dem BMI)',
+                !vb20.befunde.some(b => b.id === 'ernaehrungszustand'));
+            const weitere = vb20.befunde.filter(b => b.weitere);
+            pruefe('Weitere Befunde werden übernommen', weitere.length, 2);
+            pruefeWahr('Unbekannte Gruppe landet unter Sonstiges',
+                weitere.every(b => b.gruppe === 'sonstiges'));
+
+            // 20c. Prüfansicht zeigt den Abschnitt, Abwählen wirkt
+            reviewData = rev20;
+            const html20 = vorbefundReviewHtml(rev20);
+            pruefeWahr('Prüfansicht hat den Abschnitt für die Erfassung', /Für die Erfassung im Höherstufungsantrag/.test(html20));
+            pruefeWahr('Jede Zeile zeigt ihre Fundstelle', (html20.match(/Laut Gutachten/g) || []).length
+                === vb20.erfassung.length + vb20.befunde.length);
+            pruefeWahr('Abschnitt steht im Formular der Prüfansicht',
+                buildReviewForm(rev20).indexOf('rev-vorbefund') > -1);
+            const gehIdx = vb20.erfassung.findIndex(z => z.bezeichnung === 'Gehstock');
+            rvVorbefund('e', gehIdx, false);
+            pruefe('Abwählen in der Prüfansicht wirkt', vb20.erfassung[gehIdx]._an, false);
+
+            // 20d. Freigabe: Der vorige Fall verschwindet, der neue steht in der Maske
+            erfassungLaden({ tabellen: { pflegepersonen: [{ name: 'Vorige Person', adresse: 'Alte Straße 1' }, {}] }, extra: { pg: '' } });
+            befundLaden({ texte: { groesse: '199' } });
+            applyImportedData(rev20);
+            const pp20 = erfassung.pflegepersonen || [];
+            pruefeWahr('Daten des vorigen Falls sind weg', !pp20.some(z => z.name === 'Vorige Person'));
+            pruefeWahr('Pflegeperson steht in der Maske', pp20.some(z => z.name === 'Otto Probe' && z.tage === '2'));
+            pruefeWahr('Hilfsmittel steht in der Maske', (erfassung.hilfsmittel || []).some(z => z.bezeichnung === 'Rollator'));
+            pruefeWahr('Abgewähltes wird nicht eingetragen', !(erfassung.hilfsmittel || []).some(z => z.bezeichnung === 'Gehstock'));
+            pruefeWahr('Arztbesuch steht in der Maske', (erfassung.arztbesuche || []).some(z => z.fach === 'Hausarzt'));
+            pruefeWahr('Medikation steht in der Maske', (erfassung.medikation || []).some(z => z.unterstuetzung === 'Stellen'));
+            pruefeWahr('Krankenhausaufenthalt steht in der Maske', (erfassung.krankenhaus || []).some(z => z.grund === 'Sturz'));
+            pruefeWahr('Jede übernommene Zeile ist als Vorgutachten markiert',
+                ['pflegepersonen', 'hilfsmittel', 'arztbesuche', 'medikation', 'krankenhaus']
+                    .every(tid => (erfassung[tid] || []).filter(z => Object.keys(z).length).every(z => z._vg === true)));
+            pruefeWahr('Jede Tabelle behält eine leere Zeile zum Weiterschreiben',
+                ['pflegepersonen', 'hilfsmittel', 'medikation'].every(tid =>
+                    Object.keys((erfassung[tid] || [])[(erfassung[tid] || []).length - 1] || { x: 1 }).length === 0));
+            pruefe('Pflegegrad des Vorgutachtens eingetragen', erfassungExtra.pg, '2');
+            pruefe('Datum des Vorgutachtens eingetragen', erfassungExtra.vorgutachten, '2026-06-17');
+            pruefe('Größe in der Befunderhebung', befundTexte['groesse'], '160');
+            pruefe('BMI daraus berechnet', befundTexte['bmi'], '31,3');
+            pruefeWahr('Schürzengriff beidseits in der Maske',
+                typeof befundWerte['schuerzengriff|rechts'] === 'number' && typeof befundWerte['schuerzengriff|links'] === 'number');
+            pruefeWahr('Weiterer Befund unter Sonstiges', (befundExtra['sonstiges'] || []).some(x => x.titel === 'Haut'));
+            pruefeWahr('Befundeinträge sind als Vorgutachten markiert', vorbefundOffen().indexOf('groesse') > -1);
+
+            // Modul 5 aus den übernommenen Zeilen – Kompressionsstrümpfe einmal, nicht doppelt
+            const m5_20 = modul5AusErfassung();
+            pruefeWahr('Kompressionsstrümpfe zählen einmal zu 4.5.7 (2× pro Tag)',
+                !!m5_20['4.5.7'] && m5_20['4.5.7'].count === 2 && m5_20['4.5.7'].period === 'D');
+            pruefeWahr('Keine Behandlungspflege daneben', !m5_20['4.5.11']);
+
+            // 20e. Markierung verschwindet mit der ersten Änderung – ohne die Tabelle neu zu zeichnen
+            renderErfassung();
+            const rIdx = erfassung.hilfsmittel.findIndex(z => z.bezeichnung === 'Rollator');
+            const rFeld = document.querySelector('[data-erf="hilfsmittel|' + rIdx + '|bezeichnung"]');
+            pruefeWahr('Markierte Zeile ist in der Maske sichtbar',
+                !!rFeld && !!rFeld.closest('tr') && rFeld.closest('tr').classList.contains('erf-vg'));
+            pruefeWahr('Tabelle nennt die unbearbeiteten Zeilen',
+                /aus dem Vorgutachten/.test((document.getElementById('erf-vg-hilfsmittel') || {}).innerHTML || ''));
+            if (rFeld) {
+                rFeld.focus();
+                erfSetzen('hilfsmittel', rIdx, 'bezeichnung', 'Rollator, insgesamt drei');
+                pruefe('Nach der Änderung ist die Marke weg', erfassung.hilfsmittel[rIdx]._vg, undefined);
+                pruefeWahr('Die Zeile ist nicht mehr markiert', !rFeld.closest('tr').classList.contains('erf-vg'));
+                pruefeWahr('Die Schreibmarke bleibt dabei stehen', document.activeElement === rFeld);
+            }
+            // Außerhalb des Höherstufungsantrags keine Markierung
+            setzeModus('erstantrag');
+            pruefe('Keine Tabellenmarkierung im Erstantrag', erfVgAnzahl('arztbesuche'), 0);
+            setzeModus('hoeherstufung');
+
+            // 20f. Im Widerspruch trägt die Freigabe keine Versorgung ein
+            setzeModus('widerspruch');
+            applyImportedData(normalizeImport({ values_orig: [], diagnoses: [], versorgung: versorgung20 }));
+            pruefeWahr('Widerspruch: keine Versorgungszeilen eingetragen',
+                !(erfassung.hilfsmittel || []).some(z => Object.keys(z).length));
+            pruefe('Widerspruch: Befund bleibt leer', Object.keys(befundTexte).filter(k => k !== 'bmi').length, 0);
+
+            reviewData = merkReview20; importZiel = merkZiel20;
+            stateOrig = merkOrig20; stateEigene = merkEigen20;
+            befundLaden(merkBef20); erfassungLaden(merkErf20); setzeModus(merkModus20);
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {
@@ -3716,6 +4005,23 @@ async function selbsttest() {
         stateEigene = sicherung.eigen;
         erstgespraechNotes = sicherung.notizen;
         appealDraft = sicherung.entwurf;
+        try {
+            if (sicherung.zweit) stateZweit = sicherung.zweit;
+            if (sicherung.anlagen && typeof anlagenLaden === 'function') anlagenLaden(sicherung.anlagen);
+            if (sicherung.befund) befundLaden(sicherung.befund);
+            if (sicherung.erfassung) erfassungLaden(sicherung.erfassung);
+            if (sicherung.modus) setzeModus(sicherung.modus);
+            // Erst genug Diagnosezeilen anlegen (wie beim Laden eines Falls), dann die Felder füllen
+            if (typeof ensureDiagRows === 'function' && typeof maxDiagIndex === 'function') {
+                ensureDiagRows(maxDiagIndex(sicherung.felder));
+            }
+            Object.keys(sicherung.felder || {}).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = sicherung.felder[id];
+            });
+            const notizFeld = document.getElementById('erstgespraech-notes');
+            if (notizFeld) notizFeld.value = erstgespraechNotes || '';
+        } catch (e) {}
         // Probedateien des Tests wieder aus dem Speicher-Nachweis entfernen
         try {
             if (sicherung.speicherungen === null) localStorage.removeItem(SPEICHER_PROTOKOLL);

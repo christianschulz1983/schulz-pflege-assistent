@@ -221,8 +221,16 @@ function m5HaeufigkeitText(nr, wert) {
     const o = (wert && typeof wert === 'object') ? wert : { count: 0, period: 'W' };
     const anzahl = Number(o.count) || 0;
     if (anzahl === 0 && m5OhneWertungMoeglich(nr)) return M5_KEINE_WERTUNG;
-    const zahl = String(anzahl).replace('.', ',');
-    return zahl + 'x pro ' + (o.period === 'D' ? 'Tag' : o.period === 'W' ? 'Woche' : 'Monat');
+    /* Die NBA kennt nur Tag, Woche und Monat. Ein Termin im Quartal steht deshalb als
+       0,3333 pro Monat im Datensatz – so wird gerechnet (BRi: vier Nachkommastellen). Ins
+       Schriftstück gehört das nicht: Lässt sich der Wert als ganze Zahl im Quartal oder im
+       Jahr ausdrücken, wird er so geschrieben – „1x im Quartal" statt „0,3333x pro Monat". */
+    if (o.period === 'M' && !Number.isInteger(anzahl)) {
+        const quartal = anzahl * 3, jahr = anzahl * 12;
+        if (Math.round(quartal) > 0 && Math.abs(quartal - Math.round(quartal)) < 0.01) return Math.round(quartal) + 'x im Quartal';
+        if (Math.round(jahr) > 0 && Math.abs(jahr - Math.round(jahr)) < 0.01) return Math.round(jahr) + 'x im Jahr';
+    }
+    return haeufigkeitDE(anzahl) + 'x pro ' + (o.period === 'D' ? 'Tag' : o.period === 'W' ? 'Woche' : 'Monat');
 }
 
 /* WAS EINE ÄNDERUNG IN MODUL 5 TATSÄCHLICH BEWIRKT.
@@ -472,12 +480,12 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
         for (let m = 1; m <= 6; m++) {
             const a = rO.weights[m - 1], b = rE.weights[m - 1];
             const anz = diffs.filter(d => d.m === m).length;
-            mo += `- Modul ${m} (${mN[m - 1]}): Gutachten ${a.toFixed(2)} / meine Einschätzung ${b.toFixed(2)}`
+            mo += `- Modul ${m} (${mN[m - 1]}): Gutachten ${zahlDE(a)} / meine Einschätzung ${zahlDE(b)}`
                 + (modMitDiff.has(m) ? `  <-- abweichend, ${anz} Kriterium/Kriterien\n` : '\n');
         }
         p += 'MODULÜBERSICHT (gewichtete Punkte):\n' + mo
-           + `Gesamt: Gutachten ${rO.total.toFixed(2)} (${rO.pg ? 'Pflegegrad ' + rO.pg : 'kein Pflegegrad'}) / meine Einschätzung `
-           + `${rE.total.toFixed(2)} (${rE.pg ? 'Pflegegrad ' + rE.pg : 'kein Pflegegrad'})\n\n`;
+           + `Gesamt: Gutachten ${zahlDE(rO.total)} (${rO.pg ? 'Pflegegrad ' + rO.pg : 'kein Pflegegrad'}) / meine Einschätzung `
+           + `${zahlDE(rE.total)} (${rE.pg ? 'Pflegegrad ' + rE.pg : 'kein Pflegegrad'})\n\n`;
         p += allgemeinAufgabe((typeof appModus !== 'undefined') ? appModus : 'widerspruch');
     }
     return p;

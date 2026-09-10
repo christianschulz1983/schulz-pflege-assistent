@@ -541,6 +541,15 @@
         }
         @media (max-width: 700px) { .bz-seiten { grid-template-columns: 1fr; } }
 
+        /* Erfassungstabellen: Zeilen aus dem Vorgutachten, noch nicht bearbeitet */
+        tr.erf-vg td:first-child { box-shadow: inset 3px 0 0 #d97706; }
+        tr.erf-vg { background: rgba(217, 119, 6, 0.06); }
+        .erf-block.erf-vg { border-left: 3px solid #d97706; background: rgba(217, 119, 6, 0.05); }
+        .erf-vg-hinweis {
+            font-size: 11px; line-height: 1.5; color: #b45309; margin-bottom: 10px;
+            padding: 6px 10px; border-radius: 6px; background: rgba(217, 119, 6, 0.1);
+        }
+
         /* Erfassungstabellen: eigene Angabe statt Liste */
         .erf-zelle { display: block; }
         .erf-frei { display: flex; align-items: center; gap: 4px; }
