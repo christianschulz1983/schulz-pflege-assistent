@@ -249,7 +249,9 @@ async function aiReadGutachten(event, ziel) {
               abgeholfen wird, möglichst wörtlich und vollständig; sonst leer
             - anh_gutachten_datum: Erstellungsdatum des Zweitgutachtens (tt.mm.jjjj)
             - anh_art: Durchführungsart des Zweitgutachtens, wörtlich wie im Dokument
-            Erfinde nichts. Findest du eine Angabe nicht, gib einen leeren String zurück.` : '');
+            Erfinde nichts. Findest du eine Angabe nicht, gib einen leeren String zurück.` : '')
+            // Höherstufungsantrag: Versorgung und Befund für die Erfassungsmaske mitlesen
+            + ((typeof vorbefundImportAktiv === 'function' && vorbefundImportAktiv()) ? vorbefundImportAnweisung() : '');
 
             const responseSchema = {
                 type: "OBJECT",
@@ -310,6 +312,7 @@ async function aiReadGutachten(event, ziel) {
                 },
                 required: ["diagnoses", "values_orig"]
             };
+            if (typeof vorbefundImportAktiv === 'function' && vorbefundImportAktiv()) vorbefundImportSchema(responseSchema);
             if (istZweit) {
                 responseSchema.properties.anh_schreiben_datum = { type: "STRING" };
                 responseSchema.properties.anh_frist = { type: "STRING" };
@@ -344,7 +347,9 @@ async function aiReadGutachten(event, ziel) {
             // Text wird nur dieser kleine Text geschickt (statt großes Bild) -> deutlich weniger 429.
             let userParts;
             if (textVollstaendig) {
-                userParts = [{ text: "Lies aus folgendem Gutachten-Text die Stammdaten, Diagnosen, Anamnese und Befund vollständig aus.\n\n=== GUTACHTEN-TEXT ===\n" + local.text }];
+                userParts = [{ text: "Lies aus folgendem Gutachten-Text die Stammdaten, Diagnosen, Anamnese und Befund vollständig aus"
+                    + ((typeof vorbefundImportAktiv === 'function' && vorbefundImportAktiv()) ? ", dazu die Angaben zur Versorgung (Feld versorgung)" : "")
+                    + ".\n\n=== GUTACHTEN-TEXT ===\n" + local.text }];
                 updateOverlay("Stammdaten/Diagnosen werden gelesen...", 55);
             } else if (haveLocalText) {
                 // Gescanntes Dokument: BEIDES schicken. Der Text hilft bei Namen, Daten und
@@ -506,7 +511,9 @@ function normalizeImport(data) {
         nurKriterien: !!data._nurKriterien,
         rekonstruiert: data._rekonstruiert || null,
         nichtZuordenbar: data._nichtZuordenbar || null,
-        eigeneSummen: data._eigeneSummen || null
+        eigeneSummen: data._eigeneSummen || null,
+        // Höherstufungsantrag: Angaben für die Erfassungsmaske, geprüft und an-/abwählbar
+        vorbefund: (data.versorgung && typeof vorbefundAusImport === 'function') ? vorbefundAusImport(data.versorgung) : null
     };
 }
 
@@ -840,6 +847,12 @@ function applyImportedData(rev) {
     // beim nächsten Speichern zu diesem hier.
     if (typeof setzeStellungnahme === 'function') setzeStellungnahme(""); else appealDraft = "";
     erstgespraechNotes = "";
+    /* Befunderhebung und Erfassungstabellen gehören ebenso zum Fall. Sie wurden bisher NICHT
+       geleert: Nach dem Einlesen eines neuen Gutachtens standen Pflegepersonen mit Namen und
+       Anschrift, Medikation und Befund der VORIGEN Person weiter in der Maske – und wurden mit
+       dem neuen Fall gespeichert. */
+    if (typeof befundLaden === 'function') befundLaden({});
+    if (typeof erfassungLaden === 'function') erfassungLaden({});
     // extracted nur setzen, wenn es eine KI-Zusammenfassung gibt; sonst wird das
     // Vorgutachten aus den (präzisen) Einzelkriterien berechnet.
     if (rev.extracted) {
@@ -867,6 +880,9 @@ function applyImportedData(rev) {
     if (typeof letzteProvided !== 'undefined') letzteProvided = rev.provided || null;
     if (typeof stellungnahmeVeraltet !== 'undefined') stellungnahmeVeraltet = false;
     fillTable('orig'); fillTable('own'); calculate('orig'); calculate('own'); syncSpecialUI();
+    // Höherstufungsantrag: die in der Prüfansicht freigegebenen Angaben eintragen
+    if (typeof vorbefundImportUebernehmen === 'function') vorbefundImportUebernehmen(rev);
+    if (typeof renderErfassung === 'function') renderErfassung();
     setTimeout(() => { autoResize(document.getElementById('stam-anamnese')); autoResize(document.getElementById('stam-befund')); }, 200);
 }
 
@@ -972,6 +988,7 @@ function buildReviewForm(rev) {
 
     html += `<div class="rev-section"><div class="rev-sec-title">Anamnese</div><textarea class="rev-textarea" oninput="rvText('anamnese',this.value)">${esc(rev.anamnese || '')}</textarea></div>`;
     html += `<div class="rev-section"><div class="rev-sec-title">Befund</div><textarea class="rev-textarea" oninput="rvText('befund',this.value)">${esc(rev.befund || '')}</textarea></div>`;
+    if (typeof vorbefundReviewHtml === 'function') html += vorbefundReviewHtml(rev);
 
     html += buildReviewKriterien(rev);
     return html;

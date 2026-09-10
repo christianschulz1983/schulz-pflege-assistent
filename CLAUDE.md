@@ -262,10 +262,35 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Widerspruch in einen Höherstufungsantrag und blieb dort stehen. Bei gewechselter
    Vorgangsart werden die Kriterienblöcke verworfen und neu aufgebaut; von Hand
    überarbeitete „Allgemeine Angaben" bleiben erhalten.
-21. **Befund aus dem Vorgutachten vorbelegen – nur im Höherstufungsantrag**
-   (`js/vorbefund.js`). Der Knopf steht als erste Karte in der Befunderhebung und
-   erscheint ausschließlich bei `appModus === 'hoeherstufung'`; Widerspruch, Erstantrag
-   und Anhörung sehen ihn nicht. Was dabei gilt:
+21. **Befund und Versorgung aus dem Vorgutachten – nur im Höherstufungsantrag**
+   (`js/vorbefund.js`). **Der Hauptweg ist das Einlesen selbst:** Bei
+   `appModus === 'hoeherstufung'` und `importZiel === 'orig'` (`vorbefundImportAktiv()`)
+   bekommt der EINE Einleseaufruf die Anweisung und das Feld `versorgung` dazu – kein
+   zweiter KI-Aufruf, der Schlüssel läuft sonst ins Limit. Die Angaben erscheinen in der
+   Prüfansicht (`vorbefundReviewHtml`), jede mit Fundstelle, und werden nach der Freigabe
+   eingetragen (`vorbefundImportUebernehmen`), dazu Pflegegrad und Datum im Kopf
+   „Vorgutachten und Veränderung". Widerspruch, Erstantrag und Zweitgutachten lesen
+   unverändert.
+   - **Die Versorgung steht NICHT im Befund.** Sie steht in 1.3 (Hilfsmittel), 1.4
+     (Versorgungssituation, Tabelle „Pflege durch", Wohnsituation) und 4.5.1 („Angaben zur
+     Versorgung": Arztbesuche, Medikamente, Heilmittel, Behandlungspflege). Die erste Fassung
+     las nur Befund und Anamnese und konnte die Tabellen deshalb nie füllen – die Anweisung
+     (`vorbefundTabellenRegeln`) nennt die Fundorte ausdrücklich.
+   - **In der Prüfansicht ist vorausgewählt**, anders als beim Knopf: Die Prüfansicht IST die
+     Prüfung, wie bei Stammdaten und Diagnosen; was nicht stimmt, wird abgehakt (`_an`).
+   - **Körpernahe Hilfsmittel werden fest zusammengeführt** (`vorbefundKoerpernahZusammenfuehren`):
+     „Anziehen/Ausziehen Kompressionsstrümpfe 1× täglich" aus der Behandlungspflege wird EINE
+     Hilfsmittelzeile mit 2× pro Tag und Tätigkeit – Regel 17, nicht der KI überlassen.
+   - Pflegepersonen: Das Gutachten nennt Tage und Stunden PRO WOCHE; `stunden` (am Tag) wird
+     daraus umgerechnet. Datumsfelder werden in die Form des Eingabefelds gebracht.
+   - „beidseits" gilt für rechts UND links (die Maske kennt keinen Wert ohne Seite).
+     Der Ernährungszustand wird nicht gesetzt (`VORBEFUND_ABGELEITET`) – er folgt aus dem BMI;
+     die Worte des Gutachters gehen als weiterer Befund mit (`befund_weitere` → `befundExtra`).
+   - **Tabellenzeilen tragen `_vg`** und sind orange markiert (`.erf-vg`, Hinweis je Tabelle),
+     bis `erfSetzen` sie anfasst (`erfVgAufheben` – ohne Neuzeichnen, Regel 23). Angezeigt nur
+     im Höherstufungsantrag.
+   Der Knopf in der Befunderhebung bleibt als zweiter Weg; er liest nur den gespeicherten
+   Befund- und Anamnesetext und findet die Versorgung deshalb nicht. Für ihn gilt:
    - **Die NBA-Einträge braucht die Vorbelegung gar nicht.** Einträge mit `nba:` lesen über
      `befundWert()` unmittelbar aus `stateEigene` und stehen nach dem Einlesen des
      Gutachtens bereits in der Maske – exakt und ohne KI. Vorbelegt werden nur die
@@ -339,6 +364,29 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
      nachgeschlagen hat.
    - Umgeschaltet wird immer nur die EINE Zelle (`erfZelleNeu()`) – siehe Regel 23.
 
+25. **Rechnen nach der BRi: jeder Schritt auf vier Nachkommastellen, kaufmännisch gerundet.**
+   Fußnote 13 zu Modul 5: „Bei allen Rechenschritten wird auf die 4. Stelle nach dem Komma
+   gerundet." **Auf ganze Zahlen zu runden ist ausdrücklich falsch** – das Beispiel der BRi
+   (S. 107: 3× täglich + 3× monatlich + 2× wöchentlich = 3,4 → 2 Punkte) gäbe dann nur 1 Punkt,
+   und seltene Maßnahmen verschwänden ganz. Umgesetzt in `m5Runden()` / `rundeKaufmaennisch()`
+   (`js/berechnung.js`), für JEDEN Schritt in `m5Gruppen()` – auch Gruppe C. Dort fehlte die
+   Rundung: 3 × 4,3 ist für den Rechner 12,899999999999999, also „unter 12,9" – Physiotherapie
+   dreimal wöchentlich brachte 2 statt 3 Punkte. `rundeKaufmaennisch` bereinigt den Binärfehler
+   erst (zwölf gültige Stellen), dann rundet es; sonst wird aus BMI 31,25 → 31,2.
+   - **Anzeige deutsch** (`zahlDE`, `haeufigkeitDE`): Komma, nie Punkt. Die Modultabelle zeigte
+     „10.00". Nie wieder `toFixed()` ohne diese Funktionen in die Oberfläche schreiben.
+   - **Im Schriftstück ganze Zahlen, wo es sie gibt** (`m5HaeufigkeitText`): Ein Termin im
+     Quartal steht intern als 0,3333 pro Monat, im Dokument als „1x im Quartal".
+26. **Ein neu eingelesenes Gutachten ist ein neuer Fall – auch für Befund und Erfassung.**
+   `applyImportedData` leert `befundLaden({})` und `erfassungLaden({})`. Vorher blieben
+   Pflegepersonen mit Namen und Anschrift, Medikation und Befund der VORIGEN Person stehen und
+   wurden mit dem neuen Fall gespeichert – in jeder Vorgangsart.
+27. **Der Selbsttest lässt den offenen Fall unversehrt und läuft immer vom Widerspruch aus.**
+   Er sichert, was „Fall speichern" sichert (Stammdaten-, Diagnose- und Anhörungsfelder,
+   Befund, Erfassung, Anlagen, Zweitgutachten, Vorgang) und stellt es am Ende wieder her. Vorher
+   löschte ein Selbsttest mitten im Fall Name, Anamnese und alle Diagnosen. Zu Beginn stellt er
+   den Widerspruch ein; Abschnitte, die einen anderen Vorgang brauchen, stellen ihn selbst ein.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -389,8 +437,9 @@ zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
-Befunderhebung aus dem Befundtext des Vorgutachtens vorbelegen (Regel 21).
-Der Selbsttest umfasst 975 Pruefungen.
+Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
+fuellen (Regel 21).
+Der Selbsttest umfasst 1066 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

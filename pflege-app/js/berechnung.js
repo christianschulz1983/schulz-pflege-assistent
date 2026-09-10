@@ -60,20 +60,43 @@ function offeneKontinenzAngabe(st) {
    Gruppe D (4.5.16)        Diät – einziges Kriterium mit eigener Stufe */
 const M5_BEREICHE = { A: '4.5.1–4.5.7', B: '4.5.8–4.5.11', C: '4.5.12–4.5.15', D: '4.5.16' };
 
+/* KAUFMÄNNISCH RUNDEN – so, wie man es von Hand tut: ab 5 wird aufgerundet.
+   Der Rechner kann das nicht von selbst. Er führt Dezimalzahlen binär und damit oft knapp
+   daneben: 3 × 4,3 ist für ihn 12,899999999999999, 1,6² ist 2,5600000000000005. Rundet man
+   so etwas unmittelbar, kippt es auf die falsche Seite – aus 12,9 wird „unter 12,9" und aus
+   einem BMI von 31,25 wird 31,2 statt 31,3. Deshalb wird der Wert zuerst auf zwölf gültige
+   Stellen gebracht (das beseitigt den Binärfehler), erst dann gerundet. Negative Werte
+   werden spiegelbildlich behandelt: −2,5 wird −3, wie bei positiven 2,5 → 3. */
+function rundeKaufmaennisch(x, stellen) {
+    const z = Number(x);
+    if (!isFinite(z)) return 0;
+    const f = Math.pow(10, stellen || 0);
+    const bereinigt = Number((Math.abs(z) * f).toPrecision(12));
+    return Math.sign(z) * Math.round(bereinigt) / f;
+}
+
+/* Die BRi, Fußnote 13 zu Modul 5: „Bei allen Rechenschritten wird auf die 4. Stelle nach
+   dem Komma gerundet." Also JEDER Schritt – die Umrechnung je Kriterium und die Summe. */
+const m5Runden = x => rundeKaufmaennisch(x, 4);
+
 function m5Gruppen(st) {
     let sumA = 0, sumB = 0, sumC = 0, pD = 0;
     ITEMS.filter(i => i.m === 5).forEach(i => {
         if (i.group === 'D') { pD += nbaEinzelpunkte(st, i.id); return; }
         const d = st.values[i.id] || { count: 0, period: 'W' };
-        let daily = Number(d.count);
+        let daily = Number(d.count) || 0;
         if (d.period === 'W') daily /= 7;
         if (d.period === 'M') daily /= 30;
-        if (i.group === 'A') sumA += daily;
-        else if (i.group === 'B') sumB += daily;
-        else if (i.group === 'C') sumC += (Number(d.count) * (i.factor[d.period] || 0));
+        if (i.group === 'A') sumA += m5Runden(daily);
+        else if (i.group === 'B') sumB += m5Runden(daily);
+        /* Gruppe C: Besuche × Faktor (wöchentlich 4,3, monatlich 1 bzw. 8,6 und 2).
+           Hier fehlte die Rundung ganz: 3 × 4,3 ergab 12,899999999999999 und lag damit „unter
+           12,9" – Physiotherapie dreimal wöchentlich brachte 2 statt 3 Punkte. */
+        else if (i.group === 'C') sumC += m5Runden((Number(d.count) || 0) * (i.factor[d.period] || 0));
     });
-    sumA = Math.round(sumA * 10000) / 10000;
-    sumB = Math.round(sumB * 10000) / 10000;
+    sumA = m5Runden(sumA);
+    sumB = m5Runden(sumB);
+    sumC = m5Runden(sumC);
     const pA = sumA > 8 ? 3 : sumA > 3 ? 2 : sumA >= 1 ? 1 : 0;
     const pB = sumB >= 3 ? 3 : sumB >= 1 ? 2 : sumB >= 0.1429 ? 1 : 0;
     const pC = sumC >= 60 ? 6 : sumC >= 12.9 ? 3 : sumC >= 8.6 ? 2 : sumC >= 4.3 ? 1 : 0;
@@ -110,6 +133,27 @@ const MODUL_SPANNEN = {
     6: [{ ab: 12, bis: 18, gew: 15 },   { ab: 7,  bis: 11, gew: 11.25 },
         { ab: 4,  bis: 6,  gew: 7.5 },  { ab: 1,  bis: 3,  gew: 3.75 }, { ab: 0, bis: 0, gew: 0 }]
 };
+
+/* Zahlen deutsch schreiben – mit Komma, nicht mit Punkt.
+   Die Anzeige lief bisher an mehreren Stellen über `toFixed(2)` ohne Umstellung; in der
+   Modultabelle stand deshalb „10.00" statt „10,00". In einem Schriftstück für eine deutsche
+   Pflegekasse ist das schlicht falsch geschrieben. Eine Stelle für alle.
+   Achtung: Diese Funktion ist nur für die ANZEIGE. Gerechnet wird immer mit dem vollen Wert –
+   die BRi schreibt vor, bei allen Rechenschritten erst auf die 4. Nachkommastelle zu runden. */
+function zahlDE(n, stellen) {
+    const z = Number(n);
+    if (!isFinite(z)) return '';
+    const s = (stellen === undefined) ? 2 : stellen;
+    return rundeKaufmaennisch(z, s).toFixed(s).replace('.', ',');
+}
+
+/* Häufigkeiten ohne unnötige Nullen: „3" statt „3,00", aber „3,39" bleibt „3,39".
+   Gebraucht für die Durchschnittswerte des Moduls 5, die naturgemäß Brüche sind. */
+function haeufigkeitDE(n) {
+    const z = rundeKaufmaennisch(n, 2);
+    if (!isFinite(Number(n))) return '';
+    return (Number.isInteger(z) ? String(z) : z.toFixed(2).replace(/0$/, '')).replace('.', ',');
+}
 
 function spanneZu(modul, einzel) {
     return (MODUL_SPANNEN[modul] || []).find(s => einzel >= s.ab) || null;
@@ -249,12 +293,12 @@ function calculate(pref) {
     zeigeKontinenzHinweis(pref, st);
 
     const setEl = (id,v) => { const el=document.getElementById(id); if(el)el.innerText=v; };
-    setEl('mod-w-'+pref+'-1',w1.toFixed(2)); setEl('mod-r-'+pref+'-1',s1);
-    setEl('mod-w-'+pref+'-2',p2.toFixed(2)); setEl('mod-r-'+pref+'-2',s2);
-    setEl('mod-w-'+pref+'-3',p3.toFixed(2)); setEl('mod-r-'+pref+'-3',s3);
-    setEl('mod-w-'+pref+'-4',w4.toFixed(2)); setEl('mod-r-'+pref+'-4',s4);
-    setEl('mod-w-'+pref+'-5',w5.toFixed(2)); setEl('mod-r-'+pref+'-5',ptsM5);
-    setEl('mod-w-'+pref+'-6',w6.toFixed(2)); setEl('mod-r-'+pref+'-6',s6);
+    setEl('mod-w-'+pref+'-1',zahlDE(w1)); setEl('mod-r-'+pref+'-1',s1);
+    setEl('mod-w-'+pref+'-2',zahlDE(p2)); setEl('mod-r-'+pref+'-2',s2);
+    setEl('mod-w-'+pref+'-3',zahlDE(p3)); setEl('mod-r-'+pref+'-3',s3);
+    setEl('mod-w-'+pref+'-4',zahlDE(w4)); setEl('mod-r-'+pref+'-4',s4);
+    setEl('mod-w-'+pref+'-5',zahlDE(w5)); setEl('mod-r-'+pref+'-5',ptsM5);
+    setEl('mod-w-'+pref+'-6',zahlDE(w6)); setEl('mod-r-'+pref+'-6',s6);
     setEl('total-w-'+pref, total.toFixed(2).replace('.',','));
     setEl('pg-title-'+pref, pg>0?'PFLEGEGRAD '+pg:'KEIN PFLEGEGRAD');
 
@@ -285,9 +329,9 @@ function calculate(pref) {
                 const gap=getGap(m,rv);
                 return `<tr class="${isWin?'winner-row':''}">
                     <td>${m}. ${mNames[m-1]}</td>
-                    <td class="center mono">${rw.toFixed(2)}</td>
+                    <td class="center mono">${zahlDE(rw)}</td>
                     <td class="center mono">${rv}</td>
-                    <td class="center" style="color:var(--accent);opacity:0.7;font-family:var(--font-mono);font-weight:700">${rO.weights[m-1].toFixed(2)}</td>
+                    <td class="center" style="color:var(--accent);opacity:0.7;font-family:var(--font-mono);font-weight:700">${zahlDE(rO.weights[m-1])}</td>
                     <td class="center" style="color:var(--accent);opacity:0.7;font-family:var(--font-mono)">${rO.raws[m-1]}</td>
                     <td class="center"><span class="gap-badge ${gap.cls}">${gap.t}</span></td>
                 </tr>`;
@@ -302,7 +346,7 @@ function calculate(pref) {
                 const gap=getGap(m,rv);
                 return `<tr>
                     <td>${m}. ${mNames[m-1]}</td>
-                    <td class="center mono">${rw.toFixed(2)}</td>
+                    <td class="center mono">${zahlDE(rw)}</td>
                     <td class="center mono">${rv}</td>
                     <td class="center"><span class="gap-badge ${gap.cls}">${gap.t}</span></td>
                 </tr>`;
@@ -360,7 +404,7 @@ function updateLiveCompRows() {
     for(let m=1;m<=6;m++){
         const ew=document.getElementById('mod-w-comp-'+m);
         const er=document.getElementById('mod-r-comp-'+m);
-        if(ew)ew.innerText=rO.weights[m-1].toFixed(2);
+        if(ew)ew.innerText=zahlDE(rO.weights[m-1]);
         if(er)er.innerText=rO.raws[m-1];
         zeigeModulHinweis(m, rO, rE);
     }

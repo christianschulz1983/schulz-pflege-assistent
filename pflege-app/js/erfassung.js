@@ -203,6 +203,7 @@ function renderErfassung() {
                 <div class="card-header"><div class="dot"></div>${escapeHtml(t.titel)}</div>
                 <div style="padding:16px 20px">
                     ${t.hinweis ? `<p style="font-size:11px;color:var(--text-muted);line-height:1.55;margin-bottom:12px">${escapeHtml(t.hinweis)}</p>` : ''}
+                    <div id="erf-vg-${t.id}">${erfVgHinweisHtml(t.id)}</div>
                     ${t.alsFormular
                         ? `<div id="erf-body-${t.id}">${erfZeilen(t)}</div>`
                         : `<div style="overflow-x:auto"><table class="erf-tabelle">
@@ -234,10 +235,43 @@ function erfZeilen(t) {
     return (erfassung[t.id]).map((z, i) => erfZeile(t, i, z)).join('');
 }
 
+/* Zeilen aus dem Vorgutachten tragen „_vg". Sie sind der FRÜHERE Stand – im
+   Höherstufungsantrag geht es gerade um das, was sich seither geändert hat. Deshalb bleiben
+   sie sichtbar markiert, bis der Berater sie bearbeitet. Angezeigt nur im
+   Höherstufungsantrag; gespeichert bleibt die Marke, damit sie beim Zurückwechseln stimmt. */
+function erfVgZeigen(z) {
+    return !!(z && z._vg) && typeof appModus !== 'undefined' && appModus === 'hoeherstufung';
+}
+
+function erfVgAnzahl(tid) {
+    return (erfassung[tid] || []).filter(erfVgZeigen).length;
+}
+
+function erfVgHinweisHtml(tid) {
+    const n = erfVgAnzahl(tid);
+    return n ? `<div class="erf-vg-hinweis">${n} ${n === 1 ? 'Zeile stammt' : 'Zeilen stammen'} noch unverändert `
+             + 'aus dem Vorgutachten (markiert). Bitte auf den heutigen Stand bringen – mit der ersten '
+             + 'Änderung entfällt die Markierung.</div>' : '';
+}
+
+// Markierung einer Zeile aufheben, ohne die Tabelle neu zu zeichnen (Regel 23)
+function erfVgAufheben(tid, i) {
+    const z = erfassung[tid] && erfassung[tid][i];
+    if (!z || !z._vg) return;
+    delete z._vg;
+    const zelle = document.querySelector('[data-erf-zelle^="' + tid + '|' + i + '|"]');
+    const reihe = zelle ? zelle.closest('tr, .erf-block') : null;
+    if (reihe) reihe.classList.remove('erf-vg');
+    const hinweis = document.getElementById('erf-vg-' + tid);
+    if (hinweis) hinweis.innerHTML = erfVgHinweisHtml(tid);
+}
+
 function erfZeile(t, i, z) {
+    const vg = erfVgZeigen(z) ? ' erf-vg' : '';
+    const vgTitel = vg ? ' title="Aus dem Vorgutachten übernommen – noch nicht bearbeitet"' : '';
     if (t.alsFormular) {
         // Untereinander mit Beschriftung über dem Feld, damit alles lesbar bleibt
-        return `<div class="erf-block">
+        return `<div class="erf-block${vg}"${vgTitel}>
             <div class="erf-block-kopf">
                 <span class="erf-block-nr">Eintrag ${i + 1}</span>
                 <button class="erf-weg" title="Eintrag entfernen" onclick="erfZeileWeg('${t.id}',${i})">×</button>
@@ -250,7 +284,7 @@ function erfZeile(t, i, z) {
             </div>
         </div>`;
     }
-    return `<tr>${t.spalten.map(s => `<td>${erfFeld(t, i, s, z[s.k])}</td>`).join('')}
+    return `<tr class="${vg.trim()}"${vgTitel}>${t.spalten.map(s => `<td>${erfFeld(t, i, s, z[s.k])}</td>`).join('')}
         <td><button class="erf-weg" title="Zeile entfernen" onclick="erfZeileWeg('${t.id}',${i})">×</button></td></tr>`;
 }
 
@@ -320,6 +354,8 @@ function erfZurListe(tid, i, key) {
 function erfSetzen(tid, i, key, wert) {
     if (!erfassung[tid]) erfassung[tid] = [];
     if (!erfassung[tid][i]) erfassung[tid][i] = {};
+    // Wer eine Zeile anfasst, hat sie geprüft – sie ist nicht mehr „aus dem Vorgutachten"
+    erfVgAufheben(tid, i);
     // „eigene Angabe" gewählt: aus dem Auswahlfeld wird ein Schreibfeld, noch ohne Wert
     if (wert === ERF_FREI) {
         erfFreiModus[erfFreiSchluessel(tid, i, key)] = true;
@@ -333,7 +369,7 @@ function erfSetzen(tid, i, key, wert) {
     if (tid === 'pflegepersonen' && (key === 'tage' || key === 'stunden')) {
         const z = erfassung[tid][i];
         const t = parseFloat(z.tage), s = parseFloat(z.stunden);
-        if (t > 0 && s > 0) z.wochenstunden = String(Math.round(t * s * 10) / 10).replace('.', ',');
+        if (t > 0 && s > 0) z.wochenstunden = haeufigkeitDE(rundeKaufmaennisch(t * s, 1));
         else delete z.wochenstunden;
         erfFeldNachziehen(tid, i, 'wochenstunden', z.wochenstunden || '');
     }
@@ -394,6 +430,8 @@ function erfZeileWeg(tid, i) {
     erfFreiModus = {};
     if (!erfassung[tid].length) erfassung[tid] = [{}];
     renderErfassungTabelle(tid);
+    const vgHinweis = document.getElementById('erf-vg-' + tid);
+    if (vgHinweis) vgHinweis.innerHTML = erfVgHinweisHtml(tid);
     zeigeModul5Vorschau();
 }
 
@@ -516,7 +554,8 @@ function modul5AusErfassung() {
         // Quartal und Jahr auf den Monat umlegen; alles Übrige bleibt, wie es ist.
         const u = ZEITRAUM_UMRECHNUNG[zeitraum] || { period: 'M', teiler: 1 };
         const p = u.period;
-        if (u.teiler !== 1) n = Math.round(n / u.teiler * 100) / 100;
+        // BRi Fußnote 13: jeder Rechenschritt auf die 4. Nachkommastelle (bisher nur 2)
+        if (u.teiler !== 1) n = m5Runden(n / u.teiler);
         // je Kriterium auf einen gemeinsamen Zeitraum bringen (den bisher genutzten)
         if (!ziel[nr]) { ziel[nr] = { count: n, period: p }; return; }
         const proTag = { D: 1, W: 1 / 7, M: 1 / 30 };
@@ -524,7 +563,7 @@ function modul5AusErfassung() {
         // gröbsten der beteiligten Zeiträume beibehalten
         const rang = { D: 0, W: 1, M: 2 };
         const p2 = rang[p] > rang[ziel[nr].period] ? p : ziel[nr].period;
-        ziel[nr] = { count: Math.round(summeTag / proTag[p2] * 100) / 100, period: p2 };
+        ziel[nr] = { count: m5Runden(summeTag / proTag[p2]), period: p2 };
     };
 
     (erfassung.arztbesuche || []).forEach(z => {
@@ -592,8 +631,11 @@ function zeigeModul5Vorschau() {
     if (!el) return;
     const z = modul5AusErfassung();
     const nrs = Object.keys(z);
+    /* Zahlen deutsch schreiben. Ein Zeitraum wie „im Quartal" wird auf den Monat umgelegt –
+       daraus entsteht zwangsläufig ein Durchschnittswert (0,33 statt 0.33). Genau so rechnet
+       die BRi: „Bei allen Rechenschritten wird auf die 4. Stelle nach dem Komma gerundet." */
     el.innerText = nrs.length
-        ? 'Bereit zur Übernahme: ' + nrs.map(nr => nr + ' = ' + z[nr].count + '× '
+        ? 'Bereit zur Übernahme: ' + nrs.map(nr => nr + ' = ' + haeufigkeitDE(z[nr].count) + '× '
             + (z[nr].period === 'D' ? 'pro Tag' : z[nr].period === 'W' ? 'pro Woche' : 'pro Monat')).join(' · ')
         : 'Noch keine Angaben mit personeller Unterstützung erfasst.';
 

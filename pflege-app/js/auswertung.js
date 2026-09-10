@@ -131,14 +131,14 @@ function renderAuswertung() {
                 <tbody>${[1,2,3,4,5,6].map(m=>{
                     const dw=rE.weights[m-1]-rO.weights[m-1];
                     const dr=rE.raws[m-1]-rO.raws[m-1];
-                    const dwStr=(dw>=0?'+':'')+dw.toFixed(2);
+                    const dwStr=(dw>=0?'+':'')+zahlDE(dw);
                     const drStr=(dr>=0?'+':'')+dr;
                     const clr=dw>0?'var(--green)':dw<0?'var(--red)':'var(--text-muted)';
                     return `<tr>
                         <td>${m}. ${mNames[m-1]}</td>
-                        <td class="center mono">${rO.weights[m-1].toFixed(2)}</td>
+                        <td class="center mono">${zahlDE(rO.weights[m-1])}</td>
                         <td class="center mono">${rO.raws[m-1]}</td>
-                        <td class="center" style="color:var(--accent2);font-family:var(--font-mono);font-weight:700">${rE.weights[m-1].toFixed(2)}</td>
+                        <td class="center" style="color:var(--accent2);font-family:var(--font-mono);font-weight:700">${zahlDE(rE.weights[m-1])}</td>
                         <td class="center" style="color:var(--accent2);font-family:var(--font-mono)">${rE.raws[m-1]}</td>
                         <td class="center"><span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:${clr}">${dwStr} (${drStr})</span></td>
                     </tr>`;

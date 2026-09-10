@@ -229,7 +229,8 @@ function berechneBmi() {
     const gr = parseFloat((befundTexte['groesse'] || '').replace(',', '.'));
     const gw = parseFloat((befundTexte['gewicht'] || '').replace(',', '.'));
     // Der Wert wird immer berechnet, auch wenn der Reiter gerade nicht angezeigt wird.
-    if (gr > 50 && gw > 10) befundTexte['bmi'] = (gw / Math.pow(gr / 100, 2)).toFixed(1).replace('.', ',');
+    // Kaufmännisch gerundet: 80 kg bei 160 cm sind 31,25 – also 31,3, nicht 31,2 (Binärfehler)
+    if (gr > 50 && gw > 10) befundTexte['bmi'] = zahlDE(gw / Math.pow(gr / 100, 2), 1);
     else delete befundTexte['bmi'];
     const feld = document.getElementById('befund-text-bmi');
     if (feld) feld.value = befundTexte['bmi'] || '';
@@ -342,7 +343,10 @@ function befundZeile(gruppe, e) {
 }
 
 function befundExtraZeile(gruppenId, i, x) {
-    return `<div class="befund-zeile">
+    // Weitere Befunde aus dem Vorgutachten tragen dieselbe Marke wie die Katalogeinträge
+    const vg = (x && x._vg && typeof appModus !== 'undefined' && appModus === 'hoeherstufung')
+        ? '<div class="bz-titel"><span class="befund-vg" style="margin-left:0" title="Aus dem Vorgutachten übernommen – bitte auf den heutigen Stand bringen">Vorgutachten</span></div>' : '';
+    return `<div class="befund-zeile" data-befund-extra="${gruppenId}|${i}">${vg}
         <div class="bz-seiten">
             <input type="text" class="field-input" placeholder="Bezeichnung" value="${escapeHtml(x.titel || '')}"
                    oninput="befundExtraSetzen('${gruppenId}',${i},'titel',this.value)">
@@ -364,7 +368,14 @@ function befundZeileHinzu(gruppenId) {
 
 function befundExtraSetzen(gruppenId, i, feld, wert) {
     if (!befundExtra[gruppenId] || !befundExtra[gruppenId][i]) return;
-    befundExtra[gruppenId][i][feld] = wert;
+    const x = befundExtra[gruppenId][i];
+    x[feld] = wert;
+    // Bearbeitet heißt geprüft: die Marke „Vorgutachten" entfällt – nur die Marke, nicht das Feld
+    if (x._vg) {
+        delete x._vg;
+        const zeile = document.querySelector('[data-befund-extra="' + gruppenId + '|' + i + '"] .befund-vg');
+        if (zeile && zeile.parentElement) zeile.parentElement.remove();
+    }
 }
 
 function aktualisiereBefundHinweis() {
