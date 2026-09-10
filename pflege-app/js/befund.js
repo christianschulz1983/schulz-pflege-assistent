@@ -30,6 +30,8 @@ function setzeBefund(gruppenId, eintragId, seite, wert) {
     const eintrag = befundEintrag(eintragId);
     if (!eintrag) return;
     const idx = (wert === '') ? null : parseInt(wert, 10);
+    // Sobald der Berater den Eintrag anfasst, ist er nicht mehr „aus dem Vorgutachten".
+    if (typeof vorbefundAngefasst === 'function') vorbefundAngefasst(befundSchluessel(eintrag, seite));
     if (eintrag.nba) {
         const item = ITEMS.find(i => i.nr === eintrag.nba);
         if (item && idx !== null) {
@@ -66,6 +68,7 @@ function setzeBefundText(eintragId, seite, text) {
     const eintrag = befundEintrag(eintragId);
     if (!eintrag) return;
     const s = befundSchluessel(eintrag, seite);
+    if (typeof vorbefundAngefasst === 'function') vorbefundAngefasst(s);
     if (text && text.trim()) befundTexte[s] = text; else delete befundTexte[s];
     if (eintragId === 'groesse' || eintragId === 'gewicht') berechneBmi();
 }
@@ -252,7 +255,8 @@ function leiteErnaehrungszustandAb() {
 function renderBefund() {
     const ziel = document.getElementById('tab-befund');
     if (!ziel) return;
-    ziel.innerHTML = BEFUND_GRUPPEN.map(g => `
+    ziel.innerHTML = ((typeof vorbefundKarteHtml === 'function') ? vorbefundKarteHtml() : '')
+        + BEFUND_GRUPPEN.map(g => `
         <div class="card">
             <div class="card-header"><div class="dot"></div>${escapeHtml(g.titel)}</div>
             <div style="padding:16px 20px">
@@ -316,10 +320,13 @@ function befundZeile(gruppe, e) {
                ${e.zusatzAuswahl.skala.map((s, i) => `<option value="${i}" ${befundWerte[e.id + '_zw'] === i ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
              </select></div>` : '';
     const kennung = e.nba ? '<span class="befund-nba" title="Wird unmittelbar in die eigene Einschätzung übernommen">NBA</span>' : '';
+    // Übernommenes aus dem Vorgutachten bleibt sichtbar markiert, bis es angefasst wurde.
+    const vg = (seite) => (typeof vorbefundStammtVon === 'function' && vorbefundStammtVon(befundSchluessel(e, seite)))
+        ? '<span class="befund-vg" title="Aus dem Vorgutachten übernommen – bitte auf den heutigen Stand bringen">Vorgutachten</span>' : '';
 
     if (e.seiten) {
         return `<div class="befund-zeile">
-            <div class="bz-titel">${escapeHtml(e.titel)} ${kennung}</div>
+            <div class="bz-titel">${escapeHtml(e.titel)} ${kennung}${vg('rechts') || vg('links')}</div>
             <div class="bz-seiten">
                 <div><span class="bz-seite">rechts</span>${feldReihe('rechts')}</div>
                 <div><span class="bz-seite">links</span>${feldReihe('links')}</div>
@@ -328,7 +335,7 @@ function befundZeile(gruppe, e) {
         </div>`;
     }
     return `<div class="befund-zeile">
-        <div class="bz-titel">${escapeHtml(e.titel)} ${kennung}</div>
+        <div class="bz-titel">${escapeHtml(e.titel)} ${kennung}${vg(null)}</div>
         ${feldReihe(null)}
         ${zusatz}
     </div>`;
@@ -445,11 +452,14 @@ function psycheZusammenfassung() {
 
 // ------------------------------------------------------- Speichern und Laden
 function befundSichern() {
-    return { werte: befundWerte, texte: befundTexte, extra: befundExtra, psyche: psycheListe };
+    return { werte: befundWerte, texte: befundTexte, extra: befundExtra, psyche: psycheListe,
+             // Welche Einträge stammen noch unverändert aus dem Vorgutachten? Gehört zum Fall.
+             herkunft: (typeof vorbefundSichern === 'function') ? vorbefundSichern() : {} };
 }
 function befundLaden(d) {
     befundWerte = (d && d.werte) || {};
     befundTexte = (d && d.texte) || {};
     befundExtra = (d && d.extra) || {};
     psycheListe = (d && Array.isArray(d.psyche)) ? d.psyche : [];
+    if (typeof vorbefundLaden === 'function') vorbefundLaden(d && d.herkunft);
 }

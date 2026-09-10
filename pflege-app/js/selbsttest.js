@@ -3256,6 +3256,182 @@ async function selbsttest() {
             pruefe('Abbruch: erscheint nicht im Nachweis', leseSpeicherungen().length, vorherNachweis);
         }
 
+        // ---------- 19. Befund aus dem Vorgutachten (nur Höherstufungsantrag) ----------
+        if (typeof vorbefundPruefen === 'function') {
+            const merkeModusVb = appModus;
+            const merkeBefundVb = JSON.parse(JSON.stringify(befundSichern()));
+            const merkeErfVb = JSON.parse(JSON.stringify(erfassungSichern()));
+            const merkeBefundText = document.getElementById('stam-befund')
+                ? document.getElementById('stam-befund').value : '';
+
+            // 19a. Die Vorbelegung gehört ausschließlich zum Höherstufungsantrag
+            const feldB = document.getElementById('stam-befund');
+            if (feldB) feldB.value = 'Gehen: erfolgt selbständig. Schürzengriff links bis zum hinteren '
+                + 'Beckenkamm möglich. Körpergröße 172 cm, Gewicht 68 kg. Metformin oral zweimal täglich.';
+            ['widerspruch', 'erstantrag', 'anhoerung'].forEach(m => {
+                setzeModus(m);
+                pruefe('Vorbelegung nicht im ' + m, vorbefundMoeglich(), false);
+                pruefe('Keine Vorbelegungskarte im ' + m, vorbefundKarteHtml(), '');
+            });
+            setzeModus('hoeherstufung');
+            pruefeWahr('Vorbelegung im Höherstufungsantrag möglich', vorbefundMoeglich() === true);
+            pruefeWahr('Vorbelegungskarte im Höherstufungsantrag vorhanden',
+                vorbefundKarteHtml().indexOf('leseVorbefund()') > -1);
+
+            // Ohne eingelesenes Gutachten steht nichts zum Übernehmen bereit
+            if (feldB) feldB.value = '';
+            pruefe('Ohne Gutachtentext keine Vorbelegung', vorbefundMoeglich(), false);
+            pruefeWahr('Karte weist auf das fehlende Gutachten hin',
+                vorbefundKarteHtml().indexOf('disabled') > -1);
+            if (feldB) feldB.value = merkeBefundText || 'Gehen: erfolgt selbständig.';
+
+            // 19b. Was aus dem Gutachten kommt, steht ohne KI schon in der Maske:
+            // NBA-Einträge lesen unmittelbar aus der eingelesenen Bewertung.
+            const nbaEintrag = befundEintrag('k_4_1_1');
+            if (nbaEintrag) {
+                const itemNba = ITEMS.find(i => i.nr === '4.1.1');
+                const merkNba = stateEigene.values[itemNba.id];
+                stateEigene.values[itemNba.id] = 2;
+                pruefe('NBA-Eintrag zeigt den eingelesenen Wert ohne Übernahme', befundWert(nbaEintrag, null), 2);
+                if (typeof merkNba === 'number') stateEigene.values[itemNba.id] = merkNba;
+                else delete stateEigene.values[itemNba.id];
+            }
+
+            // 19c. Die Aufgabe an die KI wird aus dem Katalog erzeugt
+            const aufgabe = vorbefundAufgabe();
+            pruefeWahr('Aufgabe nennt beschreibende Befunde', /Gangbild/.test(aufgabe));
+            pruefeWahr('Aufgabe nennt keine NBA-Kriterien', !/4\.1\.1|4\.2\.1\b/.test(aufgabe));
+            pruefeWahr('Aufgabe nennt den berechneten BMI nicht', !/„BMI"/.test(aufgabe));
+            pruefeWahr('Anweisung verbietet Raten',
+                /Erfinde nichts/.test(vorbefundAnweisung()) && /LASS IHN WEG/.test(vorbefundAnweisung()));
+            pruefeWahr('Anweisung verlangt eine Fundstelle',
+                /Ohne Beleg keinen Vorschlag/.test(vorbefundAnweisung()));
+
+            // 19d. Prüfung der KI-Antwort: nur Belegtes und nur Bekanntes wird angenommen
+            const geprueft = vorbefundPruefen({
+                befunde: [
+                    { id: 'gangbild', stufe: 'Sicher', beleg: 'Gehen: erfolgt selbständig' },
+                    { id: 'schuerzengriff', seite: 'links', stufe: 'Bis zum hinteren Beckenkamm möglich',
+                      beleg: 'Schürzengriff links bis hinterer Beckenkamm' },
+                    { id: 'groesse', text: '172', beleg: 'Körpergröße 172 cm' },
+                    { id: 'gangbild', stufe: 'geht gar nicht', beleg: 'irgendwas' },       // Stufe gibt es nicht
+                    { id: 'bmi', text: '23', beleg: 'BMI 23' },                            // wird berechnet
+                    { id: 'gibtsnicht', stufe: 'x', beleg: 'y' },                          // unbekannt
+                    { id: 'stuerze', text: 'zwei Stürze', beleg: '' }                      // ohne Fundstelle
+                ],
+                medikation: [
+                    { bezeichnung: 'Metformin', applikation: 'oral', anzahl: '2', zeitraum: 'pro Tag',
+                      durchfuehrung: 'durch Pflegeperson', beleg: 'Metformin oral zweimal täglich' },
+                    { bezeichnung: 'Ramipril', applikation: 'unter die Zunge', anzahl: '1',
+                      zeitraum: 'pro Tag', beleg: 'Ramipril' },                            // Applikation unbekannt
+                    { bezeichnung: 'Ohne Fundstelle', applikation: 'oral' }                // ohne Beleg
+                ],
+                hilfsmittel: [
+                    { bezeichnung: 'Rollator', nutzung: 'genutzt', beleg: 'nutzt einen Rollator' }
+                ]
+            });
+            pruefe('Nur belegte und bekannte Befunde angenommen', geprueft.befunde.length, 3);
+            pruefe('Erste Stufe richtig zugeordnet', geprueft.befunde[0] ? geprueft.befunde[0].stufe : null, 'Sicher');
+            pruefe('Seite übernommen', geprueft.befunde[1] ? geprueft.befunde[1].seite : null, 'links');
+            pruefeWahr('Freitext übernommen',
+                !!geprueft.befunde[2] && geprueft.befunde[2].frei === true && geprueft.befunde[2].text === '172');
+            pruefe('Nicht Übernommenes wird benannt', geprueft.verworfen.length, 6);
+            pruefe('Nur brauchbare Tabellenzeilen', geprueft.erfassung.length, 3);
+            const med = geprueft.erfassung.filter(z => z._tabelle === 'medikation');
+            pruefeWahr('Unbekannte Auswahl wird verworfen, die Zeile bleibt',
+                med.length === 2 && med[1].applikation === undefined && med[1].bezeichnung === 'Ramipril');
+            pruefeWahr('Jede Tabellenzeile trägt ihre Fundstelle',
+                geprueft.erfassung.every(z => !!z._beleg));
+
+            // 19e. Übernahme: nichts ist vorausgewählt, Angehaktes landet in der Maske
+            befundLaden({}); erfassungLaden({});
+            vorbefundFunde = geprueft;
+            zeigeVorbefundVorschlaege();
+            const kaesten = document.querySelectorAll('#vorschlag-body input[type="checkbox"]');
+            pruefe('Auswahlliste zeigt alle Vorschläge', kaesten.length, 6);
+            pruefeWahr('Nichts ist vorausgewählt',
+                Array.prototype.every.call(kaesten, c => !c.checked));
+            pruefeWahr('Jeder Vorschlag zeigt seine Fundstelle',
+                document.querySelectorAll('#vorschlag-body .vs-fund').length === 6);
+            pruefeWahr('Warnung vor dem alten Stand steht in der Liste',
+                /damalige/.test(document.getElementById('vorschlag-body').innerHTML));
+            pruefeWahr('Übernahmeknopf gehört zur Vorbelegung',
+                (document.querySelector('#vorschlag-overlay .review-header .btn-primary')
+                    .getAttribute('onclick') || '').indexOf('uebernehmeVorbefund') > -1);
+
+            // Ohne Haken darf nichts geschrieben werden
+            pruefe('Ohne Auswahl wird nichts übernommen', uebernehmeVorbefund(), 0);
+            pruefe('Befund bleibt leer', Object.keys(befundWerte).length, 0);
+
+            // Mit Haken: zwei Befunde und eine Tabellenzeile
+            vorbefundFunde = geprueft;
+            zeigeVorbefundVorschlaege();
+            document.querySelectorAll('#vorschlag-body input[type="checkbox"]').forEach(c => {
+                const k = c.getAttribute('data-vb');
+                if (k === 'b0' || k === 'b2' || k === 'e0') c.checked = true;
+            });
+            const uebernommen = uebernehmeVorbefund();
+            pruefe('Angehaktes wird übernommen', uebernommen, 3);
+            pruefe('Stufe steht in der Maske', befundWerte['gangbild'],
+                geprueft.befunde[0] ? geprueft.befunde[0].idx : -1);
+            pruefe('Freitext steht in der Maske', befundTexte['groesse'], '172');
+            pruefeWahr('Tabellenzeile angelegt',
+                (erfassung.medikation || []).some(z => z.bezeichnung === 'Metformin'));
+            pruefeWahr('Tabelle behält eine leere Zeile zum Weiterschreiben',
+                (erfassung.medikation || []).length > 0
+                && Object.keys(erfassung.medikation[erfassung.medikation.length - 1]).length === 0);
+            pruefe('Nicht Angehaktes bleibt draußen', befundWerte['schuerzengriff|links'], undefined);
+
+            // 19f. Kennzeichnung „noch aus dem Vorgutachten"
+            pruefe('Übernommenes ist gekennzeichnet', vorbefundOffen().sort(), ['gangbild', 'groesse']);
+            pruefeWahr('Kennzeichnung erscheint in der Maske',
+                befundZeile({ id: 'gehen' }, befundEintrag('gangbild')).indexOf('befund-vg') > -1);
+            pruefeWahr('Hinweis nennt die offenen Einträge', /2 Eintrag/.test(vorbefundHinweisHtml()));
+            setzeBefund('gehen', 'gangbild', null, '1');
+            pruefe('Nach eigener Eingabe entfällt die Kennzeichnung', vorbefundOffen(), ['groesse']);
+            setzeBefundText('groesse', null, '175');
+            pruefe('Auch der Freitext verliert die Kennzeichnung', vorbefundOffen(), []);
+            pruefe('Ohne offene Einträge kein Hinweis', vorbefundHinweisHtml(), '');
+
+            // 19g. Die Kennzeichnung gehört zum gespeicherten Fall
+            befundWerte['gangbild'] = 0;
+            befundHerkunft['gangbild'] = 'vorgutachten';
+            const gesichertVb = JSON.parse(JSON.stringify(befundSichern()));
+            befundLaden({});
+            pruefe('Nach dem Leeren keine Kennzeichnung', vorbefundOffen(), []);
+            befundLaden(gesichertVb);
+            pruefe('Kennzeichnung übersteht Speichern und Laden', vorbefundOffen(), ['gangbild']);
+
+            // 19h. Die Auswahlliste fällt auf ihren Ursprungszweck zurück
+            vorschlagListe = [];
+            renderVorschlaege();
+            pruefeWahr('Auswahlliste wieder für Widerspruchspunkte',
+                (document.querySelector('#vorschlag-overlay .review-header .btn-primary')
+                    .getAttribute('onclick') || '').indexOf('uebernehmeVorschlaege') > -1);
+            closeVorschlaege();
+
+            // 19i. Die anderen Vorgangsarten bleiben unberührt
+            pruefeWahr('Befunderhebung kennt die Vorbelegung nur über eine Prüfung',
+                renderBefund.toString().indexOf("typeof vorbefundKarteHtml === 'function'") > -1);
+            // Im Erstantrag gibt es kein Vorgutachten – dort darf auch keine Kennzeichnung stehen
+            befundLaden({}); befundWerte['gangbild'] = 1; befundHerkunft['gangbild'] = 'vorgutachten';
+            setzeModus('hoeherstufung');
+            pruefeWahr('Kennzeichnung im Höherstufungsantrag sichtbar', vorbefundStammtVon('gangbild') === true);
+            setzeModus('erstantrag');
+            pruefe('Keine Kennzeichnung im Erstantrag', vorbefundStammtVon('gangbild'), false);
+            renderBefund();
+            pruefe('Erstantrag zeigt keine Vorgutachten-Markierung',
+                (document.getElementById('tab-befund').innerHTML.match(/befund-vg/g) || []).length, 0);
+            pruefeWahr('Befunderhebung steht im Erstantrag unverändert zur Verfügung',
+                document.getElementById('tab-befund').innerHTML.indexOf('Beweglichkeit obere Extremitäten') > -1);
+            setzeModus('hoeherstufung');
+            pruefe('Beim Zurückwechseln ist die Kennzeichnung wieder da', vorbefundOffen(), ['gangbild']);
+
+            befundLaden(merkeBefundVb); erfassungLaden(merkeErfVb); setzeModus(merkeModusVb);
+            if (feldB) feldB.value = merkeBefundText;
+            vorbefundFunde = null;
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

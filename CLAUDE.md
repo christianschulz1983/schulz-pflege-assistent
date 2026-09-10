@@ -262,6 +262,32 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Widerspruch in einen Höherstufungsantrag und blieb dort stehen. Bei gewechselter
    Vorgangsart werden die Kriterienblöcke verworfen und neu aufgebaut; von Hand
    überarbeitete „Allgemeine Angaben" bleiben erhalten.
+21. **Befund aus dem Vorgutachten vorbelegen – nur im Höherstufungsantrag**
+   (`js/vorbefund.js`). Der Knopf steht als erste Karte in der Befunderhebung und
+   erscheint ausschließlich bei `appModus === 'hoeherstufung'`; Widerspruch, Erstantrag
+   und Anhörung sehen ihn nicht. Was dabei gilt:
+   - **Die NBA-Einträge braucht die Vorbelegung gar nicht.** Einträge mit `nba:` lesen über
+     `befundWert()` unmittelbar aus `stateEigene` und stehen nach dem Einlesen des
+     Gutachtens bereits in der Maske – exakt und ohne KI. Vorbelegt werden nur die
+     **beschreibenden** Katalogeinträge (Gangbild, Griffe, Größe, Gewicht …) und die
+     Erfassungstabellen. Berechnetes (BMI) bleibt außen vor.
+   - **Die Aufgabe an die KI wird aus dem Katalog erzeugt** (`vorbefundAufgabe()`), nicht von
+     Hand geschrieben. Ein neuer Eintrag oder eine geänderte Skala wandert automatisch mit.
+   - **Ohne Fundstelle kein Vorschlag.** `vorbefundPruefen()` verwirft jeden Vorschlag ohne
+     wörtlichen Beleg, jede Stufe, die es im Katalog nicht gibt, und jeden Auswahlwert, den
+     die Spalte nicht kennt. Was verworfen wurde, wird dem Berater benannt – lieber eine
+     Lücke als eine geratene Angabe.
+   - **Nichts ist vorausgewählt** (Regel 11 gilt unverändert). Übernommen wird nur, was der
+     Berater anhakt.
+   - **Übernommenes ist der ALTE Stand.** Der Höherstufungsantrag behauptet eine
+     Verschlechterung; bliebe die Vorbelegung ungeprüft stehen, widerspräche das
+     Schriftstück seinem eigenen Argument. Deshalb trägt jeder übernommene Eintrag die
+     Marke „Vorgutachten" (`befundHerkunft`, `.befund-vg`), bis `setzeBefund` oder
+     `setzeBefundText` ihn anfasst. Die Marke wird mit dem Fall gespeichert
+     (`befundSichern`) und nur im Höherstufungsantrag angezeigt.
+   - Die Auswahlliste (`#vorschlag-overlay`) wird von mehreren Stellen genutzt. Jede setzt
+     beim Öffnen ihren Zweck über `vorschlagOverlayZweck()` – sonst bleibt der
+     Übernahmeknopf einer fremden Liste stehen.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -312,7 +338,9 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 841 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
+Befunderhebung aus dem Befundtext des Vorgutachtens vorbelegen (Regel 21).
+Der Selbsttest umfasst 893 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

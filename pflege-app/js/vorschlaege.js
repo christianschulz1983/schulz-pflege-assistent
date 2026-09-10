@@ -134,7 +134,18 @@ Zwingende Regeln:
     }
 }
 
+/* Die Auswahlliste wird von mehreren Stellen benutzt (Widerspruchspunkte, Befundvorschläge,
+   Übernahme aus dem Vorgutachten). Jede setzt beim Öffnen ihren eigenen Zweck – so kann keine
+   Liste mit dem Übernahmeknopf einer anderen stehen bleiben. */
+function vorschlagOverlayZweck(titel, aufruf) {
+    const kopf = document.querySelector('#vorschlag-overlay .rh-title');
+    if (kopf) kopf.innerText = titel;
+    const knopf = document.querySelector('#vorschlag-overlay .review-header .btn-primary');
+    if (knopf) knopf.setAttribute('onclick', aufruf);
+}
+
 function renderVorschlaege() {
+    vorschlagOverlayZweck('Vorgeschlagene Widerspruchspunkte', 'uebernehmeVorschlaege()');
     const box = document.getElementById('vorschlag-body');
     if (!vorschlagListe.length) {
         box.innerHTML = '<div class="vs-leer">Aus den Notizen, dem Befund und der Anamnese lässt sich derzeit keine weitere Höherbewertung belastbar begründen. '
