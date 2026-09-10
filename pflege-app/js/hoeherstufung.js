@@ -190,22 +190,29 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
             const txt = (bg[d.nr] || '').trim();
             // Nummern auf die Zählung des Gutachtens umstellen (bei Medicproof 5.x.y).
             const txtAnz = nummernImText(txt, org);
+            /* ANTRAG IST KEIN WIDERSPRUCH.
+               Hier wird nichts gegenübergestellt: Der Erstantrag hat gar kein Gutachten,
+               gegen das sich etwas ableiten ließe, und der Höherstufungsantrag beschreibt
+               eine Verschlechterung – er beanstandet keine fremde Wertung. Die eigene
+               Einschätzung steht deshalb in der Überschrift, darunter folgt ihre
+               Begründung. Die Gegenüberstellung mit dem Vorgutachten steht dort, wo sie
+               hingehört: in der Tabelle. */
             let body = txtAnz
                 ? txtAnz.split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
-                : `<div>Laut gutachterlichen Richtlinien SGB XI ist eine Wertung mit „${esc(d.e)}“ ableitbar.</div>`;
+                : `<div>Die Einstufung ergibt sich aus dem erhobenen Befund und den Angaben zur Versorgung.</div>`;
             if (txt) {
                 // Geprüft wird der Originaltext – die BRi kennt nur ihre eigene Nummerierung.
                 const offen = unbelegteZitate(d.nr, txt);
                 if (offen.length) body += `<div class="zitat-warnung" data-warn="1">⚠ Bitte prüfen: nicht wörtlich im BRi-Text zu ${esc(zeigeNr(d.nr, org))} belegt: `
                     + offen.map(z => `„${esc(z)}“`).join(' · ') + `</div>`;
             }
-            // Modul 5 wird je Gruppe gewertet – siehe m5WirkungSatz().
-            const m5 = (d.m === 5 && typeof m5WirkungSatz === 'function')
-                ? m5WirkungSatz(d.nr, 'orig', 'own') : '';
+            // Modul 5 wird je Gruppe gewertet. Im Antrag ohne Gegenüberstellung – der
+            // Satz nennt nur den erreichten Stand (siehe m5StandSatz).
+            const m5 = (d.m === 5 && typeof m5StandSatz === 'function')
+                ? m5StandSatz(d.nr, 'own') : '';
             if (m5) body += `<div class="m5-wirkung">${esc(nummernImText(m5, org))}</div>`;
             return `<div class="crit" data-nr="${esc(d.nr)}" data-vals="${esc(d.o)}|${esc(d.e)}">`
-                 + `<div class="ct">${esc(zeigeNr(d.nr, org))}: ${esc(d.title)}</div>`
-                 + (istHoeher ? `<div>Bewertung im Vorgutachten: „${esc(d.o)}“</div>` : '')
+                 + `<div class="ct">${esc(zeigeNr(d.nr, org))} ${esc(d.title)}: „${esc(d.e)}“</div>`
                  + `${body}</div>`;
         }).join('')
         : `<p>Es wurden keine abweichenden Einzelkriterien erfasst.</p>`;
@@ -253,7 +260,7 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText) {
           + `der zu einer pflegerischen Versorgungsnotwendigkeit führt und somit eine Bewertung der Module erforderlich macht. `
           + `Im Folgenden werden die wesentlichen Bewertungen anhand der gutachterlichen Richtlinien SGB XI tabellarisch dargestellt:</p>`;
 
-    return `${erfassungExtra.deckblatt ? buildDeckblatt() : ''}<div class="stmt">
+    return `${erfassungExtra.deckblatt ? buildDeckblatt() : ''}<div class="stmt" data-vorgang="${istHoeher ? 'hoeherstufung' : 'erstantrag'}">
     <div class="stmt-head">
       <img class="stmt-logo" src="${FAMILIARA_LOGO}" alt="Familiara">
       <div class="stmt-address">Familiara GmbH<br>Wiesbadener Straße 3<br>12161 Berlin<br><br>Telefon 030 577 015 900<br>Fax 030 577 015 901<br><br>Geschäftsführer: Dr. med. Jörg A. Zimmermann<br><br>HRB 184522 B<br>Amtsgericht Berlin-Charlottenburg<br>Umsatzsteuer-ID: DE311459777<br><br>www.familiara.de<br>kontakt@familiara.de</div>

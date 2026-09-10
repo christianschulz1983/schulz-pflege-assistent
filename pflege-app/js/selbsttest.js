@@ -867,6 +867,123 @@ async function selbsttest() {
                 && druckHtml.indexOf("seitenAufteilen(document") < druckHtml.indexOf('window.print()'));
         }
 
+        // ---------- 9s. Antrag ohne Gegenüberstellung ----------
+        // Gemeldet: Im Erstantrag und im Höherstufungsantrag standen die Kriterien wie in
+        // einem Widerspruch – „Gutachterliche Bewertung: X" und „somit ist Y ableitbar".
+        // Ein Erstantrag hat gar kein Gutachten, gegen das sich etwas ableiten ließe.
+        if (typeof buildHoeherstufung === 'function') {
+            const mM = appModus, mO = JSON.parse(JSON.stringify(stateOrig)),
+                  mE = JSON.parse(JSON.stringify(stateEigene));
+            try {
+                const kid = nr => ITEMS.find(i => i.nr === nr).id;
+                stateOrig.extracted = null;
+                ITEMS.forEach(i => {
+                    const l = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0;
+                    stateOrig.values[i.id] = JSON.parse(JSON.stringify(l));
+                    stateEigene.values[i.id] = JSON.parse(JSON.stringify(l));
+                });
+                stateEigene.values[kid('4.1.1')] = 1;
+                stateEigene.values[kid('4.5.1')] = { count: 3, period: 'D' };
+
+                ['erstantrag', 'hoeherstufung'].forEach(m => {
+                    appModus = m;
+                    const el = document.createElement('div');
+                    el.innerHTML = buildHoeherstufung('', {}, '');
+                    const t = el.innerText.replace(/\s+/g, ' ');
+                    pruefeWahr(m + ': keine gutachterliche Bewertung im Kriterienblock',
+                        !t.includes('Gutachterliche Bewertung') && !t.includes('Bewertung im Vorgutachten'));
+                    pruefeWahr(m + ': kein Ableitungssatz gegen eine fremde Wertung',
+                        !/ist (somit )?eine Wertung mit .* ableitbar/.test(t));
+                    pruefeWahr(m + ': eigene Einschätzung steht in der Überschrift',
+                        t.includes('4.1.1 Positionswechsel im Bett: „überwiegend selbständig“'));
+                    pruefeWahr(m + ': Modul 5 ohne Gegenüberstellung',
+                        t.includes('Modul 5 kommt damit auf') && !t.includes('statt'));
+                    // Die Tabelle behält die Gegenüberstellung – dort gehört sie hin.
+                    if (m === 'hoeherstufung') {
+                        const kopf = Array.from(el.querySelectorAll('table.cmp thead th')).map(x => x.innerText.trim());
+                        pruefeWahr('hoeherstufung: Tabelle stellt weiter gegenüber',
+                            kopf.some(k => /Vorgutachten/i.test(k)));
+                    }
+                });
+
+                // Der Widerspruch bleibt unverändert – dort IST die Gegenüberstellung richtig.
+                appModus = 'widerspruch';
+                const w = document.createElement('div');
+                w.innerHTML = buildStellungnahme('', {}, '');
+                pruefeWahr('Widerspruch behält die Gegenüberstellung',
+                    w.innerText.includes('Gutachterliche Bewertung'));
+
+                // Der Stand-Satz für Modul 5 rechnet, ohne zu vergleichen
+                const st = m5StandSatz('4.5.1', 'own');
+                pruefeWahr('Modul-5-Satz nennt die Gruppe', st.includes('4.5.1–4.5.7'));
+                pruefeWahr('Modul-5-Satz nennt die gewichteten Punkte', st.includes('5,00 gewichtete Punkte'));
+                pruefeWahr('Modul-5-Satz vergleicht nicht', !/statt|bisher|Vorgutachten/.test(st));
+                pruefe('Kein Stand-Satz außerhalb von Modul 5', m5StandSatz('4.1.1', 'own'), '');
+            } finally { appModus = mM; stateOrig.values = mO.values; stateEigene.values = mE.values; }
+
+            // Die KI-Anweisung darf im Antrag nicht als Widerlegung formuliert sein
+            const bp = buildBegruendungPrompt.toString();
+            pruefeWahr('Anweisung unterscheidet Antrag und Widerspruch',
+                bp.includes('KEINE GEGENÜBERSTELLUNG') && bp.includes('Erwähne kein Gutachten'));
+            pruefeWahr('Anweisung nennt im Antrag nur die eigene Stufe',
+                bp.includes('Stufenbezeichnung: verwende ausschließlich'));
+        }
+
+        // ---------- 9t. Nicht über die Vorgangsart hinweg zusammenführen ----------
+        // Ursache des gemeldeten Bildes: Ein früher erzeugter Widerspruch blieb beim
+        // erneuten Erstellen als Höherstufungsantrag im Wortlaut stehen – das
+        // Zusammenführen behält unveränderte Kriterienblöcke.
+        if (typeof mergeStellungnahme === 'function') {
+            const alt = '<div class="stmt" data-vorgang="widerspruch"><div id="stmt-crit">'
+                      + '<div class="crit" data-nr="4.1.1" data-vals="selbständig|überwiegend selbständig">'
+                      + '<div class="ct">4.1.1: Positionswechsel im Bett</div>'
+                      + '<div>Gutachterliche Bewertung: „selbständig“</div></div></div></div>';
+            const neuAntrag = '<div class="stmt" data-vorgang="hoeherstufung"><div id="stmt-crit">'
+                      + '<div class="crit" data-nr="4.1.1" data-vals="selbständig|überwiegend selbständig">'
+                      + '<div class="ct">4.1.1 Positionswechsel im Bett: „überwiegend selbständig“</div></div></div></div>';
+            const zusammen = mergeStellungnahme(alt, neuAntrag);
+            pruefeWahr('Wechsel der Vorgangsart baut neu auf',
+                !zusammen.includes('Gutachterliche Bewertung'));
+            pruefeWahr('Wechsel der Vorgangsart übernimmt die neue Form',
+                zusammen.includes('Positionswechsel im Bett: „überwiegend selbständig“'));
+
+            // Verworfen werden nur die Kriterienblöcke – von Hand überarbeitete
+            // „Allgemeine Angaben" tragen die falsche Form nicht und bleiben erhalten.
+            const altMitText = '<div class="stmt" data-vorgang="widerspruch">'
+                + '<div id="stmt-notes" data-sig="x" data-ai="1">HANDGESCHRIEBENER ABSATZ</div>'
+                + '<div id="stmt-crit"><div class="crit" data-nr="4.1.1" data-vals="a|b">'
+                + '<div>Gutachterliche Bewertung: „selbständig“</div></div></div></div>';
+            const neuMitText = '<div class="stmt" data-vorgang="hoeherstufung">'
+                + '<div id="stmt-notes" data-sig="x" data-ai="0">Standardtext</div>'
+                + '<div id="stmt-crit"><div class="crit" data-nr="4.1.1" data-vals="a|b">'
+                + '<div>Neue Form</div></div></div></div>';
+            const gemischt = mergeStellungnahme(altMitText, neuMitText);
+            pruefeWahr('Handgeschriebene Angaben überleben den Wechsel',
+                gemischt.includes('HANDGESCHRIEBENER ABSATZ'));
+            pruefeWahr('Alte Kriterienform überlebt den Wechsel nicht',
+                !gemischt.includes('Gutachterliche Bewertung'));
+
+            // Innerhalb derselben Vorgangsart bleibt der überarbeitete Text erhalten
+            const altW = '<div class="stmt" data-vorgang="widerspruch"><div id="stmt-crit">'
+                      + '<div class="crit" data-nr="4.1.1" data-vals="selbständig|überwiegend selbständig">'
+                      + '<div class="ct">4.1.1: Positionswechsel im Bett</div>'
+                      + '<div>VON HAND ERGAENZT</div></div></div></div>';
+            const neuW = '<div class="stmt" data-vorgang="widerspruch"><div id="stmt-crit">'
+                      + '<div class="crit" data-nr="4.1.1" data-vals="selbständig|überwiegend selbständig">'
+                      + '<div class="ct">4.1.1: Positionswechsel im Bett</div>'
+                      + '<div>Neuer Standardsatz</div></div></div></div>';
+            pruefeWahr('Gleiche Vorgangsart: Handarbeit bleibt erhalten',
+                mergeStellungnahme(altW, neuW).includes('VON HAND ERGAENZT'));
+
+            // Jede Vorlage schreibt ihre Vorgangsart mit
+            pruefeWahr('Widerspruch kennzeichnet sich',
+                buildStellungnahme.toString().includes('data-vorgang="widerspruch"'));
+            pruefeWahr('Anhörung kennzeichnet sich',
+                buildAnhoerung.toString().includes('data-vorgang="anhoerung"'));
+            pruefeWahr('Antrag kennzeichnet sich',
+                buildHoeherstufung.toString().includes("data-vorgang=\"${istHoeher ? 'hoeherstufung' : 'erstantrag'}\""));
+        }
+
         // ---------- 9q. Hilfsmittel und Behandlungspflege ohne Doppelerfassung ----------
         // Gemeldet: Die Eingabemasken erfassen fast dasselbe. Nachgerechnet wurde dabei
         // eine Doppelzählung: Die Kompressionsversorgung stand in beiden Tabellen, die
@@ -1249,11 +1366,21 @@ async function selbsttest() {
                     if (m === 'widerspruch') return rein(baueDokument('N', {}, ''));
                     return rein(buildHoeherstufung('N', {}, ''));
                 };
-                ['widerspruch', 'hoeherstufung', 'erstantrag', 'anhoerung'].forEach(m => {
+                // Die Gruppenwertung wird in ALLEN vier Vorgangsarten erklärt – aber
+                // unterschiedlich: Widerspruch und Anhörung stellen gegenüber („bleiben
+                // bei 10,00"), der Antrag nennt nur den erreichten Stand.
+                ['widerspruch', 'anhoerung'].forEach(m => {
                     const t = bauen(m);
                     pruefeWahr(m + ': Modul-5-Wirkung steht im Schriftstück',
                         t.includes('nicht einzeln, sondern als Gruppe gewertet')
                         && t.includes('bleiben bei 10,00'));
+                });
+                ['hoeherstufung', 'erstantrag'].forEach(m => {
+                    const t = bauen(m);
+                    pruefeWahr(m + ': Modul 5 wird erklärt, ohne zu vergleichen',
+                        t.includes('nicht einzeln, sondern als Gruppe gewertet')
+                        && t.includes('Modul 5 kommt damit auf')
+                        && !t.includes('bleiben bei 10,00'));
                 });
 
                 // Kippt die Spanne, muss der Satz die Änderung nennen – nicht das Gegenteil.

@@ -256,6 +256,29 @@ function m5WirkungSatz(nr, von, nach) {
     return s;
 }
 
+/* Dieselbe Erklärung für den ANTRAG – ohne Gegenüberstellung.
+   Im Erstantrag gibt es kein Vorgutachten, gegen das sich etwas abheben ließe, und der
+   Höherstufungsantrag beanstandet keine fremde Wertung. Der Satz nennt deshalb nur den
+   Stand: Gruppe, Einzelpunkte des Moduls und die daraus folgenden gewichteten Punkte.
+   Gerechnet, nicht von der KI verfasst. */
+function m5StandSatz(nr, spalte) {
+    const item = ITEMS.find(i => i.nr === nr);
+    if (!item || item.m !== 5) return '';
+    const st = zustandZu(spalte || 'own');
+    const g = m5Gruppen(st);
+    const f2 = n => Number(n).toFixed(2).replace('.', ',');
+    const einzel = g.gesamt;
+    let s = '';
+    if (item.group !== 'D') {
+        s += 'Die Kriterien ' + M5_BEREICHE[item.group] + ' werden nach den Begutachtungs-Richtlinien '
+           + 'nicht einzeln, sondern als Gruppe gewertet; die Gruppe erreicht '
+           + g[item.group].pkt + (g[item.group].pkt === 1 ? ' Einzelpunkt' : ' Einzelpunkte') + '. ';
+    }
+    s += 'Modul 5 kommt damit auf ' + einzel + (einzel === 1 ? ' Einzelpunkt' : ' Einzelpunkte')
+       + ' und ' + f2(m5Gewichtet(einzel)) + ' gewichtete Punkte.';
+    return s;
+}
+
 // Alle Abweichungen Vorgutachten <-> eigene Einschätzung ermitteln
 function computeDiffs() {
     const diffs = [];
@@ -355,12 +378,28 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
         p += '\nHINWEIS: Es liegen keine eigenen Notizen aus dem Erstgespräch vor. Begründe daher\n'
            + 'ausschließlich aus dem Befundtext des Gutachters und den BRi-Texten.\n\n';
     }
-    p += 'ABWEICHENDE KRITERIEN (hierzu je eine Begründung schreiben):\n\n';
+    /* Im ANTRAG wird nichts widerlegt. Der Erstantrag hat gar kein Gutachten, und der
+       Höherstufungsantrag beschreibt eine Verschlechterung. Wird der KI hier „Bewertung
+       des Gutachters" vorgelegt, schreibt sie eine Gegenüberstellung – genau das gehört
+       nicht in einen Antrag. */
+    const istAntrag = (typeof appModus !== 'undefined')
+        && (appModus === 'erstantrag' || appModus === 'hoeherstufung');
+    p += istAntrag
+        ? 'ZU BEGRÜNDENDE KRITERIEN (hierzu je eine Begründung schreiben):\n\n'
+        : 'ABWEICHENDE KRITERIEN (hierzu je eine Begründung schreiben):\n\n';
     diffs.forEach(d => {
         const b = briFor(d.nr);
         p += `--- Kriterium ${d.nr}: ${d.title} (Modul ${d.m}) ---\n`;
-        p += `Bewertung des Gutachters: „${d.o}"\nMeine Bewertung: „${d.e}"\n`;
-        p += `Stufenbezeichnungen: verwende ausschließlich „${d.o}" und „${d.e}" – keine anderen Wörter für diese Stufen.\n`;
+        if (istAntrag) {
+            p += `Meine Bewertung: „${d.e}"\n`;
+            p += `Stufenbezeichnung: verwende ausschließlich „${d.e}" – kein anderes Wort für diese Stufe.\n`;
+            p += 'KEINE GEGENÜBERSTELLUNG: Erwähne kein Gutachten und keine andere Wertung, gegen die\n'
+               + 'sich diese abhebt. Begründe die Bewertung aus dem Befund, den Notizen und den\n'
+               + 'Richtlinien. Kein Satz der Form „statt … ist … ableitbar".\n';
+        } else {
+            p += `Bewertung des Gutachters: „${d.o}"\nMeine Bewertung: „${d.e}"\n`;
+            p += `Stufenbezeichnungen: verwende ausschließlich „${d.o}" und „${d.e}" – keine anderen Wörter für diese Stufen.\n`;
+        }
         if (d.m === 5) {
             // Ohne diesen Hinweis behauptet die KI regelmäßig einen Punktgewinn, den es
             // wegen der Gruppenwertung gar nicht gibt.
