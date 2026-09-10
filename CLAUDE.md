@@ -90,6 +90,14 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Schlusssatz enthalten. Die Grenzen werden nach der Erzeugung gemessen; bei Überschreitung
    läuft **ein** gezielter Kürzungsdurchgang, danach wird der Berater gewarnt. Niemals
    mechanisch abschneiden – das zerstört Zitate und den Ableitungssatz.
+8c. **Anamnese im Antrag: zwei Unterabschnitte.** „Anamnese" bleibt die große Überschrift.
+   Darunter **„Angaben laut Vorgutachten"** – eine von der KI erzeugte Kurzfassung des
+   Anamnesetextes, höchstens eine **Viertelseite** (`anamneseAufgabe()`, Grenzen in
+   `LAENGE.anamnese*`), ohne Bewertung, Stufen, Punkte oder Aussagen zur Verschlechterung.
+   Danach **„Aktuelle Situation"** aus Notizen und Unterschieden, höchstens eine
+   **Drittelseite** (`allgemeinWortGrenze()` – Widerspruch und Anhörung behalten die halbe
+   Seite). Ohne Vorgutachten entfällt der erste Abschnitt ganz. Die Kurzfassung entsteht im
+   **selben** KI-Aufruf wie die Begründungen – ein zweiter Abruf würde das Limit reißen.
 8a. **Zweck der Einleitung** (`allgemeinAufgabe()` in `js/vorschlaege.js`): Sie begründet
    NICHTS. Kein Richtlinienbezug, kein Zitat, keine Stufenbezeichnung, kein Ableitungssatz,
    kein Abzählen von Kriterien – das gehört ausschließlich in „Befund und Stellungnahme".
@@ -304,7 +312,7 @@ Anlagen (Arztberichte, Verordnungen) lassen sich hochladen, einem strittigen Kri
 zuordnen und erscheinen als Verweis bei der Begruendung sowie als Verzeichnis am Ende.
 Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berater legt
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
-beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 817 Pruefungen.
+beide eingelesen, als Text-PDF wie als Scan. Der Selbsttest umfasst 841 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

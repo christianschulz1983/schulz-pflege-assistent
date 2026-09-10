@@ -27,6 +27,9 @@ const STELLUNGNAHME_CSS = `
 .stmt table.cmp td.num{text-align:center;width:130px;}
 .stmt.deckblatt{page-break-after:always;margin-bottom:44px;padding-bottom:26px;border-bottom:2px dashed #bbb;}
 @media print{.stmt.deckblatt{border-bottom:none;margin-bottom:0;padding-bottom:0;}}
+/* Untergeordnete Überschrift, etwa „Angaben laut Vorgutachten" und „Aktuelle Situation"
+   unterhalb von „Anamnese". Kleiner als h2 und ohne dessen Abstand nach oben. */
+.stmt h3{font-size:11.5pt;font-weight:bold;color:#0B5394;margin:13px 0 4px;}
 .stmt .crit{margin:11px 0;}
 .stmt .crit .ct{font-weight:bold;}
 /* Arbeitshinweis zu nicht belegten Zitaten – nur am Bildschirm, nicht im Ausdruck */

@@ -532,12 +532,17 @@ Weiter zu beachten:
         type: "OBJECT",
         properties: {
             allgemein: { type: "STRING" },
+            anamnese: { type: "STRING" },
             begruendungen: { type: "ARRAY", items: { type: "OBJECT",
                 properties: { nr: { type: "STRING" }, text: { type: "STRING" } }, required: ["nr", "text"] } }
         },
         required: ["begruendungen"]
     };
     let prompt = buildBegruendungPrompt(diffs, mitAllgemein);
+    // Zusammenfassung der Anamnese aus dem Vorgutachten – im selben Aufruf, damit kein
+    // zweiter Abruf nötig wird (der Schlüssel des Verfassers läuft schnell ins Limit).
+    const anamneseRoh = (document.getElementById('stam-anamnese')?.value || '').trim();
+    if (anamneseRoh) prompt += anamneseAufgabe(anamneseRoh) + '\n\n';
     if (hoeher && verschlechterung) prompt = 'VERSCHLECHTERUNG SEIT DER BEGUTACHTUNG: ' + verschlechterung + '\n\n' + prompt;
     if (typeof befundZusammenfassung === 'function') {
         const bf = befundZusammenfassung();
@@ -554,24 +559,50 @@ Weiter zu beachten:
     const data = JSON.parse(txt.trim());
     const map = {};
     (data.begruendungen || []).forEach(b => { if (b && b.nr && b.text) map[b.nr] = b.text.trim(); });
-    return await haltenLaengenGrenzen(map, (data.allgemein || '').trim());
+    return await haltenLaengenGrenzen(map, (data.allgemein || '').trim(), (data.anamnese || '').trim());
 }
+
+/* Aufgabe: die Anamnese des Vorgutachtens auf eine Viertelseite eindampfen.
+   Sie steht im Antrag unter „Angaben laut Vorgutachten" – als knappe Wiedergabe dessen,
+   was der Gutachter damals festgehalten hat, NICHT als Bewertung und nicht als Kritik. */
+function anamneseAufgabe(roh) {
+    const cut = (t, n) => (t && t.length > n) ? t.slice(0, n) + ' …' : (t || '');
+    const zeilen = [
+        'ZUSÄTZLICHE AUFGABE – Feld „anamnese":',
+        laengenVorgabeAnamnese(),
+        'Fasse den folgenden Anamnesetext aus dem Vorgutachten SEHR KURZ zusammen. Ein einziger',
+        'Absatz, sachlicher Fließtext in der dritten Person, keine Aufzählungszeichen.',
+        'Nimm nur auf, was für den Pflegebedarf trägt: Wohn- und Versorgungssituation, wer',
+        'unterstützt, die tragenden Erkrankungen und Einschränkungen.',
+        'STRENG VERBOTEN: jede Bewertung, jede Stufenbezeichnung, jede Punktzahl, jede Kritik am',
+        'Gutachter und jede Aussage über eine Verschlechterung – das gehört in „Aktuelle Situation".',
+        'Gib NUR wieder, was im Text steht. Erfinde nichts.',
+        '',
+        '=== ANAMNESE AUS DEM VORGUTACHTEN ===',
+        cut(roh, 6000),
+        '====================================='
+    ];
+    return zeilen.join('\n');
+}
+
 
 // Hält die Längenvorgaben ein: Überschreitet die KI sie, wird einmal gezielt nachgekürzt.
 // Bleibt danach etwas zu lang, wird das dem Berater gemeldet statt stillschweigend hingenommen.
-async function haltenLaengenGrenzen(map, allgemein) {
-    const titel = (typeof appModus !== 'undefined' && appModus !== 'widerspruch')
-        ? 'Anamnese' : 'Allgemeine Angaben';
-    const vorher = laengenVerstoesse(map, allgemein);
-    if (!vorher.length) return { map: map, allgemein: allgemein };
+async function haltenLaengenGrenzen(map, allgemein, anamnese) {
+    const titel = (typeof istAntragsModus === 'function' && istAntragsModus())
+        ? 'Aktuelle Situation'
+        : ((typeof appModus !== 'undefined' && appModus !== 'widerspruch') ? 'Anamnese' : 'Allgemeine Angaben');
+    const vorher = laengenVerstoesse(map, allgemein, anamnese);
+    if (!vorher.length) return { map: map, allgemein: allgemein, anamnese: anamnese };
     showOverlay('Stellungnahme wird erstellt...', vorher.length + ' Abschnitt(e) werden gekürzt');
     let e;
-    try { e = await kuerzeUeberlaenge(map, allgemein, titel); } finally { hideOverlay(); }
+    try { e = await kuerzeUeberlaenge(map, allgemein, titel, anamnese); } finally { hideOverlay(); }
     if (e.offen.length) {
-        const namen = e.offen.map(v => v.art === 'allgemein' ? titel : v.nr).join(', ');
+        const namen = e.offen.map(v => v.art === 'allgemein' ? titel
+            : v.art === 'anamnese' ? 'Angaben laut Vorgutachten' : v.nr).join(', ');
         showToast('Zu lang geblieben: ' + namen + '. Bitte im Text noch kürzen.', 'error');
     }
-    return { map: e.map, allgemein: e.allgemein };
+    return { map: e.map, allgemein: e.allgemein, anamnese: e.anamnese };
 }
 
 /* Begründungen für das Anhörungsverfahren. Anders als im Widerspruch wird nicht das
@@ -752,8 +783,9 @@ ZWINGEND:
     const data = JSON.parse(txt.trim());
     const map = {};
     (data.begruendungen || []).forEach(b => { if (b && b.nr && b.text) map[b.nr] = b.text.trim(); });
-    return await haltenLaengenGrenzen(map, (data.allgemein || '').trim());
+    return await haltenLaengenGrenzen(map, (data.allgemein || '').trim(), (data.anamnese || '').trim());
 }
+
 
 // Erzeugt Begründungen je Abweichung und – auf Wunsch – den Abschnitt „Allgemeine Angaben"
 // im Stil des Nutzers. Ein einziger KI-Aufruf für alles.
@@ -881,7 +913,8 @@ Beachte zwingend:
     const data = JSON.parse(txt.trim());
     const map = {};
     (data.begruendungen || []).forEach(b => { if (b && b.nr && b.text) map[b.nr] = b.text.trim(); });
-    return await haltenLaengenGrenzen(map, (data.allgemein || '').trim());
+    return await haltenLaengenGrenzen(map, (data.allgemein || '').trim(), (data.anamnese || '').trim());
 }
+
 
 // Baut die Stellungnahme im Familiara-Format aus den App-Daten (Gutachten/Bescheide).
