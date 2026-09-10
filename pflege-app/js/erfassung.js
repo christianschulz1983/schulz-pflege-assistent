@@ -61,7 +61,8 @@ const ERFASSUNG_TABELLEN = [
         hinweis: 'Mehrere Einträge möglich – Pflegeperson, Pflegedienst oder beides.',
         alsFormular: true,          // untereinander statt in einer schmalen Tabelle
         spalten: [
-            { k: 'art', l: 'Art', typ: 'select', opt: ['Pflegeperson', 'Ambulanter Pflegedienst'], breit: 1 },
+            { k: 'art', l: 'Art', typ: 'select', opt: ['Pflegeperson', 'Ambulanter Pflegedienst'], breit: 1,
+              frei: true, kiFrei: true, platzhalter: 'z. B. Nachbarschaftshilfe' },
             { k: 'name', l: 'Name', typ: 'text', breit: 2 },
             { k: 'geboren', l: 'Geburtsdatum', typ: 'date', breit: 1 },
             { k: 'telefon', l: 'Telefon', typ: 'text', breit: 1 },
@@ -103,7 +104,8 @@ const ERFASSUNG_TABELLEN = [
         hinweis: 'Nur regelmäßig wiederkehrende Termine bei dauerhafter Erkrankung. '
                + 'Nur Termine „in Begleitung" fließen in Modul 5 ein.',
         spalten: [
-            { k: 'fach', l: 'Fachrichtung oder Therapie', typ: 'select', opt: ARZT_FACH.concat(THERAPIE_ART), frei: true },
+            { k: 'fach', l: 'Fachrichtung oder Therapie', typ: 'select', opt: ARZT_FACH.concat(THERAPIE_ART),
+              frei: true, kiFrei: true, platzhalter: 'z. B. Lymphdrainage' },
             { k: 'anzahl', l: 'Anzahl', typ: 'number', b: '80px' },
             { k: 'zeitraum', l: 'Zeitraum', typ: 'select', opt: ARZT_ZEITRAUM, b: '130px' },
             { k: 'begleitung', l: 'Durchführung', typ: 'select', opt: BEGLEITUNG, b: '140px' },
@@ -120,11 +122,13 @@ const ERFASSUNG_TABELLEN = [
                + 'Präparate wird nur festgehalten und verändert die Bewertung nicht. Wird verabreicht, '
                + 'wird das Stellen nicht zusätzlich gezählt. Alles außer „selbständig" fließt in Modul 5 ein.',
         spalten: [
-            { k: 'applikation', l: 'Applikationsort', typ: 'select', opt: APPLIKATION },
+            { k: 'applikation', l: 'Applikationsort', typ: 'select', opt: APPLIKATION, frei: true,
+              platzhalter: 'z. B. Nasenspray, Vaginalzäpfchen' },
             { k: 'praeparate', l: 'Unterschiedliche Präparate', typ: 'number', b: '110px' },
             { k: 'anzahl', l: 'Anzahl', typ: 'number', b: '80px' },
             { k: 'zeitraum', l: 'Zeitraum', typ: 'select', opt: HAEUFIGKEIT_ZEITRAUM, b: '120px' },
-            { k: 'unterstuetzung', l: 'Unterstützung', typ: 'select', opt: MEDIKATION_HILFE, b: '190px' }
+            { k: 'unterstuetzung', l: 'Unterstützung', typ: 'select', opt: MEDIKATION_HILFE, b: '190px',
+              frei: true, platzhalter: 'eigene Beschreibung der Hilfe' }
         ]
     },
     {
@@ -136,7 +140,8 @@ const ERFASSUNG_TABELLEN = [
                + 'An- und Ablegen zählen jeweils als eigene Maßnahme. '
                + 'Nur Maßnahmen „durch Pflegeperson" fließen in Modul 5 ein.',
         spalten: [
-            { k: 'art', l: 'Maßnahme', typ: 'select', opt: BEHANDLUNGSPFLEGE_ART, frei: true },
+            { k: 'art', l: 'Maßnahme', typ: 'select', opt: BEHANDLUNGSPFLEGE_ART, frei: true, kiFrei: true,
+              platzhalter: 'z. B. Trachealkanüle wechseln' },
             { k: 'beschreibung', l: 'Tätigkeitsbeschreibung', typ: 'text' },
             { k: 'anzahl', l: 'Anzahl', typ: 'number', b: '80px' },
             { k: 'zeitraum', l: 'Zeitraum', typ: 'select', opt: HAEUFIGKEIT_ZEITRAUM, b: '120px' },
@@ -249,28 +254,80 @@ function erfZeile(t, i, z) {
         <td><button class="erf-weg" title="Zeile entfernen" onclick="erfZeileWeg('${t.id}',${i})">×</button></td></tr>`;
 }
 
+/* Eigene Angabe statt Liste.
+   Eine Auswahlliste ohne Ausweg ist eine Wand: Die seltene Maßnahme, die zu werten ist,
+   ließe sich gar nicht erfassen. Jede Liste, in der eine Angabe BESCHREIBEND ist, trägt
+   deshalb als letzten Eintrag „eigene Angabe". Wird er gewählt, wird aus dem Auswahlfeld
+   ein Schreibfeld in derselben Zelle; ein kleiner Knopf führt zurück zur Liste.
+   Geschlossen bleiben Listen, deren Wert die RECHNUNG steuert – Zeitraum, „in Begleitung",
+   „durch Pflegeperson", genutzt/ungenutzt. Eine eigene Angabe würde dort stillschweigend
+   nicht mehr zählen; das wäre schlimmer als die fehlende Freiheit. */
+const ERF_FREI = '__eigene__';
+let erfFreiModus = {};      // "tabelle|zeile|spalte" -> true, solange das Schreibfeld steht
+
+function erfFreiSchluessel(tid, i, key) { return tid + '|' + i + '|' + key; }
+
 function erfFeld(t, i, s, wert) {
     // Kennung, um genau dieses Feld später wiederzufinden, ohne die Tabelle neu zu zeichnen
     const kenn = `data-erf="${t.id}|${i}|${s.k}"`;
     const bei = `oninput="erfSetzen('${t.id}',${i},'${s.k}',this.value)"`;
+    const zelle = inhalt => `<span class="erf-zelle" data-erf-zelle="${t.id}|${i}|${s.k}">${inhalt}</span>`;
     if (s.berechnet) {
-        return `<input type="text" class="field-input" ${kenn} readonly style="background:var(--bg-card2)" value="${escapeHtml(wert || '')}">`;
+        return zelle(`<input type="text" class="field-input" ${kenn} readonly style="background:var(--bg-card2)" value="${escapeHtml(wert || '')}">`);
     }
     if (s.typ === 'select') {
+        const w = (wert == null) ? '' : String(wert);
+        // Schreibfeld, wenn es gerade gewählt wurde ODER ein gespeicherter Wert nicht in der Liste steht
+        const eigen = s.frei && (erfFreiModus[erfFreiSchluessel(t.id, i, s.k)] || (w && s.opt.indexOf(w) < 0));
+        if (eigen) {
+            return zelle(`<span class="erf-frei">`
+                + `<input type="text" class="field-input" ${kenn} value="${escapeHtml(w)}"`
+                + ` placeholder="${escapeHtml(s.platzhalter || 'eigene Angabe')}" ${bei}>`
+                + `<button type="button" class="erf-liste" title="Wieder aus der Liste wählen"`
+                + ` onclick="erfZurListe('${t.id}',${i},'${s.k}')">☰</button></span>`);
+        }
         const opt = ['<option value=""></option>']
-            .concat(s.opt.map(o => `<option ${wert === o ? 'selected' : ''}>${escapeHtml(o)}</option>`));
-        if (s.frei && wert && !s.opt.includes(wert)) opt.push(`<option selected>${escapeHtml(wert)}</option>`);
-        return `<select class="field-input" ${kenn} onchange="erfSetzen('${t.id}',${i},'${s.k}',this.value)">${opt.join('')}</select>`
-             + (s.frei ? `<input type="text" class="field-input" style="margin-top:4px" placeholder="oder eigene Angabe"
-                    data-erf="${t.id}|${i}|${s.k}|frei"
-                    value="${(!s.opt.includes(wert) && wert) ? escapeHtml(wert) : ''}" ${bei}>` : '');
+            .concat(s.opt.map(o => `<option ${w === o ? 'selected' : ''}>${escapeHtml(o)}</option>`))
+            .concat(s.frei ? [`<option value="${ERF_FREI}">＋ eigene Angabe …</option>`] : []);
+        return zelle(`<select class="field-input" ${kenn} onchange="erfSetzen('${t.id}',${i},'${s.k}',this.value)">${opt.join('')}</select>`);
     }
-    return `<input type="${s.typ}" class="field-input" ${kenn} value="${escapeHtml(wert == null ? '' : wert)}" ${bei}>`;
+    return zelle(`<input type="${s.typ}" class="field-input" ${kenn} value="${escapeHtml(wert == null ? '' : wert)}" ${bei}>`);
+}
+
+/* Zeichnet EIN Feld neu – beim Umschalten zwischen Liste und eigener Angabe. Bewusst nur
+   dieses eine: Ein Neuzeichnen der Tabelle würde jede andere Eingabe in der Tabelle stören. */
+function erfZelleNeu(tid, i, key, mitFokus) {
+    const t = ERFASSUNG_TABELLEN.find(x => x.id === tid);
+    const s = t && t.spalten.find(c => c.k === key);
+    const zelle = document.querySelector('[data-erf-zelle="' + erfFreiSchluessel(tid, i, key) + '"]');
+    if (!t || !s || !zelle) return;
+    const wert = (erfassung[tid] && erfassung[tid][i]) ? erfassung[tid][i][key] : '';
+    zelle.outerHTML = erfFeld(t, i, s, wert);
+    if (mitFokus) {
+        const neu = document.querySelector('[data-erf="' + erfFreiSchluessel(tid, i, key) + '"]');
+        if (neu) neu.focus();
+    }
+}
+
+// Zurück zur Liste. Die eigene Angabe wird dabei verworfen – sonst stünde sie unsichtbar weiter da.
+function erfZurListe(tid, i, key) {
+    delete erfFreiModus[erfFreiSchluessel(tid, i, key)];
+    if (erfassung[tid] && erfassung[tid][i]) delete erfassung[tid][i][key];
+    erfZelleNeu(tid, i, key, true);
+    zeigeModul5Vorschau();
 }
 
 function erfSetzen(tid, i, key, wert) {
     if (!erfassung[tid]) erfassung[tid] = [];
     if (!erfassung[tid][i]) erfassung[tid][i] = {};
+    // „eigene Angabe" gewählt: aus dem Auswahlfeld wird ein Schreibfeld, noch ohne Wert
+    if (wert === ERF_FREI) {
+        erfFreiModus[erfFreiSchluessel(tid, i, key)] = true;
+        delete erfassung[tid][i][key];
+        erfZelleNeu(tid, i, key, true);
+        zeigeModul5Vorschau();
+        return;
+    }
     if (wert === '') delete erfassung[tid][i][key]; else erfassung[tid][i][key] = wert;
     // Wochenstunden aus Tagen und Stunden je Tag
     if (tid === 'pflegepersonen' && (key === 'tage' || key === 'stunden')) {
@@ -332,6 +389,9 @@ function erfHinzufuegen(tid, werte) {
 function erfZeileWeg(tid, i) {
     if (!erfassung[tid]) return;
     erfassung[tid].splice(i, 1);
+    // Die Zeilennummern verschieben sich – Merker fuer offene Schreibfelder waeren danach falsch.
+    // Eigene Angaben mit Inhalt bleiben trotzdem stehen: Sie erkennt erfFeld am Wert selbst.
+    erfFreiModus = {};
     if (!erfassung[tid].length) erfassung[tid] = [{}];
     renderErfassungTabelle(tid);
     zeigeModul5Vorschau();
@@ -583,6 +643,7 @@ function erfassungSichern() { return { tabellen: erfassung, extra: erfassungExtr
 function erfassungLaden(d) {
     erfassung = (d && d.tabellen) || {};
     erfassungExtra = (d && d.extra) || {};
+    erfFreiModus = {};
     // Fälle aus der Zeit vor der Umstellung auf Applikationsorte lesbar machen
     if (erfassung.medikation) erfassung.medikation = medikationUmstellen(erfassung.medikation);
 }

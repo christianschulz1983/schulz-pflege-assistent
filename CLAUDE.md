@@ -322,6 +322,23 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    nachgezogen (`erfFeldNachziehen()`). Jedes Feld trägt dafür `data-erf="tabelle|zeile|spalte"`.
    Der Selbsttest prüft, dass `document.activeElement` das Feld bleibt.
 
+24. **Jede beschreibende Auswahlliste hat einen Ausweg** (`js/erfassung.js`). Eine Liste ohne
+   eigene Angabe ist eine Wand: Die seltene Maßnahme, die zu werten ist, ließe sich gar nicht
+   erfassen. Letzter Eintrag ist deshalb „＋ eigene Angabe …" (`ERF_FREI`); wird er gewählt,
+   wird aus dem Auswahlfeld ein Schreibfeld in derselben Zelle, mit einem Knopf zurück zur
+   Liste. Ein gespeicherter Wert außerhalb der Liste erscheint von selbst als Schreibfeld.
+   Die Trennlinie – und sie ist der eigentliche Punkt der Regel:
+   - **Offen (`frei`), wo die Angabe BESCHREIBT:** Applikationsort, Unterstützung bei der
+     Medikation, Fachrichtung, Maßnahme der Behandlungspflege, Art der Pflegeperson.
+   - **Geschlossen, wo der Wert die RECHNUNG steuert:** Zeitraum (`ZEITRAUM_UMRECHNUNG`),
+     „in Begleitung", „durch Pflegeperson", genutzt/ungenutzt. Eine eigene Angabe würde dort
+     stillschweigend nicht mehr zählen – schlimmer als die fehlende Freiheit.
+   - **`kiFrei` ist nicht `frei`.** Freie Eingabe ist ein Recht des Beraters, nicht des
+     Modells. `vorbefundPruefen()` hält die KI an die Liste, außer bei rein beschreibenden
+     Spalten (`fach`, `art`). Sonst stünde eine erfundene Angabe in der Maske, die niemand
+     nachgeschlagen hat.
+   - Umgeschaltet wird immer nur die EINE Zelle (`erfZelleNeu()`) – siehe Regel 23.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -373,7 +390,7 @@ Die Dateien selbst lassen sich nicht in das Word-Dokument einbetten - der Berate
 sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof GmbH werden
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung aus dem Befundtext des Vorgutachtens vorbelegen (Regel 21).
-Der Selbsttest umfasst 944 Pruefungen.
+Der Selbsttest umfasst 975 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

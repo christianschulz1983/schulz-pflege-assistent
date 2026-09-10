@@ -206,7 +206,11 @@ function vorbefundPruefen(antwort) {
                 if (s.berechnet) return;
                 const w = (v[s.k] == null ? '' : String(v[s.k])).trim();
                 if (!w) return;
-                if (s.typ === 'select' && !s.frei && s.opt.indexOf(w) < 0) {
+                /* Freie Eingabe ist ein Recht des BERATERS, nicht des Modells: „frei" öffnet die
+                   Maske, „kiFrei" öffnet die Prüfung. Wo eine Angabe die Rechnung steuert
+                   (Applikationsort, Unterstützung), muss die KI aus der Liste wählen – sonst
+                   stünde eine erfundene Angabe in der Maske, die niemand nachgeschlagen hat. */
+                if (s.typ === 'select' && !s.kiFrei && s.opt.indexOf(w) < 0) {
                     verworfen.push(t.titel + ' „' + wert + '": ' + s.l + ' „' + w + '" ist dort nicht vorgesehen');
                     return;
                 }

@@ -541,6 +541,17 @@
         }
         @media (max-width: 700px) { .bz-seiten { grid-template-columns: 1fr; } }
 
+        /* Erfassungstabellen: eigene Angabe statt Liste */
+        .erf-zelle { display: block; }
+        .erf-frei { display: flex; align-items: center; gap: 4px; }
+        .erf-frei .field-input { flex: 1; min-width: 0; }
+        .erf-liste {
+            flex-shrink: 0; width: 28px; align-self: stretch; min-height: 30px; cursor: pointer;
+            border: 1px solid var(--border); background: var(--bg-card2); border-radius: 6px;
+            color: var(--text-muted); font-size: 12px; line-height: 1; padding: 0;
+        }
+        .erf-liste:hover { color: var(--accent); border-color: var(--accent); }
+
         /* MODUL 3: erfasste psychische Problemlagen */
         .psyche-zeile {
             padding: 10px 12px; margin-bottom: 8px; border-radius: 8px;
