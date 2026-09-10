@@ -3067,6 +3067,83 @@ async function selbsttest() {
                 pruefe('Wochenstunden erscheinen im Feld', wo ? wo.value : null, '20');
                 pruefeWahr('Auch dabei bleibt die Schreibmarke stehen', document.activeElement === tagFeld);
             }
+            // ---------- 13d. Eigene Angabe statt Liste ----------
+            const spalte = (tid, k) => ERFASSUNG_TABELLEN.find(t => t.id === tid).spalten.find(c => c.k === k);
+            // Beschreibende Listen sind offen, rechnende bleiben geschlossen
+            [['medikation', 'applikation'], ['medikation', 'unterstuetzung'], ['arztbesuche', 'fach'],
+             ['behandlungspflege', 'art'], ['pflegepersonen', 'art']].forEach(([tid, k]) => {
+                pruefeWahr('Eigene Angabe möglich: ' + tid + '.' + k, spalte(tid, k).frei === true);
+            });
+            [['medikation', 'zeitraum'], ['arztbesuche', 'zeitraum'], ['arztbesuche', 'begleitung'],
+             ['behandlungspflege', 'durchfuehrung'], ['hilfsmittel', 'nutzung']].forEach(([tid, k]) => {
+                pruefeWahr('Rechnende Liste bleibt geschlossen: ' + tid + '.' + k, !spalte(tid, k).frei);
+            });
+            // Die KI darf nur dort frei formulieren, wo die Angabe rein beschreibend ist
+            pruefeWahr('KI darf die Fachrichtung frei nennen', spalte('arztbesuche', 'fach').kiFrei === true);
+            pruefeWahr('KI darf die Maßnahme frei nennen', spalte('behandlungspflege', 'art').kiFrei === true);
+            pruefeWahr('KI muss den Applikationsort aus der Liste wählen',
+                !spalte('medikation', 'applikation').kiFrei);
+            pruefeWahr('KI muss die Unterstützung aus der Liste wählen',
+                !spalte('medikation', 'unterstuetzung').kiFrei);
+
+            // Offene Liste trägt den zusätzlichen Eintrag, geschlossene nicht
+            const auswahl = (tid, i, k) => {
+                const el = document.querySelector('[data-erf="' + tid + '|' + i + '|' + k + '"]');
+                return el && el.tagName === 'SELECT' ? [...el.options].map(o => o.value) : null;
+            };
+            erfassung = {}; renderErfassung();
+            pruefeWahr('Offene Liste bietet „eigene Angabe" an',
+                (auswahl('medikation', 0, 'applikation') || []).indexOf(ERF_FREI) > -1);
+            pruefeWahr('Geschlossene Liste bietet sie nicht an',
+                (auswahl('medikation', 0, 'zeitraum') || []).indexOf(ERF_FREI) === -1);
+
+            // Umschalten: aus dem Auswahlfeld wird ein Schreibfeld – und wieder zurück
+            erfSetzen('behandlungspflege', 0, 'art', ERF_FREI);
+            const frei = document.querySelector('[data-erf="behandlungspflege|0|art"]');
+            pruefeWahr('Nach der Wahl steht dort ein Schreibfeld', !!frei && frei.tagName === 'INPUT');
+            pruefeWahr('Die Schreibmarke steht gleich darin', document.activeElement === frei);
+            pruefeWahr('Der Platzhalter nennt ein Beispiel', !!frei && /Trachealkanüle/.test(frei.placeholder));
+            pruefe('Die Sonderkennung landet nie in den Daten',
+                (erfassung.behandlungspflege[0] || {}).art, undefined);
+            pruefe('Ohne Angabe entsteht keine weitere Zeile', erfassung.behandlungspflege.length, 1);
+            if (frei) {
+                frei.value = 'Trachealkanüle wechseln';
+                erfSetzen('behandlungspflege', 0, 'art', 'Trachealkanüle wechseln');
+                pruefe('Die eigene Angabe wird gespeichert',
+                    erfassung.behandlungspflege[0].art, 'Trachealkanüle wechseln');
+                pruefeWahr('Die Schreibmarke bleibt auch hier stehen', document.activeElement === frei);
+                pruefeWahr('Das Feld wurde dabei nicht ersetzt',
+                    document.querySelector('[data-erf="behandlungspflege|0|art"]') === frei);
+            }
+            // Sie zählt in Modul 5 wie jede andere Maßnahme
+            erfSetzen('behandlungspflege', 0, 'anzahl', '2');
+            erfSetzen('behandlungspflege', 0, 'zeitraum', 'pro Tag');
+            erfSetzen('behandlungspflege', 0, 'durchfuehrung', 'durch Pflegeperson');
+            const zFrei = modul5AusErfassung();
+            pruefeWahr('Eine eigene Maßnahme wird gewertet',
+                !!zFrei['4.5.11'] && zFrei['4.5.11'].count === 2);
+            // Zurück zur Liste
+            erfZurListe('behandlungspflege', 0, 'art');
+            const wiederListe = document.querySelector('[data-erf="behandlungspflege|0|art"]');
+            pruefeWahr('Zurück zur Liste liefert wieder ein Auswahlfeld',
+                !!wiederListe && wiederListe.tagName === 'SELECT');
+            pruefe('Dabei wird die eigene Angabe verworfen',
+                erfassung.behandlungspflege[0].art, undefined);
+
+            // Ein gespeicherter Wert außerhalb der Liste erscheint von selbst als Schreibfeld
+            erfassungLaden({ tabellen: { medikation: [
+                { applikation: 'Nasenspray', anzahl: '2', zeitraum: 'pro Tag',
+                  unterstuetzung: 'Gabe durch Pflegeperson' }, {} ] }, extra: {} });
+            renderErfassung();
+            const gespeichert = document.querySelector('[data-erf="medikation|0|applikation"]');
+            pruefeWahr('Eigene Angabe übersteht Speichern und Laden',
+                !!gespeichert && gespeichert.tagName === 'INPUT' && gespeichert.value === 'Nasenspray');
+            const eigenM5 = modul5AusErfassung();
+            pruefeWahr('Ein eigener Applikationsort zählt zur Medikation',
+                !!eigenM5['4.5.1'] && eigenM5['4.5.1'].count === 2);
+            pruefeWahr('Der Ort steht auch im Dokument',
+                /Nasenspray/.test(buildHoeherstufung('', {}, '', '')));
+
             erfassungLaden(sicherungErf2); setzeModus(modusVorTipp); renderErfassung();
         }
 
@@ -3517,6 +3594,11 @@ async function selbsttest() {
                 ],
                 hilfsmittel: [
                     { bezeichnung: 'Rollator', nutzung: 'genutzt', beleg: 'nutzt einen Rollator' }
+                ],
+                // Beschreibende Spalte: hier darf die KI etwas nennen, das nicht in der Liste steht
+                behandlungspflege: [
+                    { art: 'Trachealkanüle wechseln', anzahl: '1', zeitraum: 'pro Woche',
+                      durchfuehrung: 'durch Pflegeperson', beleg: 'Trachealkanüle wird woechentlich gewechselt' }
                 ]
             });
             pruefe('Nur belegte und bekannte Befunde angenommen', geprueft.befunde.length, 3);
@@ -3525,7 +3607,10 @@ async function selbsttest() {
             pruefeWahr('Freitext übernommen',
                 !!geprueft.befunde[2] && geprueft.befunde[2].frei === true && geprueft.befunde[2].text === '172');
             pruefe('Nicht Übernommenes wird benannt', geprueft.verworfen.length, 7);
-            pruefe('Nur brauchbare Tabellenzeilen', geprueft.erfassung.length, 3);
+            pruefe('Nur brauchbare Tabellenzeilen', geprueft.erfassung.length, 4);
+            pruefeWahr('Beschreibende Spalte nimmt auch eine freie Angabe der KI an',
+                geprueft.erfassung.some(z => z._tabelle === 'behandlungspflege'
+                    && z.art === 'Trachealkanüle wechseln'));
             const med = geprueft.erfassung.filter(z => z._tabelle === 'medikation');
             pruefeWahr('Unbekannte Auswahl wird verworfen, die Zeile bleibt',
                 med.length === 2 && med[1].unterstuetzung === undefined && med[1].applikation === 'Augentropfen');
@@ -3539,11 +3624,11 @@ async function selbsttest() {
             vorbefundFunde = geprueft;
             zeigeVorbefundVorschlaege();
             const kaesten = document.querySelectorAll('#vorschlag-body input[type="checkbox"]');
-            pruefe('Auswahlliste zeigt alle Vorschläge', kaesten.length, 6);
+            pruefe('Auswahlliste zeigt alle Vorschläge', kaesten.length, 7);
             pruefeWahr('Nichts ist vorausgewählt',
                 Array.prototype.every.call(kaesten, c => !c.checked));
             pruefeWahr('Jeder Vorschlag zeigt seine Fundstelle',
-                document.querySelectorAll('#vorschlag-body .vs-fund').length === 6);
+                document.querySelectorAll('#vorschlag-body .vs-fund').length === 7);
             pruefeWahr('Warnung vor dem alten Stand steht in der Liste',
                 /damalige/.test(document.getElementById('vorschlag-body').innerHTML));
             pruefeWahr('Übernahmeknopf gehört zur Vorbelegung',
