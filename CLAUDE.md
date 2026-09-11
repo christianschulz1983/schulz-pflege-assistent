@@ -98,6 +98,10 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    **Drittelseite** (`allgemeinWortGrenze()` – Widerspruch und Anhörung behalten die halbe
    Seite). Ohne Vorgutachten entfällt der erste Abschnitt ganz. Die Kurzfassung entsteht im
    **selben** KI-Aufruf wie die Begründungen – ein zweiter Abruf würde das Limit reißen.
+   **Nie der Rohtext als Ersatz:** Fällt die KI aus, entfällt der Abschnitt und die
+   Schlussmeldung sagt es. Früher stand dann der ganze Anamnesetext da – im Fall des
+   Verfassers drei Seiten. `mergeStellungnahme` entfernt so einen Rohtext aus älteren
+   Dokumenten (erkennbar an `data-ai="0"` und mehr als 1,5 Viertelseiten).
 8a. **Zweck der Einleitung** (`allgemeinAufgabe()` in `js/vorschlaege.js`): Sie begründet
    NICHTS. Kein Richtlinienbezug, kein Zitat, keine Stufenbezeichnung, kein Ableitungssatz,
    kein Abzählen von Kriterien – das gehört ausschließlich in „Befund und Stellungnahme".
@@ -246,16 +250,23 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    „Körperlicher Befund". Die Katalogruppe „Ernährung" enthält dieselben vier Felder und
    wird deshalb übersprungen (`BEFUND_GRUPPEN_DOPPELT` in `js/hoeherstufung.js`).
 
-19. **Ein Antrag stellt nichts gegenüber.** Im Erstantrag und im Höherstufungsantrag steht
-   im Kriterienblock **nur die eigene Einschätzung** – „4.1.1 Positionswechsel im Bett:
-   „überwiegend selbständig"", darunter die Begründung. Kein „Gutachterliche Bewertung",
-   kein „Bewertung im Vorgutachten", kein Ableitungssatz gegen eine fremde Wertung: Der
-   Erstantrag hat gar kein Gutachten, und der Höherstufungsantrag beschreibt eine
-   Verschlechterung. Die Gegenüberstellung steht in der **Tabelle**, nicht je Kriterium.
-   Für Modul 5 gilt `m5StandSatz()` statt `m5WirkungSatz()` – er nennt den erreichten
-   Stand statt eines Vorher/Nachher. Die KI-Anweisung ist entsprechend geteilt
-   (`istAntrag` in `buildBegruendungPrompt`). **Widerspruch und Anhörung bleiben, wie sie
-   sind** – dort ist die Gegenüberstellung der Zweck.
+19. **Ein Antrag stellt nichts gegenüber – und begründet nicht Kriterium für Kriterium.**
+   Der Antrag ersetzt den **Fragebogen des Medizinischen Dienstes**. Statt „Befund und
+   Stellungnahme" je Kriterium (BRi-Zitat, Ableitungssatz – die Form des Widerspruchs)
+   steht dort **„Einschränkungen in den Lebensbereichen"** (`js/hoeherstufung.js`):
+   je Modul mit Einschränkung (`antragBereiche()`) EIN dichter Absatz – was geht nicht mehr,
+   wer hilft wobei wie oft, im Höherstufungsantrag: was hat sich seit dem Vorgutachten
+   verschlechtert – und darunter die Zeile „Einschätzung: …" mit den eigenen Stufen.
+   Kein Vorher/Nachher je Kriterium; die Gegenüberstellung steht in der **Tabelle**. Modul 5
+   bekommt EINEN gerechneten Satz (`m5ModulSatz`), nicht einen je Kriterium.
+   Die KI-Aufgabe ist eine eigene (`buildAntragPrompt`, `generateBegruendungenAntrag`): keine
+   Stilbeispiele aus Widersprüchen, keine BRi-Zitate, keine Stufenbezeichnungen im Absatz,
+   keine Punkte, keine Kritik. Länge: 5 Sätze / 110 Wörter je Bereich; das ganze Schriftstück
+   rund **7 Seiten** (`LAENGE.antragSeitenMax`, der Selbsttest misst einen vollen Fall – 6).
+   Die Befundtabellen enthalten im Antrag nur Befunde, keine NBA-Kriterien – die stehen in
+   den Lebensbereichen (Regel 17; doppelt waren es 8 statt 6 Seiten).
+   **Widerspruch und Anhörung bleiben, wie sie sind** – dort ist die Begründung je Kriterium
+   und die Gegenüberstellung der Zweck.
 20. **Nicht über die Vorgangsart hinweg zusammenführen.** Jede Vorlage schreibt
    `data-vorgang` in ihr Wurzelelement. `mergeStellungnahme()` behält unveränderte
    Kriterienblöcke im WORTLAUT – so wanderte die Gegenüberstellung aus einem früheren
@@ -386,6 +397,21 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Befund, Erfassung, Anlagen, Zweitgutachten, Vorgang) und stellt es am Ende wieder her. Vorher
    löschte ein Selbsttest mitten im Fall Name, Anamnese und alle Diagnosen. Zu Beginn stellt er
    den Widerspruch ein; Abschnitte, die einen anderen Vorgang brauchen, stellen ihn selbst ein.
+28. **Ersatztexte werden nachgeholt** (`data-ai`). Fällt die KI aus (Limit), setzt die Vorlage
+   Ersatztexte ein. Jeder Block trägt `data-ai="1"` (von der KI) oder `"0"` (Ersatz) – in allen
+   drei Vorlagen, dazu `#stmt-notes` und `#stmt-anamnese`. Beim nächsten „Stellungnahme
+   erstellen" gilt ein Ersatzblock als NICHT geschrieben (`generateAppealText`) und wird beim
+   Zusammenführen durch den KI-Text ersetzt. Vorher blieb der Ersatzsatz für immer stehen,
+   weil sich die Bewertung ja nicht geändert hatte.
+29. **`escapeHtml` maskiert auch `"` und `'`.** Die App schreibt damit Werte in Attribute
+   (`value="…"`, `data-vals="…"`). Ohne Maskierung endete das Attribut beim ersten `"`: Aus
+   „Rollator "Premium" mit Korb" wurde im Feld „Rollator ", und die Kennung eines
+   Lebensbereichs (JSON) war nach zwei Zeichen abgeschnitten – jeder Bereich wurde bei jedem
+   Klick neu geschrieben, Handkorrekturen gingen verloren.
+   **Gegenproben an der Quelle:** Wo eine Regel mitten in einem Ablauf steckt und sich nicht von
+   außen aushebeln lässt, wird der alte Fehler in einer Sicherungskopie zurückgebaut, der Test
+   läuft, die Datei wird zurückgespielt und per Prüfsumme verglichen. Genau so fiel der
+   Fehler oben auf: Die Gegenprobe schlug nicht an, weil ohnehin alles neu geschrieben wurde.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -439,7 +465,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1066 Pruefungen.
+Der Selbsttest umfasst 1116 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

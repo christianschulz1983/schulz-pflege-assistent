@@ -995,13 +995,15 @@ async function selbsttest() {
                     Array.from(el2.querySelectorAll('h3')).map(x => x.innerText), ['Aktuelle Situation']);
                 pruefeWahr('Ohne Vorgutachten kein leerer Abschnitt', !el2.querySelector('#stmt-anamnese'));
 
-                // Ohne KI-Kurzfassung steht der Rohtext da – besser als eine Lücke
-                document.getElementById('stam-anamnese').value = 'Roher Anamnesetext aus dem Gutachten.';
+                /* Ohne KI-Kurzfassung entfällt der Abschnitt. Früher stand hier der Rohtext –
+                   im Fall des Verfassers drei Seiten Anamnese aus dem Vorgutachten. */
+                document.getElementById('stam-anamnese').value = 'Roher Anamnesetext aus dem Gutachten. '.repeat(80);
                 const el3 = document.createElement('div');
                 el3.innerHTML = buildHoeherstufung('Notizen.', {}, '', '');
-                pruefe('Ohne Kurzfassung steht der Rohtext',
-                    (el3.querySelector('#stmt-anamnese') || {}).innerText,
-                    'Roher Anamnesetext aus dem Gutachten.');
+                pruefeWahr('Ohne Kurzfassung kein Rohtext im Dokument',
+                    !el3.querySelector('#stmt-anamnese') && el3.innerText.indexOf('Roher Anamnesetext') === -1);
+                pruefeWahr('Ohne Kurzfassung auch keine leere Überschrift',
+                    !Array.from(el3.querySelectorAll('h3')).some(x => /Angaben laut Vorgutachten/.test(x.innerText)));
             } finally { appModus = mM; document.getElementById('stam-anamnese').value = mAnam; }
 
             // Längen: Viertelseite für die Anamnese, Drittelseite für die aktuelle Situation
@@ -1036,7 +1038,7 @@ async function selbsttest() {
             pruefeWahr('Anweisung verbietet Erfinden', a.includes('Erfinde nichts'));
             pruefeWahr('Anweisung übergibt den Rohtext', a.includes('Rohtext'));
             pruefeWahr('Erzeugung fragt die Zusammenfassung ab',
-                generateBegruendungenAntrag.toString().includes('anamneseAufgabe(anamneseRoh)')
+                buildAntragPrompt.toString().includes('anamneseAufgabe(anamneseRoh)')
                 && generateBegruendungenAntrag.toString().includes('anamnese: { type: "STRING" }'));
         }
 
@@ -1067,8 +1069,10 @@ async function selbsttest() {
                         !t.includes('Gutachterliche Bewertung') && !t.includes('Bewertung im Vorgutachten'));
                     pruefeWahr(m + ': kein Ableitungssatz gegen eine fremde Wertung',
                         !/ist (somit )?eine Wertung mit .* ableitbar/.test(t));
-                    pruefeWahr(m + ': eigene Einschätzung steht in der Überschrift',
-                        t.includes('4.1.1 Positionswechsel im Bett: „überwiegend selbständig“'));
+                    pruefeWahr(m + ': eigene Einschätzung steht unter dem Lebensbereich',
+                        t.includes('Einschätzung: Positionswechsel im Bett „überwiegend selbständig“'));
+                    pruefeWahr(m + ': keine Überschrift je Kriterium mehr',
+                        !t.includes('4.1.1 Positionswechsel im Bett: „'));
                     pruefeWahr(m + ': Modul 5 ohne Gegenüberstellung',
                         t.includes('Modul 5 kommt damit auf') && !t.includes('statt'));
                     // Die Tabelle behält die Gegenüberstellung – dort gehört sie hin.
@@ -1551,9 +1555,11 @@ async function selbsttest() {
                 ['hoeherstufung', 'erstantrag'].forEach(m => {
                     const t = bauen(m);
                     pruefeWahr(m + ': Modul 5 wird erklärt, ohne zu vergleichen',
-                        t.includes('nicht einzeln, sondern als Gruppe gewertet')
+                        t.includes('nicht einzeln, sondern gruppenweise gewertet')
                         && t.includes('Modul 5 kommt damit auf')
                         && !t.includes('bleiben bei 10,00'));
+                    pruefe(m + ': der Modul-5-Satz steht nur einmal',
+                        (t.match(/Modul 5 kommt damit auf/g) || []).length, 1);
                 });
 
                 // Kippt die Spanne, muss der Satz die Änderung nennen – nicht das Gegenteil.
@@ -2329,8 +2335,12 @@ async function selbsttest() {
             const modusVorM5 = appModus;
             setzeModus('hoeherstufung');
             const antrag = buildHoeherstufung('', {}, '');
-            pruefeWahr('Antragsvorlage nennt „entfällt oder selbständig"',
-                antrag.includes('entfällt oder selbständig'));
+            // Der Antrag nennt die heutige Häufigkeit; dass das Vorgutachten hier nichts sah,
+            // erfährt die KI als „ohne Einschränkung" – nie als „0x".
+            pruefeWahr('Antragsvorlage nennt die heutige Häufigkeit',
+                antrag.includes('Medikation „3x pro Tag“'));
+            pruefeWahr('KI erfährt: im Vorgutachten ohne Einschränkung',
+                buildAntragPrompt(antragBereiche(), false).includes('Medikation: heute „3x pro Tag"; im Vorgutachten ohne Einschränkung'));
             pruefeWahr('Antragsvorlage enthält kein „0x pro"', !antrag.includes('0x pro'));
             setzeModus(modusVorM5);
             // Die Anweisung an die KI verbietet die Null ausdrücklich
@@ -3995,6 +4005,233 @@ async function selbsttest() {
             reviewData = merkReview20; importZiel = merkZiel20;
             stateOrig = merkOrig20; stateEigene = merkEigen20;
             befundLaden(merkBef20); erfassungLaden(merkErf20); setzeModus(merkModus20);
+        }
+
+
+        // ---------- 21. Antrag: Lebensbereiche statt Einzelbegründungen, höchstens rund 7 Seiten ----------
+        /* Gemeldet: Im Höherstufungsantrag standen drei Seiten Anamnese aus dem Vorgutachten und
+           je Kriterium ein Widerspruchsblock. Der Antrag ersetzt den Fragebogen des Medizinischen
+           Dienstes – je Lebensbereich ein kurzer Absatz, die Einschätzung darunter. */
+        if (typeof antragBereiche === 'function') {
+            const merk21 = {
+                modus: appModus, orig: JSON.parse(JSON.stringify(stateOrig)), eigen: JSON.parse(JSON.stringify(stateEigene)),
+                bef: JSON.parse(JSON.stringify(befundSichern())), erf: JSON.parse(JSON.stringify(erfassungSichern())),
+                anam: document.getElementById('stam-anamnese').value, befTxt: document.getElementById('stam-befund').value,
+                notes: document.getElementById('erstgespraech-notes') ? document.getElementById('erstgespraech-notes').value : '',
+                doc: (document.getElementById('appeal-document') || {}).innerHTML || '', draft: appealDraft,
+                key: (typeof userApiKey !== 'undefined') ? userApiKey : '', ki: window.callGeminiWithFallback
+            };
+            const id21 = nr => ITEMS.find(i => i.nr === nr).id;
+            const leer21 = () => ITEMS.forEach(i => {
+                const l = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0;
+                stateOrig.values[i.id] = JSON.parse(JSON.stringify(l));
+                stateEigene.values[i.id] = JSON.parse(JSON.stringify(l));
+            });
+            try {
+                setzeModus('hoeherstufung');
+                stateOrig.extracted = null;
+                leer21();
+                // Vorgutachten: leichte Einschränkungen; heute: deutlich mehr
+                stateOrig.values[id21('4.1.1')] = 1;
+                stateEigene.values[id21('4.1.1')] = 1;             // unverändert
+                stateEigene.values[id21('4.1.5')] = 3;             // neu
+                stateEigene.values[id21('4.4.5')] = 2;
+                stateEigene.values[id21('4.5.1')] = { count: 6, period: 'D' };
+                stateEigene.values[id21('4.5.4')] = { count: 4, period: 'D' };
+
+                // 21a. Bereiche: nur Module mit Einschränkung, je Kriterium heute und früher
+                const b21 = antragBereiche();
+                pruefe('Bereiche nur mit Einschränkung', b21.map(b => b.nr), ['M1', 'M4', 'M5']);
+                const mob = b21.find(b => b.nr === 'M1') || { kriterien: [] };
+                pruefeWahr('Unverändertes Kriterium ist nicht als verschlechtert markiert',
+                    mob.kriterien.some(k => k.nr === '4.1.1' && k.geaendert === false));
+                pruefeWahr('Neue Einschränkung ist als verschlechtert markiert',
+                    mob.kriterien.some(k => k.nr === '4.1.5' && k.geaendert === true && k.o === null));
+                const sigVorher = mob.sig;
+                stateEigene.values[id21('4.1.5')] = 2;
+                pruefeWahr('Kennung ändert sich mit der Einschätzung',
+                    (antragBereiche().find(b => b.nr === 'M1') || {}).sig !== sigVorher);
+                stateEigene.values[id21('4.1.5')] = 3;
+                setzeModus('erstantrag');
+                pruefeWahr('Erstantrag: kein Vergleich mit einem Vorgutachten',
+                    antragBereiche().every(b => b.kriterien.every(k => k.o === null && !k.geaendert)));
+                setzeModus('hoeherstufung');
+
+                // 21b. Das Schriftstück
+                const bau21 = texte => { const d = document.createElement('div');
+                    d.innerHTML = buildHoeherstufung('', texte || {}, '', ''); return d; };
+                let d21 = bau21({});
+                const t21 = d21.innerText.replace(/\s+/g, ' ');
+                pruefeWahr('Abschnitt „Einschränkungen in den Lebensbereichen"', t21.includes('Einschränkungen in den Lebensbereichen'));
+                pruefeWahr('Kein „Befund und Stellungnahme" im Antrag', !t21.includes('Befund und Stellungnahme'));
+                pruefeWahr('Kein Füllsatz je Kriterium', !t21.includes('Die Einstufung ergibt sich aus dem erhobenen Befund'));
+                pruefeWahr('Kein Ableitungssatz', !/Wertung mit .* ableitbar/.test(t21));
+                pruefe('Je Lebensbereich ein Block', d21.querySelectorAll('#stmt-crit .crit.bereich').length, 3);
+                pruefeWahr('Ohne KI: Block als Ersatz markiert',
+                    Array.from(d21.querySelectorAll('#stmt-crit .crit')).every(c => c.getAttribute('data-ai') === '0'));
+                pruefeWahr('Einschätzung steht unter dem Bereich',
+                    t21.includes('Einschätzung: Positionswechsel im Bett „überwiegend selbständig“ · Treppensteigen „unselbständig“'));
+                pruefe('Modul-5-Satz genau einmal', (t21.match(/Modul 5 kommt damit auf/g) || []).length, 1);
+                /* Die Kennung eines Bereichs muss das HTML-Attribut unbeschaedigt ueberstehen. Sie war
+                   nach zwei Zeichen abgeschnitten (escapeHtml maskierte keine Anfuehrungszeichen) -
+                   jeder Bereich wurde bei jedem Klick neu geschrieben, Handkorrekturen gingen verloren. */
+                const m1Block = d21.querySelector('.crit[data-nr="M1"]');
+                pruefe('Kennung des Bereichs uebersteht das Attribut',
+                    m1Block ? m1Block.getAttribute('data-vals') : null, (antragBereiche().find(b => b.nr === 'M1') || {}).sig);
+                pruefe('Anfuehrungszeichen werden maskiert', escapeHtml("a \"b\" 'c'"), 'a &quot;b&quot; &#39;c&#39;');
+                const hmSp = ERFASSUNG_TABELLEN.find(x => x.id === 'hilfsmittel');
+                const feldDiv = document.createElement('div');
+                feldDiv.innerHTML = erfFeld(hmSp, 0, hmSp.spalten[0], 'Rollator "Premium" mit Korb');
+                pruefe('Eingabe mit Anfuehrungszeichen bleibt vollstaendig im Feld',
+                    (feldDiv.querySelector('input') || {}).value, 'Rollator "Premium" mit Korb');
+                pruefeWahr('Tabelle ohne „abweichende Bepunktung"', !t21.includes('abweichenden Bepunktung'));
+                d21 = bau21({ M1: 'Das Aufstehen gelingt nur noch mit Hilfe des Ehemannes.' });
+                pruefeWahr('Mit KI-Text: Absatz steht im Bereich und ist markiert',
+                    (d21.querySelector('.crit[data-nr="M1"]') || {}).getAttribute
+                    && d21.querySelector('.crit[data-nr="M1"]').getAttribute('data-ai') === '1'
+                    && d21.querySelector('.crit[data-nr="M1"]').innerText.includes('Hilfe des Ehemannes'));
+
+                // Befundtabellen ohne NBA-Kriterien – die stehen in den Lebensbereichen (Regel 17)
+                befundLaden({ werte: { 'schuerzengriff|rechts': 1 } });
+                const bb = befundBlock();
+                pruefeWahr('Befundtabellen enthalten Befunde', bb.includes('Schürzengriff'));
+                pruefeWahr('Befundtabellen enthalten keine NBA-Kriterien', !/Positionswechsel im Bett/.test(bb));
+
+                // 21c. Die Anweisung an die KI – Antrag, kein Widerspruch
+                const p21 = buildAntragPrompt(antragBereiche(), true);
+                const sys21 = generateBegruendungenAntrag.toString();
+                pruefeWahr('KI bekommt je Bereich die Kennung', /--- M1: Mobilität ---/.test(p21) && /--- M5: /.test(p21));
+                pruefeWahr('KI sieht, was sich verschlechtert hat', p21.includes('VERSCHLECHTERT'));
+                pruefeWahr('KI-Vorgabe verbietet BRi-Zitate und Ableitungssatz',
+                    sys21.includes('jedes Zitat aus den Begutachtungs-Richtlinien') && sys21.includes('ableitbar'));
+                pruefeWahr('KI-Vorgabe nennt den Zweck: Fragebogen ersetzen', sys21.includes('ersetzt den Fragebogen'));
+                pruefeWahr('Keine Stilbeispiele aus Widersprüchen im Antrag', !sys21.includes('getStilBeispiele'));
+                pruefeWahr('Keine „Widerspruch"-Rahmung in der Eingabe', !/gesamten Widerspruchs/.test(p21));
+                pruefeWahr('Einleitung verweist auf die Lebensbereiche',
+                    allgemeinAufgabe('hoeherstufung').includes('Einschränkungen in den Lebensbereichen'));
+                pruefeWahr('Widerspruch behält seinen Verweis',
+                    allgemeinAufgabe('widerspruch').includes('Befund und Stellungnahme'));
+                pruefe('Antrag: Absatz höchstens 5 Sätze / 110 Wörter', [satzGrenze(), wortGrenze()], [5, 110]);
+                pruefeWahr('Zu langer Bereich wird erkannt',
+                    laengenVerstoesse({ M1: 'Wort '.repeat(130) }, '', '').some(v => v.nr === 'M1'));
+                setzeModus('widerspruch');
+                pruefe('Widerspruch: Grenzen unverändert', [satzGrenze(), wortGrenze()], [5, 150]);
+                setzeModus('hoeherstufung');
+
+                // 21d. Genau der gemeldete Fall: KI fällt aus, dann klappt es
+                const docEl = document.getElementById('appeal-document');
+                const notizFeld = document.getElementById('erstgespraech-notes');
+                if (docEl && notizFeld) {
+                    if (typeof userApiKey !== 'undefined') userApiKey = 'TEST-OHNE-NETZ';
+                    notizFeld.value = '';                    // ohne Notizen keine Rechtschreibprüfung
+                    document.getElementById('stam-anamnese').value = 'Langer Anamnesetext des Vorgutachtens. '.repeat(120);
+                    setzeStellungnahme('');
+                    let aufrufe = 0, antragAufrufe = 0;
+                    window.callGeminiWithFallback = async () => { aufrufe++; throw new Error('429 (Test)'); };
+                    await generateAppealText();
+                    const erst = docEl.innerHTML;
+                    pruefeWahr('KI aus: kein Rohtext der Anamnese', erst.indexOf('Langer Anamnesetext') === -1);
+                    pruefeWahr('KI aus: Abschnitt „Angaben laut Vorgutachten" entfällt', erst.indexOf('Angaben laut Vorgutachten') === -1);
+                    pruefeWahr('KI aus: Bereiche als Ersatz markiert', /class="crit bereich"[^>]*data-ai="0"/.test(erst));
+
+                    window.callGeminiWithFallback = async (payload) => {
+                        aufrufe++;
+                        const props = payload.generationConfig && payload.generationConfig.responseSchema
+                            && payload.generationConfig.responseSchema.properties;
+                        if (props && props.bereiche) {
+                            antragAufrufe++;
+                            return { candidates: [{ content: { parts: [{ text: JSON.stringify({
+                                bereiche: [{ nr: 'M1', text: 'Treppen kann sie nicht mehr allein steigen.' },
+                                           { nr: 'M4', text: 'Beim Ankleiden des Oberkörpers hilft der Ehemann.' },
+                                           { nr: 'M5', text: 'Die Medikamente werden gereicht.' },
+                                           { nr: 'M9', text: 'Erfundener Bereich.' }],
+                                anamnese: 'Kurzfassung des Vorgutachtens in wenigen Sätzen.',
+                                allgemein: 'Aktuelle Lage in knapper Form.' }) }] } }] };
+                        }
+                        throw new Error('unerwarteter Aufruf');
+                    };
+                    await generateAppealText();
+                    const zweit = docEl.innerHTML;
+                    pruefe('Zweiter Versuch: genau ein KI-Aufruf für den Antrag', antragAufrufe, 1);
+                    pruefeWahr('Zweiter Versuch: Ersatzblöcke durch KI-Text ersetzt',
+                        zweit.includes('Treppen kann sie nicht mehr allein steigen.')
+                        && !/class="crit bereich"[^>]*data-ai="0"/.test(zweit));
+                    pruefeWahr('Zweiter Versuch: Kurzfassung des Vorgutachtens steht da',
+                        zweit.includes('Kurzfassung des Vorgutachtens in wenigen Sätzen.'));
+                    pruefeWahr('Ein von der KI erfundener Bereich fällt weg', zweit.indexOf('Erfundener Bereich') === -1);
+
+                    // Ein älteres Antragsdokument (alter Aufbau, drei Seiten Rohtext) wird umgebaut
+                    const alt = '<div class="stmt" data-vorgang="hoeherstufung"><h2>Anamnese</h2>'
+                        + '<h3>Angaben laut Vorgutachten</h3><div id="stmt-anamnese" data-ai="0"><p>'
+                        + 'Roher Text. '.repeat(400) + '</p></div><h3>Aktuelle Situation</h3><div id="stmt-notes" data-sig="x" data-ai="0"></div>'
+                        + '<h2>Befund und Stellungnahme</h2><div id="stmt-crit"><div class="crit" data-nr="4.1.1" data-vals="a|b">'
+                        + '<div>Die Einstufung ergibt sich aus dem erhobenen Befund und den Angaben zur Versorgung.</div></div></div></div>';
+                    const gemischt = document.createElement('div');
+                    gemischt.innerHTML = mergeStellungnahme(alt, buildHoeherstufung('', {}, '', ''));
+                    const gt = gemischt.innerText;
+                    pruefeWahr('Altes Dokument: Rohtext der Anamnese entfernt', gt.indexOf('Roher Text.') === -1);
+                    pruefeWahr('Altes Dokument: leere Überschrift entfernt', gt.indexOf('Angaben laut Vorgutachten') === -1);
+                    pruefeWahr('Altes Dokument: Abschnitt heißt jetzt Lebensbereiche',
+                        gt.includes('Einschränkungen in den Lebensbereichen') && !gt.includes('Befund und Stellungnahme'));
+                    pruefeWahr('Altes Dokument: Füllsätze je Kriterium verschwunden',
+                        gt.indexOf('Die Einstufung ergibt sich') === -1);
+                    // Eine von der KI erzeugte Kurzfassung bleibt, auch wenn diesmal keine neue kommt
+                    const mitKurz = alt.replace('data-ai="0"><p>' + 'Roher Text. '.repeat(400), 'data-ai="1"><p>Kurz.');
+                    gemischt.innerHTML = mergeStellungnahme(mitKurz, buildHoeherstufung('', {}, '', ''));
+                    pruefeWahr('Vorhandene Kurzfassung bleibt erhalten', gemischt.innerText.includes('Kurz.'));
+                }
+
+                // 21e. Seitenzahl: ein voller Fall passt in rund 7 Seiten
+                if (typeof seitenAufteilen === 'function' && typeof injectStellungnahmeCss === 'function') {
+                    injectStellungnahmeCss();
+                    leer21();
+                    ITEMS.filter(i => i.opts && i.m !== 5).forEach((i, k) => { if (k % 2 === 0) stateEigene.values[i.id] = 2; });
+                    stateEigene.values[id21('4.5.1')] = { count: 6, period: 'D' };
+                    stateEigene.values[id21('4.5.13')] = { count: 2, period: 'M' };
+                    const satz = 'Die versicherte Person benötigt dabei regelmäßig personelle Unterstützung durch den Ehemann. ';
+                    const texte = {}; ['M1', 'M2', 'M3', 'M4', 'M5', 'M6'].forEach(m => { texte[m] = satz.repeat(8); });
+                    ensureDiagRows(12);
+                    for (let n = 1; n <= 12; n++) {
+                        document.getElementById('diag-icd-' + n).value = 'I' + (10 + n) + '.9';
+                        document.getElementById('diag-txt-' + n).value = 'Diagnose Nummer ' + n;
+                    }
+                    erfassungLaden({ tabellen: {
+                        pflegepersonen: [{ art: 'Pflegeperson', name: 'A B', tage: '7', stunden: '2', unterstuetzung: 'Körperpflege, Haushalt' },
+                                         { art: 'Pflegeperson', name: 'C D', tage: '2', stunden: '5', unterstuetzung: 'Einkäufe' }],
+                        hilfsmittel: Array.from({ length: 10 }, (_, k) => ({ bezeichnung: 'Hilfsmittel ' + k, nutzung: 'genutzt' })),
+                        arztbesuche: [{ fach: 'Hausarzt', anzahl: '2', zeitraum: 'pro Monat', begleitung: 'in Begleitung' }],
+                        medikation: [{ applikation: 'oral (Tabletten, Tropfen, Säfte)', anzahl: '2', zeitraum: 'pro Tag', unterstuetzung: 'Gabe durch Pflegeperson' }]
+                    }, extra: { pg: '3' } });
+                    befundLaden({ texte: { groesse: '160', gewicht: '80' }, werte: { 'schuerzengriff|rechts': 1, 'schuerzengriff|links': 1, gangbild: 2 } });
+                    document.getElementById('stam-anamnese').value = 'Anamnese.';
+                    const html = buildHoeherstufung('', texte, 'Aktuelle Situation. '.repeat(25), 'Vorgutachten. '.repeat(20));
+                    const q = document.createElement('div');
+                    q.style.cssText = 'position:absolute;left:-10000px;top:0;width:170mm';
+                    q.innerHTML = html;
+                    document.body.appendChild(q);
+                    const z = document.createElement('div');
+                    z.style.cssText = 'position:absolute;left:-10000px;top:0';
+                    document.body.appendChild(z);
+                    const seiten = seitenAufteilen(q, z);
+                    q.remove(); z.remove();
+                    pruefeWahr('Voller Höherstufungsantrag: höchstens ' + LAENGE.antragSeitenMax + ' Seiten (gemessen: ' + seiten + ')',
+                        seiten > 0 && seiten <= LAENGE.antragSeitenMax);
+                }
+            } finally {
+                window.callGeminiWithFallback = merk21.ki;
+                if (typeof userApiKey !== 'undefined') userApiKey = merk21.key;
+                stateOrig = merk21.orig; stateEigene = merk21.eigen;
+                befundLaden(merk21.bef); erfassungLaden(merk21.erf);
+                document.getElementById('stam-anamnese').value = merk21.anam;
+                document.getElementById('stam-befund').value = merk21.befTxt;
+                const nf = document.getElementById('erstgespraech-notes'); if (nf) nf.value = merk21.notes;
+                const de = document.getElementById('appeal-document'); if (de) de.innerHTML = merk21.doc;
+                appealDraft = merk21.draft;
+                const box = document.getElementById('appeal-result-container');
+                if (box) box.style.display = (merk21.doc || '').trim() ? 'block' : 'none';
+                setzeModus(merk21.modus);
+                hideOverlay();
+            }
         }
 
     } catch (e) {

@@ -29,25 +29,18 @@ function haeufigkeitText(z) {
    Vorher standen sie zweimal im Dokument. */
 const BEFUND_GRUPPEN_DOPPELT = ['ernaehrung'];
 
+/* Die Befundtabellen enthalten nur noch BEFUNDE – Griffe, Gangbild, Sehen, Hören, Wunden,
+   Kontinenz, Atmung. Die NBA-Kriterien (Einträge mit „nba") und die Problemlagen des
+   Moduls 3 stehen mit ihrer Einschätzung im Abschnitt „Einschränkungen in den
+   Lebensbereichen". Standen sie auch hier, war jede Einschätzung zweimal im Dokument
+   (Regel 17) – und das Schriftstück entsprechend länger. */
 function befundBlock() {
     let html = '';
     BEFUND_GRUPPEN.forEach(g => {
         if (BEFUND_GRUPPEN_DOPPELT.indexOf(g.id) !== -1) return;
         const zeilen = [];
-        // Modul 3: nur die tatsächlich erfassten Problemlagen, nicht alle dreizehn Kriterien
-        if (g.sonder === 'psyche') {
-            psycheListe.forEach(z => {
-                if (z.wertung === null && typeof z.haeufigkeit !== 'number') return;
-                const teile = [];
-                if (typeof z.haeufigkeit === 'number') teile.push(PSYCHE_HAEUFIGKEIT[z.haeufigkeit]);
-                if (z.wertung !== null) teile.push(PSYCHE_WERTUNG[z.wertung]);
-                if ((z.bemerkung || '').trim()) teile.push(z.bemerkung.trim());
-                // Die Katalogtitel tragen die Kriteriumsnummer mit; sie folgt der
-                // Zählung des Gutachtens (bei Medicproof 5.x.y).
-                zeilen.push([nummernImText(psycheTitel(z.nr)), teile.join(' – ')]);
-            });
-        }
         g.eintraege.forEach(e => {
+            if (e.nba) return;                    // steht in den Lebensbereichen
             if (e.frei) {
                 const t = befundTexte[e.id];
                 if (t && t.trim()) zeilen.push([e.titel, t]);
@@ -57,9 +50,6 @@ function befundBlock() {
             seiten.forEach(s => {
                 const w = befundWert(e, s);
                 if (w === null) return;
-                // Unauffällige NBA-Kriterien (Stufe 0) nicht auflisten – sie tragen nichts bei
-                // und würden das Dokument mit 35 Zeilen ohne Aussage füllen.
-                if (e.nba && w === 0) return;
                 const zusatz = [befundZusatzText(e), befundTexte[e.id + '_zusatz']].filter(Boolean).join(', ');
                 zeilen.push([nummernImText(e.titel) + (s ? ' ' + s : ''), e.skala[w] + (zusatz ? ' – ' + zusatz : '')]);
             });
@@ -70,6 +60,94 @@ function befundBlock() {
         if (zeilen.length) html += tabellenBlock(g.titel, ['Kriterium', 'Befund'], zeilen);
     });
     return html;
+}
+
+// ====================================================== Lebensbereiche (Antrag)
+/* EIN ANTRAG IST KEIN WIDERSPRUCH – AUCH NICHT IM AUFBAU.
+   Der Antrag ersetzt den Fragebogen des Medizinischen Dienstes: Er soll zeigen, welche
+   Einschränkungen heute bestehen und – im Höherstufungsantrag – was sich seit dem
+   Vorgutachten verschlechtert hat. Eine Begründung je Kriterium mit BRi-Zitat und
+   Ableitungssatz („… ist somit eine Wertung mit … ableitbar") ist die Form des Widerspruchs;
+   im Antrag machte sie das Schriftstück zehn Seiten lang und liest sich wie ein Streit.
+   Stattdessen: je Lebensbereich (Modul) ein kurzer Absatz und darunter eine Zeile mit der
+   eigenen Einschätzung. Die Gegenüberstellung mit dem Vorgutachten steht in der Tabelle. */
+const ANTRAG_BEREICHE = {
+    1: 'Mobilität', 2: 'Kognitive und kommunikative Fähigkeiten',
+    3: 'Verhaltensweisen und psychische Problemlagen', 4: 'Selbstversorgung',
+    5: 'Krankheits- und therapiebedingte Anforderungen', 6: 'Gestaltung des Alltagslebens und sozialer Kontakte'
+};
+
+// Einschätzung eines Kriteriums als Text, wie sie im Schriftstück erscheint
+function antragStufe(item, wert) {
+    if (item.m === 5 && item.group !== 'D') {
+        const o = (wert && typeof wert === 'object') ? wert : { count: 0, period: 'W' };
+        return (Number(o.count) > 0) ? m5HaeufigkeitText(item.nr, o) : null;
+    }
+    if (!item.opts || typeof wert !== 'number' || wert <= 0) return null;
+    return expandLabel(item.opts[wert] || '');
+}
+
+/* Die Lebensbereiche, zu denen etwas zu sagen ist: jedes Modul mit mindestens einer
+   Einschränkung in der eigenen Einschätzung. Je Bereich die eingeschränkten Kriterien und,
+   im Höherstufungsantrag, ihre Stufe laut Vorgutachten – die braucht die KI, um die
+   Veränderung zu beschreiben. „sig" ändert sich, sobald sich eine Einschätzung ändert;
+   nur dann wird der Absatz neu verfasst, sonst bleibt ein von Hand überarbeiteter stehen. */
+function antragBereiche() {
+    const hoeher = (typeof appModus !== 'undefined' && appModus === 'hoeherstufung');
+    const liste = [];
+    for (let m = 1; m <= 6; m++) {
+        const kriterien = [];
+        ITEMS.filter(i => i.m === m).forEach(i => {
+            const e = antragStufe(i, stateEigene.values[i.id]);
+            if (!e) return;
+            const o = hoeher ? antragStufe(i, stateOrig.values[i.id]) : null;
+            const eintrag = { nr: i.nr, title: i.title, e: e, o: o, geaendert: hoeher && o !== e };
+            // Modul 3: die Bemerkung aus der Befunderhebung gehört zur Einschätzung
+            if (m === 3 && typeof psycheListe !== 'undefined') {
+                const pz = psycheListe.find(z => z.nr === i.nr);
+                if (pz && (pz.bemerkung || '').trim()) eintrag.bemerkung = pz.bemerkung.trim();
+            }
+            kriterien.push(eintrag);
+        });
+        if (!kriterien.length) continue;
+        liste.push({ nr: 'M' + m, m: m, titel: ANTRAG_BEREICHE[m], kriterien: kriterien,
+                     sig: JSON.stringify(kriterien.map(k => [k.nr, k.e, k.o, k.bemerkung || ''])) });
+    }
+    return liste;
+}
+
+// Die Zeile „Einschätzung: …" unter dem Absatz – ohne Gegenüberstellung (Regel 19)
+function bereichEinschaetzung(b, org) {
+    return b.kriterien.map(k => nummernImText(k.title, org) + ' „' + k.e + '“'
+        + (k.bemerkung ? ' (' + k.bemerkung + ')' : '')).join(' · ');
+}
+
+/* Modul 5 wird je Gruppe gewertet (siehe m5Gruppen). Im Bereich steht dazu EIN gerechneter
+   Satz – nicht, wie vorher, derselbe Satz unter jedem Kriterium des Moduls. */
+function m5ModulSatz(spalte) {
+    const g = m5Gruppen(zustandZu(spalte || 'own'));
+    const einzel = g.gesamt;
+    return 'Die Maßnahmen dieses Bereichs werden nach den Begutachtungs-Richtlinien nicht einzeln, '
+        + 'sondern gruppenweise gewertet; Modul 5 kommt damit auf ' + einzel
+        + (einzel === 1 ? ' Einzelpunkt' : ' Einzelpunkte') + ' und ' + zahlDE(m5Gewichtet(einzel))
+        + ' gewichtete Punkte.';
+}
+
+function lebensbereicheHtml(bereiche, texte, org) {
+    const esc = escapeHtml;
+    if (!bereiche.length) return '<p>Es wurden keine Einschränkungen der Selbständigkeit erfasst.</p>';
+    return bereiche.map(b => {
+        const txt = ((texte || {})[b.nr] || '').trim();
+        const absaetze = txt
+            ? nummernImText(txt, org).split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
+            : '';
+        const m5 = (b.m === 5) ? `<div class="m5-wirkung">${esc(m5ModulSatz('own'))}</div>` : '';
+        return `<div class="crit bereich" data-nr="${esc(b.nr)}" data-vals="${esc(b.sig)}" data-ai="${txt ? '1' : '0'}">`
+             + `<div class="ct">${esc(modulNr(b.m, org))} ${esc(b.titel)}</div>`
+             + absaetze
+             + `<div class="bereich-wertung">Einschätzung: ${esc(bereichEinschaetzung(b, org))}</div>`
+             + m5 + `</div>`;
+    }).join('');
 }
 
 // Deckblatt: Antragsschreiben an die Pflegekasse, das die versicherte Person unterschreibt.
@@ -182,40 +260,11 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
         if (icd || txt) diagZeilen.push([icd, txt, '']);
     }
 
-    // Abweichende Kriterien
+    // Abweichungen – für die Kennung der „Aktuellen Situation" (allgemeinSignature)
     const diffs = computeDiffs();
-    const bg = begruendungen || {};
-    const critHtml = diffs.length
-        ? diffs.map(d => {
-            const txt = (bg[d.nr] || '').trim();
-            // Nummern auf die Zählung des Gutachtens umstellen (bei Medicproof 5.x.y).
-            const txtAnz = nummernImText(txt, org);
-            /* ANTRAG IST KEIN WIDERSPRUCH.
-               Hier wird nichts gegenübergestellt: Der Erstantrag hat gar kein Gutachten,
-               gegen das sich etwas ableiten ließe, und der Höherstufungsantrag beschreibt
-               eine Verschlechterung – er beanstandet keine fremde Wertung. Die eigene
-               Einschätzung steht deshalb in der Überschrift, darunter folgt ihre
-               Begründung. Die Gegenüberstellung mit dem Vorgutachten steht dort, wo sie
-               hingehört: in der Tabelle. */
-            let body = txtAnz
-                ? txtAnz.split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
-                : `<div>Die Einstufung ergibt sich aus dem erhobenen Befund und den Angaben zur Versorgung.</div>`;
-            if (txt) {
-                // Geprüft wird der Originaltext – die BRi kennt nur ihre eigene Nummerierung.
-                const offen = unbelegteZitate(d.nr, txt);
-                if (offen.length) body += `<div class="zitat-warnung" data-warn="1">⚠ Bitte prüfen: nicht wörtlich im BRi-Text zu ${esc(zeigeNr(d.nr, org))} belegt: `
-                    + offen.map(z => `„${esc(z)}“`).join(' · ') + `</div>`;
-            }
-            // Modul 5 wird je Gruppe gewertet. Im Antrag ohne Gegenüberstellung – der
-            // Satz nennt nur den erreichten Stand (siehe m5StandSatz).
-            const m5 = (d.m === 5 && typeof m5StandSatz === 'function')
-                ? m5StandSatz(d.nr, 'own') : '';
-            if (m5) body += `<div class="m5-wirkung">${esc(nummernImText(m5, org))}</div>`;
-            return `<div class="crit" data-nr="${esc(d.nr)}" data-vals="${esc(d.o)}|${esc(d.e)}">`
-                 + `<div class="ct">${esc(zeigeNr(d.nr, org))} ${esc(d.title)}: „${esc(d.e)}“</div>`
-                 + `${body}</div>`;
-        }).join('')
-        : `<p>Es wurden keine abweichenden Einzelkriterien erfasst.</p>`;
+    // Kern des Antrags: je Lebensbereich ein Absatz und die eigene Einschätzung
+    const bereiche = antragBereiche();
+    const critHtml = lebensbereicheHtml(bereiche, begruendungen || {}, org);
 
     // Gegenüberstellung: beim Erstantrag nur eine Wertespalte
     const row = (label, o, e, bold) => istHoeher
@@ -241,13 +290,15 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
         ? nummernImText(allgemeinText.trim(), org).split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
         : (notes ? `<p>${esc(notes).replace(/\n/g, '<br>')}</p>` : '');
 
-    /* Angaben laut Vorgutachten: die von der KI gekürzte Fassung, sonst der Rohtext.
-       Ohne Vorgutachten (Erstantrag) gibt es diesen Abschnitt gar nicht. */
+    /* Angaben laut Vorgutachten: NUR die von der KI gekürzte Fassung (Viertelseite).
+       Früher stand hier ersatzweise der ROHTEXT, wenn die KI ausfiel – im Fall des Verfassers
+       drei Seiten Anamnese aus dem Vorgutachten, das der Medizinische Dienst ohnehin hat.
+       Ohne Kurzfassung entfällt der Abschnitt; die App meldet das (generateAppealText). */
     const anamneseRoh = g('stam-anamnese');
     const anamneseKurz = (anamneseZusammenfassung && anamneseZusammenfassung.trim())
         ? anamneseZusammenfassung.trim() : '';
-    const anamneseBlock = anamneseRoh
-        ? (anamneseKurz || anamneseRoh).split(/\n\s*\n/)
+    const anamneseBlock = (anamneseRoh && anamneseKurz)
+        ? anamneseKurz.split(/\n\s*\n/)
             .map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
         : '';
 
@@ -265,7 +316,8 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
           + `Veränderungen im Gesundheitszustand und in der Alltagskompetenz ergeben, die zu einer höheren pflegerischen Versorgungsnotwendigkeit `
           + `führen und somit eine Neubewertung der Module erforderlich machen`
           + (erfassungExtra.verschlechterung ? ` (${df('vschl', erfassungExtra.verschlechterung)})` : '')
-          + `. Im Folgenden werden die wesentlichen Abweichungen tabellarisch dargestellt:</p>`
+          + `. Die folgende Tabelle stellt die gewichteten Punkte des Vorgutachtens der heutigen Einschätzung gegenüber; `
+          + `die Einschränkungen selbst sind im Anschluss je Lebensbereich beschrieben.</p>`
         : `<p>Es bestehen relevante Einschränkungen der Selbständigkeit und ein daraus resultierender personeller Unterstützungsbedarf, `
           + `der zu einer pflegerischen Versorgungsnotwendigkeit führt und somit eine Bewertung der Module erforderlich macht. `
           + `Im Folgenden werden die wesentlichen Bewertungen anhand der gutachterlichen Richtlinien SGB XI tabellarisch dargestellt:</p>`;
@@ -308,8 +360,8 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
           was das Vorgutachten festgehalten hat (kurz zusammengefasst, Viertelseite) und
           wie es heute aussieht (Drittelseite). Ohne Vorgutachten entfällt der erste. */''}
     <h2>Anamnese</h2>
-    ${anamneseRoh ? `<h3>Angaben laut Vorgutachten</h3>
-    <div id="stmt-anamnese" data-ai="${anamneseKurz ? '1' : '0'}">${anamneseBlock}</div>` : ''}
+    ${anamneseBlock ? `<h3>Angaben laut Vorgutachten</h3>
+    <div id="stmt-anamnese" data-ai="1">${anamneseBlock}</div>` : ''}
     <h3>Aktuelle Situation</h3>
     <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${notesBlock}</div>
 
@@ -338,14 +390,14 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
     ${tabellenBlock('Behandlungspflege', ['Maßnahme', 'Tätigkeitsbeschreibung', 'Häufigkeit', 'Durchführung'],
         (erfassung.behandlungspflege || []).filter(z => (z.art || '').trim()).map(z => [z.art, z.beschreibung || '', haeufigkeitText(z), z.durchfuehrung || '']))}
 
-    <h2>${istHoeher ? 'Gegenüberstellung des Vorgutachtens und der abweichenden Bepunktung' : 'Bewertung der Module'}</h2>
+    <h2>${istHoeher ? 'Bewertung der Module: Vorgutachten und heutige Einschätzung' : 'Bewertung der Module'}</h2>
     ${einleitung}
     <table class="cmp">
-      <thead><tr><th>Modul</th>${istHoeher ? '<th>Gewichtete Punkte laut Vorgutachten</th>' : ''}<th>Gewichtete Punkte Beurteilung</th></tr></thead>
+      <thead><tr><th>Modul</th>${istHoeher ? '<th>Gewichtete Punkte laut Vorgutachten</th>' : ''}<th>Gewichtete Punkte heute</th></tr></thead>
       <tbody id="stmt-cmp-body">${tableRows}</tbody>
     </table>
 
-    <h2>Befund und Stellungnahme</h2>
+    <h2 id="stmt-crit-titel">Einschränkungen in den Lebensbereichen</h2>
     <div id="stmt-crit">${critHtml}</div>
 
     <hr>
