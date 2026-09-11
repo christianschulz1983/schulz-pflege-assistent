@@ -19,21 +19,31 @@ const LAENGE = {
     begruendungWoerterMax: 150,
     // Anhoerungsverfahren: weniger Kriterien, dafuer tiefer begruendet.
     begruendungSaetzeAnhoerung: 8,
-    begruendungWoerterAnhoerung: 230
+    begruendungWoerterAnhoerung: 230,
+    /* Antrag: statt einer Begründung je Kriterium ein Absatz je Lebensbereich (Modul).
+       Sechs Absätze zu höchstens 110 Wörtern sind gut eine Seite – vorher standen dort
+       leicht fünfzehn Begründungen zu je 150 Wörtern, also vier bis fünf Seiten. */
+    antragBereichSaetzeMax: 5,
+    antragBereichWoerterMax: 110,
+    // Richtwert für das ganze Antragsschriftstück (Vorgabe des Verfassers: rund 7 Seiten)
+    antragSeitenMax: 7
 };
+
+function istAntragsModus() {
+    return (typeof appModus !== 'undefined')
+        && (appModus === 'erstantrag' || appModus === 'hoeherstufung');
+}
 
 // Grenzen je nach Vorgangsart
 function satzGrenze() {
+    if (istAntragsModus()) return LAENGE.antragBereichSaetzeMax;
     return (typeof appModus !== 'undefined' && appModus === 'anhoerung')
         ? LAENGE.begruendungSaetzeAnhoerung : LAENGE.begruendungSaetzeMax;
 }
 function wortGrenze() {
+    if (istAntragsModus()) return LAENGE.antragBereichWoerterMax;
     return (typeof appModus !== 'undefined' && appModus === 'anhoerung')
         ? LAENGE.begruendungWoerterAnhoerung : LAENGE.begruendungWoerterMax;
-}
-function istAntragsModus() {
-    return (typeof appModus !== 'undefined')
-        && (appModus === 'erstantrag' || appModus === 'hoeherstufung');
 }
 // Der einleitende Abschnitt: halbe Seite im Widerspruch und in der Anhörung,
 // Drittelseite im Antrag („Aktuelle Situation").
@@ -129,20 +139,25 @@ async function kuerzeUeberlaenge(map, allgemein, einleitTitel, anamnese) {
         else stuecke.push({ nr: v.nr, text: map[v.nr] });
     });
 
+    // Im Antrag gibt es weder BRi-Zitate noch Ableitungssätze – die Vorgabe darf sie dort
+    // nicht als unantastbar erklären, sonst schreibt die KI sie beim Kürzen hinein.
+    const antrag = istAntragsModus();
     const systemPrompt = `Du kürzt bereits fertige Textabschnitte einer pflegefachlichen Stellungnahme.
 Kürze AUSSCHLIESSLICH – formuliere nicht neu, ergänze nichts, ändere keine Aussage und keine Zahl.
 
 Vorgaben:
-- Abschnitte mit einer Kriteriumsnummer: höchstens ${satzGrenze()} Sätze und
+- ${antrag ? 'Abschnitte M1 bis M6 (je ein Lebensbereich)' : 'Abschnitte mit einer Kriteriumsnummer'}: höchstens ${satzGrenze()} Sätze und
   ${wortGrenze()} Wörter.
 - Der Abschnitt „__allgemein__" (Überschrift „${einleitTitel || 'Allgemeine Angaben'}"):
   höchstens ${allgemeinWortGrenze()} Wörter in 2 bis 3 Absätzen.
 - Der Abschnitt „__anamnese__" (Zusammenfassung der Angaben aus dem Vorgutachten):
   höchstens ${LAENGE.anamneseWoerterMax} Wörter, ein einziger Absatz.
 
-Was erhalten bleiben MUSS: alle Feststellungen aus den Notizen des Verfassers, jedes wörtliche
+Was erhalten bleiben MUSS: alle Feststellungen aus den Notizen des Verfassers${antrag
+    ? ', jede Angabe zu Hilfebedarf, Häufigkeit und helfender Person.'
+    : `, jedes wörtliche
 Zitat aus den Richtlinien einschließlich der Anführungszeichen, jede Stufenbezeichnung und der
-Schlusssatz „Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „…" ableitbar."
+Schlusssatz „Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „…" ableitbar."`}
 Gestrichen werden Füllwörter, Wiederholungen, Allgemeinplätze und Nebensätze ohne Beweiswert.
 Gib zu jeder Nummer den gekürzten Text zurück, sonst nichts.`;
 
@@ -183,6 +198,14 @@ Gib zu jeder Nummer den gekürzten Text zurück, sonst nichts.`;
 function laengenVorgabeAnamnese() {
     return `LÄNGE – HARTE OBERGRENZE: höchstens ${LAENGE.anamneseWoerterMax} Wörter
 (etwa ${LAENGE.anamneseZeichenMax} Zeichen, also HÖCHSTENS eine VIERTEL A4-Seite), ein einziger Absatz.`;
+}
+
+// Vorgabe für die Absätze je Lebensbereich im Antrag
+function laengenVorgabeBereich() {
+    return `LÄNGE – HARTE OBERGRENZE: Jeder Absatz zu einem Lebensbereich hat HÖCHSTENS
+${LAENGE.antragBereichSaetzeMax} Sätze und ${LAENGE.antragBereichWoerterMax} Wörter. Das ganze Schriftstück soll nicht mehr
+als rund ${LAENGE.antragSeitenMax} Seiten umfassen – ein langer Text wird bei der Pflegekasse nicht gelesen.
+Lieber drei dichte Sätze als fünf allgemeine.`;
 }
 
 function laengenVorgabeAllgemein(titel) {

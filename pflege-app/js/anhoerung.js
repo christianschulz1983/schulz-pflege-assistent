@@ -288,7 +288,8 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
             const kipp = l.kipptAllein
                 ? `<div>Bereits die richtlinienkonforme Wertung dieses einen Kriteriums ergäbe ${esc(pgSatz(l.pgMit))}.</div>` : '';
             const anl = (typeof anlagenVerweisHtml === 'function') ? anlagenVerweisHtml(l.nr) : '';
-            return `<div class="crit" data-nr="${esc(l.nr)}" data-vals="${esc(lagenSchluessel(l))}">`
+            // data-ai: stammt der Text von der KI? Ersatzbloecke werden beim naechsten Mal nachgeholt.
+            return `<div class="crit" data-nr="${esc(l.nr)}" data-vals="${esc(lagenSchluessel(l))}" data-ai="${txt ? '1' : '0'}">`
                  + `<div class="ct">${esc(zeigeNr(l.nr, org))}: ${esc(l.titel)}</div>`
                  // Wie in der Vorlage des Verfassers: nur die Bewertung, gegen die sich die
                  // Stellungnahme richtet – das ist im Anhörungsverfahren die des

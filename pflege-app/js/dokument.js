@@ -96,7 +96,8 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
             const m5 = (d.m === 5 && typeof m5WirkungSatz === 'function')
                 ? m5WirkungSatz(d.nr, 'orig', 'own') : '';
             if (m5) body += `<div class="m5-wirkung">${esc(nummernImText(m5, org))}</div>`;
-            return `<div class="crit" data-nr="${esc(d.nr)}" data-vals="${esc(d.o)}|${esc(d.e)}"><div class="ct">${esc(zeigeNr(d.nr, org))}: ${esc(d.title)}</div><div>Gutachterliche Bewertung: „${esc(d.o)}“</div>${body}</div>`;
+            // data-ai: stammt der Text von der KI? Ersatzbloecke werden beim naechsten Mal nachgeholt.
+            return `<div class="crit" data-nr="${esc(d.nr)}" data-vals="${esc(d.o)}|${esc(d.e)}" data-ai="${txt ? '1' : '0'}"><div class="ct">${esc(zeigeNr(d.nr, org))}: ${esc(d.title)}</div><div>Gutachterliche Bewertung: „${esc(d.o)}“</div>${body}</div>`;
         }).join('')
         : `<p>Es wurden keine von der Begutachtung abweichenden Einzelkriterien erfasst.</p>`;
 
@@ -310,7 +311,8 @@ function mergeStellungnahme(existingHtml, freshHtml) {
         const altLeer = !cN.innerHTML.trim();
         // Ersetzen nur, wenn bisher nichts dasteht oder tatsächlich ein neu verfasster
         // KI-Text vorliegt. Scheitert die KI, bleibt der vorhandene Text unangetastet.
-        if (altLeer || (fN.getAttribute('data-ai') === '1' && alt !== neu)) {
+        const altNurNotizen = cN.getAttribute('data-ai') === '0';
+        if (altLeer || (fN.getAttribute('data-ai') === '1' && (alt !== neu || altNurNotizen))) {
             cN.innerHTML = fN.innerHTML;
             cN.setAttribute('data-sig', neu);
             cN.setAttribute('data-ai', fN.getAttribute('data-ai') || '0');
@@ -319,8 +321,21 @@ function mergeStellungnahme(existingHtml, freshHtml) {
     /* „Angaben laut Vorgutachten": Der Abschnitt wird nur ersetzt, wenn eine neu erzeugte
        Zusammenfassung vorliegt. Von Hand überarbeitete Fassungen bleiben stehen. */
     const fA = fresh.querySelector('#stmt-anamnese'), cA = cur.querySelector('#stmt-anamnese');
-    if (fA && cA) {
-        if (!cA.innerHTML.trim() || fA.getAttribute('data-ai') === '1') cA.innerHTML = fA.innerHTML;
+    /* Früher stand hier ersatzweise der ungekürzte Anamnesetext (data-ai="0"). So ein
+       Rohtext ist keine Überarbeitung des Beraters, sondern der Ausfall der Kurzfassung –
+       er wird ersetzt oder, wenn es noch keine Kurzfassung gibt, entfernt. Eine von Hand
+       gekürzte Fassung erkennt man daran, dass sie die Viertelseite nicht sprengt. */
+    const rohtext = el => !!el && el.getAttribute('data-ai') !== '1'
+        && zaehleZeichen(el.textContent || '') > LAENGE.anamneseZeichenMax * 1.5;
+    if (!fA && rohtext(cA)) {
+        const titel = cA.previousElementSibling;
+        if (titel && /^H3$/i.test(titel.tagName) && /Angaben laut Vorgutachten/.test(titel.textContent)) titel.remove();
+        cA.remove();
+    } else if (fA && cA) {
+        if (!cA.innerHTML.trim() || fA.getAttribute('data-ai') === '1' || rohtext(cA)) {
+            cA.innerHTML = fA.innerHTML;
+            cA.setAttribute('data-ai', fA.getAttribute('data-ai') || '0');
+        }
     } else if (fA && !cA) {
         // Der Abschnitt ist neu hinzugekommen (älteres Schriftstück) – dann mit aufnehmen.
         const anker = cur.querySelector('#stmt-notes');
@@ -334,6 +349,17 @@ function mergeStellungnahme(existingHtml, freshHtml) {
     // überarbeitete) Begründungen bleiben erhalten, solange sich die Bewertung nicht geändert
     // hat. Neue Abweichungen kommen hinzu, weggefallene verschwinden.
     const fCrit = fresh.querySelector('#stmt-crit'), cCrit = cur.querySelector('#stmt-crit');
+    /* Die Überschrift des Abschnitts folgt der Vorlage: Ein älterer Antrag hieß noch
+       „Befund und Stellungnahme", der heutige „Einschränkungen in den Lebensbereichen". */
+    const fTitel = fresh.querySelector('#stmt-crit-titel');
+    if (fTitel && cCrit) {
+        let cTitel = cur.querySelector('#stmt-crit-titel');
+        if (!cTitel) {
+            const vor = cCrit.previousElementSibling;
+            if (vor && /^H2$/i.test(vor.tagName)) { cTitel = vor; cTitel.id = 'stmt-crit-titel'; }
+        }
+        if (cTitel) cTitel.textContent = fTitel.textContent;
+    }
     if (fCrit && cCrit) {
         const alt = {};
         cCrit.querySelectorAll('.crit[data-nr]').forEach(el => { alt[el.getAttribute('data-nr')] = el; });
@@ -345,9 +371,12 @@ function mergeStellungnahme(existingHtml, freshHtml) {
             frischeBloecke.forEach(f => {
                 const nr = f.getAttribute('data-nr');
                 const a = alt[nr];
-                // Unverändert bewertet -> bestehenden Text behalten, sonst neuen übernehmen
-                neu.appendChild((a && a.getAttribute('data-vals') === f.getAttribute('data-vals'))
-                    ? a.cloneNode(true) : f.cloneNode(true));
+                // Unverändert bewertet -> bestehenden Text behalten, sonst neuen übernehmen.
+                // Ausnahme: Der alte Block war nur der Ersatztext (data-ai="0") und jetzt liegt
+                // ein von der KI verfasster vor – dann gilt der neue.
+                const behalten = a && a.getAttribute('data-vals') === f.getAttribute('data-vals')
+                    && !(a.getAttribute('data-ai') === '0' && f.getAttribute('data-ai') === '1');
+                neu.appendChild(behalten ? a.cloneNode(true) : f.cloneNode(true));
             });
             cCrit.innerHTML = neu.innerHTML;
         }
@@ -412,15 +441,25 @@ async function generateAppealText() {
         // Im Anhoerungsverfahren sind nur die strittig gebliebenen Kriterien zu begruenden.
         const analyse = istAnh ? schwellenAnalyse() : null;
         const diffs = istAnh ? analyse.strittig : computeDiffs();
-        const schluessel = d => istAnh ? lagenSchluessel(d) : (d.o + '|' + d.e);
+        /* Im Antrag sind die Einheiten die LEBENSBEREICHE (je Modul ein Absatz), nicht die
+           abweichenden Kriterien – der Antrag begründet nicht Kriterium für Kriterium. */
+        const istAntrag = !istAnh && typeof istAntragsModus === 'function' && istAntragsModus();
+        const einheiten = istAntrag ? antragBereiche() : diffs;
+        const schluessel = d => istAnh ? lagenSchluessel(d) : (istAntrag ? d.sig : (d.o + '|' + d.e));
         const vorhandenEl = document.getElementById('appeal-document');
         const vorhandenHtml = (vorhandenEl && vorhandenEl.innerHTML.trim()) ? vorhandenEl.innerHTML : (appealDraft || '');
         const bereitsDa = {};
         if (vorhandenHtml) {
             const tmp = document.createElement('div'); tmp.innerHTML = vorhandenHtml;
-            tmp.querySelectorAll('.crit[data-nr]').forEach(el => { bereitsDa[el.getAttribute('data-nr')] = el.getAttribute('data-vals'); });
+            /* Ein Block, der NICHT von der KI stammt (data-ai="0" – etwa weil sie beim letzten
+               Mal im Limit hing), gilt als noch nicht geschrieben. Sonst bliebe der Ersatzsatz
+               für immer stehen: Die Bewertung ist ja unverändert. */
+            tmp.querySelectorAll('.crit[data-nr]').forEach(el => {
+                if (el.getAttribute('data-ai') === '0') return;
+                bereitsDa[el.getAttribute('data-nr')] = el.getAttribute('data-vals');
+            });
         }
-        const zuErzeugen = diffs.filter(d => bereitsDa[d.nr] !== schluessel(d));
+        const zuErzeugen = einheiten.filter(d => bereitsDa[d.nr] !== schluessel(d));
         // „Allgemeine Angaben" nur neu verfassen, wenn sie fehlen oder sich Notizen/Abweichungen änderten
         let allgemeinText = '';
         // Gekürzte Anamnese aus dem Vorgutachten (nur Erstantrag und Höherstufung)
@@ -430,11 +469,14 @@ async function generateAppealText() {
             const tmp2 = document.createElement('div'); tmp2.innerHTML = vorhandenHtml;
             const n = tmp2.querySelector('#stmt-notes');
             const sig = istAnh ? anhoerungSignatur(analyse, notes) : allgemeinSignature(notes, diffs);
-            if (n && n.innerHTML.trim() && n.getAttribute('data-sig') === sig) brauchtAllgemein = false;
+            // Nur ein von der KI verfasster Abschnitt gilt als vorhanden – der blosse Notiztext
+            // (data-ai="0", KI ausgefallen) wird beim naechsten Mal nachgeholt.
+            if (n && n.innerHTML.trim() && n.getAttribute('data-sig') === sig
+                && n.getAttribute('data-ai') !== '0') brauchtAllgemein = false;
         }
         if ((zuErzeugen.length || brauchtAllgemein) && keyPresent) {
             const was = [];
-            if (zuErzeugen.length) was.push(`${zuErzeugen.length} Begründung(en)`);
+            if (zuErzeugen.length) was.push(istAntrag ? `${zuErzeugen.length} Lebensbereich(e)` : `${zuErzeugen.length} Begründung(en)`);
             if (brauchtAllgemein) was.push('Allgemeine Angaben');
             showOverlay("Stellungnahme wird erstellt...", was.join(' und ') + ' werden verfasst');
             try {
@@ -455,6 +497,16 @@ async function generateAppealText() {
         }
 
         const fresh = baueDokument(notes, begruendungen, allgemeinText, anamneseKurz);
+        /* Antrag ohne Kurzfassung des Vorgutachtens: Der Abschnitt entfällt – früher stand dort
+           ersatzweise der ganze Anamnesetext (drei Seiten). Das dem Berater sagen, damit er
+           entweder erneut erzeugt oder den Abschnitt bewusst weglässt. */
+        const vorhandenKurz = /id="stmt-anamnese"[^>]*data-ai="1"/.test(vorhandenHtml || '');
+        const fehltKurzfassung = istAntrag && !!(document.getElementById('stam-anamnese')?.value || '').trim()
+            && !anamneseKurz && !vorhandenKurz;
+        const hinweisKurzfassung = fehltKurzfassung
+            ? ' Der Abschnitt „Angaben laut Vorgutachten" fehlt noch – die Kurzfassung konnte nicht erzeugt '
+              + 'werden. Bitte später erneut „Stellungnahme erstellen" (die übrigen Texte bleiben erhalten).'
+            : '';
         const docEl = document.getElementById('appeal-document');
         const cont = document.getElementById('appeal-result-container');
         // Vorhandenen (ggf. vom Nutzer bearbeiteten) Stand ermitteln
@@ -482,10 +534,13 @@ async function generateAppealText() {
         const warnAnzahl = (docEl ? docEl.querySelectorAll('.zitat-warnung[data-warn]').length : 0);
         if (warnAnzahl) {
             showToast(`Achtung: In ${warnAnzahl} Begründung${warnAnzahl > 1 ? 'en' : ''} steht ein Zitat, das sich nicht wörtlich in den BRi belegen lässt. Die Stellen sind rot markiert – bitte streichen oder korrigieren.`, "error");
+        } else if (hinweisKurzfassung) {
+            showToast((merged ? "Aktualisiert." : "Stellungnahme erstellt.") + hinweisKurzfassung, "error");
         } else {
             showToast(merged
                 ? "Aktualisiert – Ihre Ergänzungen wurden beibehalten, nur die Falldaten wurden erneuert."
-                : "Stellungnahme im Familiara-Format erstellt. Alle BRi-Zitate sind belegt.", "success");
+                : (istAntrag ? "Stellungnahme im Familiara-Format erstellt."
+                             : "Stellungnahme im Familiara-Format erstellt. Alle BRi-Zitate sind belegt."), "success");
         }
         if (docEl) docEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {

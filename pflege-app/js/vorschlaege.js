@@ -339,8 +339,11 @@ function allgemeinAufgabe(vorgang) {
         + 'Stichpunkte zu Fließtext aus, ohne Inhalte zu verändern oder hinzuzuerfinden.\n';
 
     // Diese Sperre ist der Kern der Änderung: keine Begründung, keine Richtlinien, keine Stufen.
-    const sperre = 'STRENG VERBOTEN in diesem Abschnitt – all das gehört ausschließlich in den\n'
-        + 'Abschnitt „Befund und Stellungnahme":\n'
+    // Im Antrag heißt der nachfolgende Abschnitt anders – er ist keine Begründung je Kriterium.
+    const antrag = (vorgang === 'erstantrag' || vorgang === 'hoeherstufung');
+    const sperre = 'STRENG VERBOTEN in diesem Abschnitt – ' + (antrag
+            ? 'die Einschränkungen je Lebensbereich stehen im\nAbschnitt „Einschränkungen in den Lebensbereichen":\n'
+            : 'all das gehört ausschließlich in den\nAbschnitt „Befund und Stellungnahme":\n')
         + '- jede Begründung, warum eine andere Wertung richtig wäre\n'
         + '- jeder Bezug auf die Begutachtungs-Richtlinien und jedes Zitat daraus\n'
         + '- jede Stufenbezeichnung („überwiegend selbständig" und dergleichen)\n'
@@ -491,84 +494,126 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
     return p;
 }
 
-// Begründungen für Höherstufungsantrag und Erstantrag. Kein Vorwurf an den Gutachter,
-// sondern Darstellung der Veränderung beziehungsweise des bestehenden Hilfebedarfs.
-async function generateBegruendungenAntrag(diffs, mitAllgemein, vorgang) {
+/* DER ANTRAG ERSETZT DEN FRAGEBOGEN DES MEDIZINISCHEN DIENSTES – er ist kein Widerspruch.
+   Deshalb eine eigene Aufgabe statt der Widerspruchsvorlage: keine Begründung je Kriterium,
+   keine BRi-Zitate, kein Ableitungssatz, keine Stilbeispiele aus Widersprüchen (die trugen
+   genau diesen Ton hinein). Verfasst werden je Lebensbereich ein dichter Absatz, dazu
+   „Aktuelle Situation" und die Kurzfassung des Vorgutachtens – alles in EINEM Aufruf. */
+
+// Die erfassten Versorgungsangaben als knappe Zeilen – Material für die Absätze
+function antragVersorgungText() {
+    const z = [];
+    const zeilen = (tid, fn) => (erfassung[tid] || []).filter(r => Object.keys(r).some(k => k.charAt(0) !== '_' && r[k])).map(fn).filter(Boolean);
+    const pp = zeilen('pflegepersonen', r => [r.art, r.name, r.tage ? r.tage + ' Tage/Woche' : '',
+        r.wochenstunden ? r.wochenstunden + ' Std./Woche' : '', r.unterstuetzung].filter(Boolean).join(', '));
+    if (pp.length) z.push('Pflegepersonen und Pflegedienst:\n- ' + pp.join('\n- '));
+    const hm = zeilen('hilfsmittel', r => [r.bezeichnung, r.nutzung, haeufigkeitText(r), r.taetigkeit].filter(Boolean).join(', '));
+    if (hm.length) z.push('Hilfsmittel:\n- ' + hm.join('\n- '));
+    const ab = zeilen('arztbesuche', r => [r.fach, haeufigkeitText(r), r.begleitung].filter(Boolean).join(', '));
+    if (ab.length) z.push('Arzt- und Therapiebesuche:\n- ' + ab.join('\n- '));
+    const md = zeilen('medikation', r => [r.applikation, haeufigkeitText(r), medikationHilfe(r)].filter(Boolean).join(', '));
+    if (md.length) z.push('Medikation:\n- ' + md.join('\n- '));
+    const bp = zeilen('behandlungspflege', r => [r.art, r.beschreibung, haeufigkeitText(r), r.durchfuehrung].filter(Boolean).join(', '));
+    if (bp.length) z.push('Behandlungspflege:\n- ' + bp.join('\n- '));
+    return z.join('\n');
+}
+
+function buildAntragPrompt(bereiche, mitAllgemein) {
+    const cut = (s, n) => (s && s.length > n) ? s.slice(0, n) + ' …' : (s || '');
+    const hoeher = (typeof appModus !== 'undefined' && appModus === 'hoeherstufung');
+    const wert = id => (document.getElementById(id)?.value || '').trim();
+    const zeilen = [];
+    if (wert('stam-betreffend')) zeilen.push('VERSICHERTE PERSON: ' + wert('stam-betreffend'));
+    const vs = (typeof erfassungExtra !== 'undefined' && erfassungExtra.verschlechterung) || '';
+    if (hoeher && vs) zeilen.push('VERSCHLECHTERUNG SEIT DER BEGUTACHTUNG (Angabe des Beraters): ' + vs);
+    const notizen = wert('erstgespraech-notes');
+    zeilen.push('');
+    if (notizen) {
+        zeilen.push('==================== HAUPTQUELLE ====================');
+        zeilen.push('MEINE FESTSTELLUNGEN AUS DEM GESPRÄCH MIT DER VERSICHERTEN PERSON');
+        zeilen.push('Grundlage des gesamten Antrags. Stichpunkte zu Fließtext ausformen, nichts hinzuerfinden:');
+        zeilen.push(cut(notizen, 6000));
+        zeilen.push('=====================================================');
+    } else {
+        zeilen.push('HINWEIS: Es liegen keine eigenen Notizen vor. Stütze dich auf Befund und Versorgung.');
+    }
+    zeilen.push('');
+    zeilen.push('LEBENSBEREICHE, zu denen je ein Absatz zu schreiben ist (Feld „bereiche", Kennung wie angegeben):');
+    bereiche.forEach(b => {
+        zeilen.push('--- ' + b.nr + ': ' + b.titel + ' ---');
+        b.kriterien.forEach(k => {
+            let s = '- ' + k.title + ': heute „' + k.e + '"';
+            if (hoeher) s += k.o ? '; laut Vorgutachten „' + k.o + '"' : '; im Vorgutachten ohne Einschränkung';
+            if (hoeher && k.geaendert) s += '  <-- VERSCHLECHTERT';
+            if (k.bemerkung) s += ' (' + k.bemerkung + ')';
+            zeilen.push(s);
+        });
+    });
+    zeilen.push('');
+    if (typeof befundZusammenfassung === 'function') {
+        const bf = befundZusammenfassung();
+        if (bf) { zeilen.push('ERHOBENER BEFUND (heute):'); zeilen.push(bf); zeilen.push(''); }
+    }
+    const vt = antragVersorgungText();
+    if (vt) { zeilen.push('VERSORGUNG (heute):'); zeilen.push(vt); zeilen.push(''); }
+    if (hoeher) {
+        const befundAlt = wert('stam-befund');
+        if (befundAlt) {
+            zeilen.push('BEFUND LAUT VORGUTACHTEN (früherer Stand – nur zum Vergleich, nicht wiedergeben):');
+            zeilen.push(cut(befundAlt, 3000));
+            zeilen.push('');
+        }
+    }
+    let p = zeilen.join('\n') + '\n';
+    if (mitAllgemein) p += allgemeinAufgabe((typeof appModus !== 'undefined') ? appModus : 'hoeherstufung') + '\n';
+    const anamneseRoh = wert('stam-anamnese');
+    if (anamneseRoh) p += anamneseAufgabe(anamneseRoh) + '\n\n';
+    return p;
+}
+
+// Absätze je Lebensbereich für Höherstufungsantrag und Erstantrag
+async function generateBegruendungenAntrag(bereiche, mitAllgemein, vorgang) {
     const hoeher = (vorgang === 'hoeherstufung');
-    const verschlechterung = (typeof erfassungExtra !== 'undefined' && erfassungExtra.verschlechterung) || '';
+    const systemPrompt = `Du bist ein erfahrener Pflegeberater und verfasst die pflegefachliche Stellungnahme zu ${hoeher
+        ? 'einem Antrag auf Höherstufung des Pflegegrades' : 'einem Erstantrag auf einen Pflegegrad'} (NBA, SGB XI).
 
-    const systemPrompt = `Du bist ein erfahrener Pflegeberater und verfasst die Begründungen für ${hoeher
-        ? 'einen Antrag auf Höherstufung des Pflegegrades' : 'einen Erstantrag auf einen Pflegegrad'} (NBA, SGB XI).
+ZWECK: Die Stellungnahme ersetzt den Fragebogen des Medizinischen Dienstes. Sie zeigt, welche
+Einschränkungen der Selbständigkeit heute bestehen${hoeher
+        ? ' und was sich seit dem Vorgutachten verschlechtert hat. Das Vorgutachten liegt dem Medizinischen Dienst vor – wiederhole es nicht, sondern beschreibe die VERÄNDERUNG.'
+        : '. Es gibt noch kein Gutachten.'}
+Sie ist KEIN Widerspruch: Es wird nichts widerlegt und niemand kritisiert.
 
-WICHTIG – anderer Charakter als ein Widerspruch:
-${hoeher
-    ? 'Das Vorgutachten war zum damaligen Zeitpunkt möglicherweise zutreffend. Kritisiere den Gutachter NICHT '
-    + 'und wirf ihm keine Fehler vor. Begründe ausschließlich über die VERÄNDERUNG: Was hat sich seit der '
-    + 'Begutachtung verschlechtert, wodurch, und welcher zusätzliche personelle Unterstützungsbedarf ist daraus '
-    + 'entstanden?' + (verschlechterung ? ' Anlass der Verschlechterung laut Angabe: ' + verschlechterung : '')
-    : 'Es liegt noch kein Gutachten vor. Stelle den bestehenden Hilfebedarf sachlich und erstmalig dar. '
-    + 'Es gibt keine fremde Bewertung, die du angreifen könntest.'}
+AUFGABE „bereiche": Zu JEDEM genannten Lebensbereich EIN Absatz, Kennung wie angegeben (M1 bis M6).
+${laengenVorgabeBereich()}
+Inhalt je Absatz – konkret, alltagsnah, aus Notizen, Befund und Versorgung:
+- Was gelingt nicht mehr oder nur noch mit Hilfe? Wer hilft, wobei, wie oft?${hoeher
+        ? '\n- Was ist seit dem Vorgutachten schlechter geworden? Die mit VERSCHLECHTERT markierten Punkte zuerst.' : ''}
+- Bündle zu einem zusammenhängenden Bild des Bereichs. Zähle die Kriterien NICHT einzeln ab –
+  die Einschätzung je Kriterium steht bereits in einer eigenen Zeile unter dem Absatz.
 
-Schreibe zu JEDEM Kriterium eine Begründung im Stil der folgenden Beispiele des Verfassers – übernimm Aufbau,
-Ton und Wortwahl, nicht aber die Kritik am Gutachter:
+STRENG VERBOTEN in allen Abschnitten:
+- jedes Zitat aus den Begutachtungs-Richtlinien und jeder Verweis „laut Richtlinien"
+- jeder Ableitungssatz („… ist somit eine Wertung mit … ableitbar")
+- Stufenbezeichnungen („überwiegend unselbständig" und dergleichen) – sie stehen in der Zeile darunter
+- Punktzahlen und Pflegegrade
+- jede Kritik am Gutachter oder am Vorgutachten
+- Erfundenes: keine Befunde, Diagnosen, Zeitangaben oder Vorkommnisse, die nicht im Material stehen
 
-=== STILBEISPIELE DES VERFASSERS ===
-${getStilBeispiele()}
-=== ENDE STILBEISPIELE ===
-
-RANGFOLGE DER QUELLEN:
-1. Meine Notizen aus dem Erstgespräch und der erhobene Befund sind die Grundlage. Stichpunkte zu
-   vollständigem Fließtext ausformulieren, ohne Inhalte zu verändern oder hinzuzuerfinden.
-2. Danach die eigene Bewertung des Kriteriums.
-3. Abgleich mit dem BRi-Text (wörtliches Zitat).
-
-${laengenVorgabeBegruendung()}
-
-AUFBAU je Begründung – GENAU EIN SATZ je Nummer, zusammenhängender Fließtext:
-1. ${hoeher ? 'Was hat sich seit der Begutachtung verändert?' : 'Welche Einschränkung besteht?'}
-2. Konkreter Sachverhalt aus Notizen und Befund, einschließlich der erforderlichen personellen
-   Unterstützung – der einzige Satz, der etwas länger sein darf.
-3. Richtlinienmaßstab mit einem wörtlichen, knapp gehaltenen BRi-Zitat.
-4. Schluss: „Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „…" ableitbar."
-Ein fünfter Satz ist zulässig, wenn der Sachverhalt es zwingend erfordert – mehr nicht.
-
-ZITIERREGEL – wird technisch überprüft: Alles in Anführungszeichen MUSS zeichengenau in den
-mitgelieferten BRi-Texten dieses Kriteriums stehen. Im Zweifel ohne Anführungszeichen sinngemäß wiedergeben.
-
-Weiter zu beachten:
-- Erfinde keine Befunde, Diagnosen, Zeitangaben oder Vorkommnisse.
-- Verwende ausschließlich die je Kriterium angegebenen Stufenbezeichnungen. In den Modulen 2 und 3 gibt es
-  keine Stufe „selbständig".
-- Modul 5, Kriterien 4.5.1 bis 4.5.14: Ist keine Maßnahme festgestellt, lautet die Bewertung
-  „${M5_KEINE_WERTUNG}". Schreibe dafür NIEMALS „0", „null" oder „0x pro Woche".
-- Beachte die mitgelieferte Hilfsmittel-Regel und die Hinweise unter „Achtung"; widerspricht eine Argumentation
-  ihnen, verwende sie nicht.
-- Variiere die Eröffnungen über alle Begründungen hinweg.
-- Sachlich-fachlicher Gutachterstil in der dritten Person, ohne Aufzählungszeichen und Überschriften.
-- Gib NUR den Begründungstext zurück.`;
+Sachlicher Fließtext in der dritten Person, ohne Aufzählungszeichen und Überschriften.
+Gib die Felder „bereiche", ${mitAllgemein ? '„allgemein", ' : ''}und – falls verlangt – „anamnese" zurück.`;
 
     const responseSchema = {
         type: "OBJECT",
         properties: {
             allgemein: { type: "STRING" },
             anamnese: { type: "STRING" },
-            begruendungen: { type: "ARRAY", items: { type: "OBJECT",
+            bereiche: { type: "ARRAY", items: { type: "OBJECT",
                 properties: { nr: { type: "STRING" }, text: { type: "STRING" } }, required: ["nr", "text"] } }
         },
-        required: ["begruendungen"]
+        required: ["bereiche"]
     };
-    let prompt = buildBegruendungPrompt(diffs, mitAllgemein);
-    // Zusammenfassung der Anamnese aus dem Vorgutachten – im selben Aufruf, damit kein
-    // zweiter Abruf nötig wird (der Schlüssel des Verfassers läuft schnell ins Limit).
-    const anamneseRoh = (document.getElementById('stam-anamnese')?.value || '').trim();
-    if (anamneseRoh) prompt += anamneseAufgabe(anamneseRoh) + '\n\n';
-    if (hoeher && verschlechterung) prompt = 'VERSCHLECHTERUNG SEIT DER BEGUTACHTUNG: ' + verschlechterung + '\n\n' + prompt;
-    if (typeof befundZusammenfassung === 'function') {
-        const bf = befundZusammenfassung();
-        if (bf) prompt += 'ERHOBENER BEFUND:\n' + bf + '\n\n';
-    }
     const res = await callGeminiWithFallback({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        contents: [{ role: "user", parts: [{ text: buildAntragPrompt(bereiche, mitAllgemein) }] }],
         generationConfig: { responseMimeType: "application/json", responseSchema: responseSchema }
     }, systemPrompt);
     let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -576,8 +621,10 @@ Weiter zu beachten:
     const fence = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
     if (fence) txt = fence[1];
     const data = JSON.parse(txt.trim());
+    // Nur Absätze zu Bereichen, die es gibt – ein von der KI erfundener Bereich fällt weg
+    const erlaubt = new Set(bereiche.map(b => b.nr));
     const map = {};
-    (data.begruendungen || []).forEach(b => { if (b && b.nr && b.text) map[b.nr] = b.text.trim(); });
+    (data.bereiche || []).forEach(b => { if (b && erlaubt.has(b.nr) && b.text) map[b.nr] = b.text.trim(); });
     return await haltenLaengenGrenzen(map, (data.allgemein || '').trim(), (data.anamnese || '').trim());
 }
 
@@ -617,8 +664,11 @@ async function haltenLaengenGrenzen(map, allgemein, anamnese) {
     let e;
     try { e = await kuerzeUeberlaenge(map, allgemein, titel, anamnese); } finally { hideOverlay(); }
     if (e.offen.length) {
+        // Absätze der Lebensbereiche heißen M1…M6 – dem Berater den Bereich nennen, nicht die Kennung
+        const bereichName = nr => (/^M[1-6]$/.test(nr) && typeof ANTRAG_BEREICHE !== 'undefined')
+            ? 'Lebensbereich ' + ANTRAG_BEREICHE[nr.charAt(1)] : nr;
         const namen = e.offen.map(v => v.art === 'allgemein' ? titel
-            : v.art === 'anamnese' ? 'Angaben laut Vorgutachten' : v.nr).join(', ');
+            : v.art === 'anamnese' ? 'Angaben laut Vorgutachten' : bereichName(v.nr)).join(', ');
         showToast('Zu lang geblieben: ' + namen + '. Bitte im Text noch kürzen.', 'error');
     }
     return { map: e.map, allgemein: e.allgemein, anamnese: e.anamnese };

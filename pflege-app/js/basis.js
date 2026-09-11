@@ -258,8 +258,13 @@ function autoResize(t) {
     t.style.height=t.scrollHeight+'px';
 }
 
+/* Auch Anführungszeichen maskieren. Die App setzt mit dieser Funktion Werte in Attribute
+   (value="…", data-vals="…"). Ohne &quot; endete das Attribut beim ersten ": Aus
+   „Rollator "Premium" mit Korb" wurde im Feld „Rollator " – und wer danach hineintippte,
+   überschrieb den Rest endgültig. Im Fließtext ändert sich nichts: &quot; sieht aus wie ". */
 function escapeHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // EXPONENTIAL BACKOFF FOR API CALLS (WITH RESILIENCE FOR RATE LIMITS)
