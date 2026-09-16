@@ -429,6 +429,13 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Die Fußzeile zählt **gedruckte Blätter**, nicht Kästen: Ein unteilbarer übergroßer Block
    belegt mehrere, und die Fußzeile steht am Kastenende, also auf dem letzten davon.
    Gemessen wird EINMAL, bevor das erste Element verschoben wird.
+32. **Keine Namen realer Personen im Code – auch nicht von Kollegen.** Das Repository ist
+   öffentlich einsehbar gewesen. Beraternamen stehen nicht fest in der Auswahlliste (nur der
+   Verfasser selbst); weitere Berater wählen „anderer Name", die App merkt ihn sich lokal.
+   `loadVerfasser` übernimmt einen gespeicherten Namen, den die Liste nicht (mehr) führt, als
+   „anderer Name" – sonst setzte `getVerfasser` still den ersten Listennamen in fremde
+   Schriftstücke. Testdaten nur mit offensichtlichen Fantasienamen und -daten
+   (Muster, Beispiel, Probe, 01.01.1950).
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -482,7 +489,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1150 Pruefungen.
+Der Selbsttest umfasst 1154 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

@@ -202,6 +202,37 @@ async function selbsttest() {
 
         const html = buildStellungnahme('', {}, '');
         pruefeWahr('Verfasser steht im Dokument', html.includes(getVerfasser().name));
+
+        /* Beraternamen stehen nicht fest im Programm (öffentliches Repository). Wer seinen
+           Namen früher aus der Liste gewählt hatte, darf beim nächsten Start nicht still
+           den ersten Listennamen bekommen – der Name wird als „anderer Name" übernommen. */
+        if (typeof loadVerfasser === 'function' && typeof VERFASSER_STORAGE !== 'undefined') {
+            let merkV = null;
+            try { merkV = localStorage.getItem(VERFASSER_STORAGE); } catch (e) {}
+            const felder = ['verf-name-sel', 'verf-name-frei', 'verf-qual-sel', 'verf-qual-frei'];
+            const merkF = felder.map(id => { const el = document.getElementById(id); return el ? el.value : null; });
+            try {
+                pruefeWahr('Keine Kollegennamen fest in der Beraterliste',
+                    Array.from(document.getElementById('verf-name-sel').options)
+                        .every(o => o.value === '__frei' || o.value === 'Christian Schulz'));
+                localStorage.setItem(VERFASSER_STORAGE, JSON.stringify(
+                    { nameSel: 'Frieda Beispiel', nameFrei: '', qualSel: '', qualFrei: '' }));
+                loadVerfasser();
+                pruefe('Gespeicherter Name ohne Listeneintrag bleibt erhalten', getVerfasser().name, 'Frieda Beispiel');
+                pruefe('Er steht dann unter „anderer Name"', document.getElementById('verf-name-sel').value, '__frei');
+                localStorage.setItem(VERFASSER_STORAGE, JSON.stringify(
+                    { nameSel: 'Christian Schulz', nameFrei: '', qualSel: '', qualFrei: '' }));
+                loadVerfasser();
+                pruefe('Ein Name aus der Liste bleibt ausgewählt', getVerfasser().name, 'Christian Schulz');
+            } finally {
+                felder.forEach((id, k) => { const el = document.getElementById(id); if (el && merkF[k] !== null) el.value = merkF[k]; });
+                onVerfasserChange();          // speichert – deshalb danach den alten Eintrag zurück
+                try {
+                    if (merkV === null) localStorage.removeItem(VERFASSER_STORAGE);
+                    else localStorage.setItem(VERFASSER_STORAGE, merkV);
+                } catch (e) {}
+            }
+        }
         pruefeWahr('Kein "Pflegegrad 0" im Dokument', !html.includes('Pflegegrad 0'));
         pruefeWahr('Stattdessen "kein Pflegegrad"', html.includes('kein Pflegegrad'));
         pruefeWahr('Kein Erstellungsdatum im Dokument', !html.includes(todayDE()));

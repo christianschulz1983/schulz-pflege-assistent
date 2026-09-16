@@ -89,6 +89,16 @@ function loadVerfasser() {
     try { s = JSON.parse(localStorage.getItem(VERFASSER_STORAGE) || 'null'); } catch (e) {}
     if (s) {
         const set = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+        /* Gespeicherter Name, den die Liste nicht mehr führt: als „anderer Name" übernehmen.
+           Namen von Beratern stehen nicht mehr fest im Programm (öffentliches Repository,
+           keine Einwilligung). Ohne diese Übernahme griffe eine Auswahl ins Leere, und
+           getVerfasser setzte STILL den ersten Listennamen in fremde Schriftstücke. */
+        const sel = document.getElementById('verf-name-sel');
+        if (sel && s.nameSel && s.nameSel !== '__frei'
+            && !Array.from(sel.options).some(o => o.value === s.nameSel)) {
+            if (!String(s.nameFrei || '').trim()) s.nameFrei = s.nameSel;
+            s.nameSel = '__frei';
+        }
         set('verf-name-sel', s.nameSel); set('verf-name-frei', s.nameFrei);
         set('verf-qual-sel', s.qualSel); set('verf-qual-frei', s.qualFrei);
     }
