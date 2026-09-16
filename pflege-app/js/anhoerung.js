@@ -330,7 +330,7 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
     </div>
 
     <h1>Pflegefachliche Stellungnahme</h1>
-    <p>auf Grundlage der Richtlinien des Medizinischen Dienstes Bund zur Feststellung der Pflegebedürftigkeit nach dem SGB XI vom 21. Dezember 2023</p>
+    <p id="stmt-grundlage">${BRI_GRUNDLAGE_SATZ}</p>
 
     <div class="data-block" id="stmt-data">
       ${dataRow('Betreffend', name)}

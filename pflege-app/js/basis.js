@@ -4,6 +4,26 @@
 const apiKey = "";
 let userApiKey = "";
 
+/* MASSGEBLICHE FASSUNG DER BEGUTACHTUNGS-RICHTLINIEN.
+   Die Richtlinien zum Verfahren zur Feststellung der Pflegebedürftigkeit sowie zur
+   pflegefachlichen Konkretisierung der Inhalte des Begutachtungsinstruments nach
+   § 17 Absatz 1 SGB XI wurden vom Medizinischen Dienst Bund am 21.08.2024 erlassen,
+   vom Bundesministerium für Gesundheit am 18.09.2024 genehmigt und sind am 26.09.2024
+   in Kraft getreten. Die Vorgängerfassung (2017) gilt NICHT mehr und darf in keinem
+   Schriftstück genannt werden. Alle Vorgangsarten nennen dieselbe Fassung – deshalb
+   steht der Satz nur hier und wird von den Vorlagen übernommen. */
+const BRI_FASSUNG = {
+    erlassen: '21. August 2024',
+    genehmigt: '18. September 2024',
+    inkraft: '26. September 2024',
+    kurz: '21.08.2024'
+};
+const BRI_GRUNDLAGE_SATZ =
+    'auf Grundlage der Richtlinien des Medizinischen Dienstes Bund zum Verfahren zur Feststellung '
+    + 'der Pflegebedürftigkeit sowie zur pflegefachlichen Konkretisierung der Inhalte des '
+    + 'Begutachtungsinstruments nach § 17 Absatz 1 SGB XI vom ' + BRI_FASSUNG.erlassen
+    + ', in Kraft getreten am ' + BRI_FASSUNG.inkraft;
+
 // API-Schlüssel lokal merken, damit er nur einmal eingetragen werden muss
 const API_KEY_STORAGE = "pflege_assistent_api_key";
 

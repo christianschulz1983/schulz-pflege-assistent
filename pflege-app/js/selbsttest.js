@@ -4234,6 +4234,59 @@ async function selbsttest() {
             }
         }
 
+        /* 22. Fassung der Begutachtungs-Richtlinien.
+           Jedes Schriftstück nennt unter der Überschrift die Rechtsgrundlage. Sie muss in
+           allen vier Vorgangsarten dieselbe und die geltende sein: erlassen am 21.08.2024,
+           in Kraft seit 26.09.2024. Die Vorgängerfassung darf nirgends mehr auftauchen. */
+        {
+            const merk22 = { modus: appModus };
+            try {
+                const ueberholt = /2017|Dezember 2023/;
+                const bauen = {
+                    widerspruch: () => buildStellungnahme('', {}, ''),
+                    anhoerung: () => buildAnhoerung('', {}, ''),
+                    erstantrag: () => buildHoeherstufung('', {}, '', ''),
+                    hoeherstufung: () => buildHoeherstufung('', {}, '', '')
+                };
+                Object.keys(bauen).forEach(m => {
+                    setzeModus(m);
+                    const h = document.createElement('div');
+                    h.innerHTML = bauen[m]();
+                    const zeile = h.querySelector('#stmt-grundlage');
+                    pruefeWahr(m + ': Zeile zur Rechtsgrundlage vorhanden', !!zeile);
+                    const t = zeile ? zeile.textContent : '';
+                    pruefeWahr(m + ': Richtlinien vom 21. August 2024', t.includes('vom 21. August 2024'));
+                    pruefeWahr(m + ': Inkrafttreten 26. September 2024',
+                        t.includes('in Kraft getreten am 26. September 2024'));
+                    pruefeWahr(m + ': Rechtsgrundlage § 17 Absatz 1 SGB XI genannt', t.includes('§ 17 Absatz 1 SGB XI'));
+                    pruefeWahr(m + ': keine überholte Fassung im Schriftstück', !ueberholt.test(h.textContent));
+                });
+                // Ein früher gespeichertes Schriftstück trägt die alte Zeile noch ohne Kennung
+                setzeModus('widerspruch');
+                const altDoc = '<div class="stmt" data-vorgang="widerspruch"><h1>Pflegefachliche Stellungnahme</h1>'
+                    + '<p>auf Grundlage der Richtlinien des Medizinischen Dienstes Bund zur Feststellung der '
+                    + 'Pflegebedürftigkeit nach dem SGB XI vom 21. Dezember 2023</p>'
+                    + '<div class="data-block" id="stmt-data"></div>'
+                    + '<h2>Begründung</h2><div id="stmt-crit"></div></div>';
+                const zus = document.createElement('div');
+                zus.innerHTML = mergeStellungnahme(altDoc, buildStellungnahme('', {}, ''));
+                pruefeWahr('Gespeichertes Schriftstück: alte Fassung verschwindet beim Aktualisieren',
+                    zus.textContent.indexOf('21. Dezember 2023') === -1);
+                pruefeWahr('Gespeichertes Schriftstück: geltende Fassung steht danach da',
+                    zus.textContent.includes('vom 21. August 2024'));
+                // Beruft sich die KI auf die alte Fassung, wird die Stelle gemeldet
+                if (typeof ueberholteBegriffeImText === 'function') {
+                    pruefeWahr('Berufung auf die Fassung von 2017 wird gemeldet',
+                        ueberholteBegriffeImText('Nach den Begutachtungs-Richtlinien von 2017 gilt anderes.')
+                            .some(f => /2017/.test(f.wort)));
+                    pruefe('Die geltende Fassung wird nicht angemahnt',
+                        ueberholteBegriffeImText(BRI_GRUNDLAGE_SATZ).length, 0);
+                }
+            } finally {
+                setzeModus(merk22.modus);
+            }
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

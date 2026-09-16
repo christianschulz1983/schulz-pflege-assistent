@@ -412,6 +412,13 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    außen aushebeln lässt, wird der alte Fehler in einer Sicherungskopie zurückgebaut, der Test
    läuft, die Datei wird zurückgespielt und per Prüfsumme verglichen. Genau so fiel der
    Fehler oben auf: Die Gegenprobe schlug nicht an, weil ohnehin alles neu geschrieben wurde.
+30. **Es gilt nur eine Fassung der Begutachtungs-Richtlinien: 21.08.2024.** Erlassen vom MD Bund
+   am 21.08.2024, vom BMG genehmigt am 18.09.2024, in Kraft seit 26.09.2024. Sie steht EINMAL
+   im Programm (`BRI_FASSUNG`, `BRI_GRUNDLAGE_SATZ` in `js/basis.js`); alle vier Vorgangsarten
+   setzen dieselbe Zeile `#stmt-grundlage` unter die Überschrift. Vorher stand dort ein falsches
+   Datum (21.12.2023). Beim Zusammenführen wird die Zeile in älteren Schriftstücken erkannt und
+   richtiggestellt, auch wenn sie noch keine Kennung trägt. Beruft sich die KI im Text auf die
+   Fassung von 2017, meldet das `UEBERHOLTE_BEGRIFFE` – geändert wird nichts von allein.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -465,7 +472,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1116 Pruefungen.
+Der Selbsttest umfasst 1140 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

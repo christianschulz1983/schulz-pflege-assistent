@@ -127,7 +127,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     </div>
 
     <h1>Pflegefachliche Stellungnahme</h1>
-    <p>auf Grundlage der Richtlinien des Medizinischen Dienstes Bund zur Feststellung der Pflegebedürftigkeit nach dem SGB XI vom 21. Dezember 2023</p>
+    <p id="stmt-grundlage">${BRI_GRUNDLAGE_SATZ}</p>
 
     <div class="data-block" id="stmt-data">
       ${dataRow('Betreffend', name)}
@@ -217,7 +217,12 @@ function zitatGedeckt(zitat, quelle) {
    sehen, wo er steht und selbst entscheiden, so wie bei den Zitaten.
    Rückgabe: Anzahl der gefundenen Stellen. */
 const UEBERHOLTE_BEGRIFFE = [
-    { wort: /Pflegestufen?/g, statt: 'Pflegegrad', seit: 'Pflegestufen wurden 2017 durch Pflegegrade ersetzt' }
+    { wort: /Pflegestufen?/g, statt: 'Pflegegrad', seit: 'Pflegestufen wurden 2017 durch Pflegegrade ersetzt' },
+    /* Alte Fassung der Begutachtungs-Richtlinien. Die KI kennt die Fassung von 2017 und
+       beruft sich gelegentlich auf sie. Maßgeblich ist die Fassung vom 21.08.2024. */
+    { wort: /(?:Richtlinien|Richtlinie|BRi|Begutachtungsanleitung)[^.\n]{0,40}\b201[5-7]\b/g,
+      statt: 'Richtlinien vom ' + BRI_FASSUNG.erlassen,
+      seit: 'in Kraft seit ' + BRI_FASSUNG.inkraft + '; die Fassung von 2017 gilt nicht mehr' }
 ];
 
 function ueberholteBegriffeImText(text) {
@@ -298,8 +303,17 @@ function mergeStellungnahme(existingHtml, freshHtml) {
     const vals = {};
     fresh.querySelectorAll('[data-f]').forEach(el => { const k = el.getAttribute('data-f'); if (!(k in vals)) vals[k] = el.innerHTML; });
     cur.querySelectorAll('[data-f]').forEach(el => { const k = el.getAttribute('data-f'); if (k in vals) el.innerHTML = vals[k]; });
-    // Reine Datenblöcke komplett ersetzen (Kopfdaten, Vergleichstabelle).
-    ['stmt-data', 'stmt-cmp-body'].forEach(id => {
+    /* Die Grundlagenzeile unter der Überschrift nennt die Fassung der Richtlinien.
+       In früher gespeicherten Schriftstücken steht dort noch die alte Fassung und die
+       Zeile trägt noch keine Kennung – sie wird hier nachträglich erkannt, damit sie
+       beim Aktualisieren richtiggestellt wird. */
+    if (fresh.querySelector('#stmt-grundlage') && !cur.querySelector('#stmt-grundlage')) {
+        const h1 = cur.querySelector('.stmt h1') || cur.querySelector('h1');
+        const p = h1 && h1.nextElementSibling;
+        if (p && /^P$/i.test(p.tagName) && /Richtlinien/.test(p.textContent)) p.id = 'stmt-grundlage';
+    }
+    // Reine Datenblöcke komplett ersetzen (Kopfdaten, Vergleichstabelle, Rechtsgrundlage).
+    ['stmt-data', 'stmt-cmp-body', 'stmt-grundlage'].forEach(id => {
         const f = fresh.querySelector('#' + id), c = cur.querySelector('#' + id);
         if (f && c) c.innerHTML = f.innerHTML;
     });
