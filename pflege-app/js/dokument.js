@@ -766,72 +766,133 @@ const DRUCK_CSS = `
 
 /* Verteilt die Blöcke des Schriftstücks auf A4-Seiten und nummeriert sie.
    Wird als Quelltext in das Druckfenster übertragen (siehe printAppealText), damit sie
-   sich hier prüfen und dort ausführen lässt.
+   sich hier prüfen und dort ausführen lässt. Deshalb steht hier alles in der Funktion
+   selbst – im Druckfenster gibt es keine anderen Programmteile.
 
    Regeln:
-   - Ein Block wird nie zerschnitten: .crit (ein Kriterium mit seiner Begründung),
-     .data-block, Tabellen und Überschriften.
+   - Ein Block wird nie zerschnitten: ein Kriterium mit seiner Begründung, ein Absatz,
+     eine Tabelle, ein Datenblock.
    - Eine Überschrift wandert mit dem folgenden Block zusammen auf die nächste Seite –
      „Allgemeine Angaben" steht sonst allein unten.
-   - Ein Block, der für sich allein höher ist als eine Seite, bekommt eine eigene Seite
-     und darf dort umbrechen. Ihn zu erzwingen würde ihn abschneiden. */
+   - In Sammelkästen wird HINEINGEGANGEN. Die Begründungen stehen alle zusammen in
+     `#stmt-crit`; als ein Stück gemessen war dieser Kasten sechsmal so hoch wie eine
+     Seite, galt aber als EINE Seite. Der Browser brach ihn dann selbst um – mitten in
+     einer Begründung – und druckte sieben Blätter, während die Fußzeile „von 5" zählte.
+     Der Kasten wird auf jeder Seite neu aufgebaut, damit seine Gestaltung erhalten bleibt.
+   - Bleibt am Ende doch ein einzelner Block übrig, der höher ist als eine Seite (den
+     kann man nicht teilen, ohne ihn zu zerschneiden), zählt die Fußzeile die Blätter
+     mit, die er tatsächlich braucht. */
 function seitenAufteilen(quelle, ziel, hoeheMm) {
-    const proMm = 3.7795275591;                     // 1 mm in px bei 96 dpi
+    const proMm = 3.7795275591;                      // 1 mm in px bei 96 dpi
     const nutzbar = (hoeheMm || 253) * proMm;        // 296mm - 20 oben - 16 unten - Fußzeile
+    const seitenHoehe = 296 * proMm;                 // Höhe eines .seite-Kastens (DRUCK_CSS)
     const mmZuPx = el => {
         const s = getComputedStyle(el);
         return el.getBoundingClientRect().height
              + parseFloat(s.marginTop || 0) + parseFloat(s.marginBottom || 0);
     };
-    // Einheiten bilden: Überschrift + folgender Block gehören zusammen.
-    const einheiten = [];
+
+    /* Einheiten bilden. `kette` ist der Weg der Sammelkästen von der Seitenhülle bis zur
+       Einheit; er wird auf einer neuen Seite nachgebaut. Gemessen wird ausschließlich
+       hier – vor dem ersten Verschieben, solange alles noch am selben Ort steht. */
+    const einheitenAus = (eltern, kette) => {
+        const raus = [];
+        const kinder = Array.from(eltern.children);
+        for (let i = 0; i < kinder.length; i++) {
+            const el = kinder[i];
+            const hoehe = mmZuPx(el);
+            if (/^H[1-6]$/.test(el.tagName) && i + 1 < kinder.length) {
+                const zusammen = hoehe + mmZuPx(kinder[i + 1]);
+                if (zusammen <= nutzbar) {
+                    raus.push({ teile: [el, kinder[i + 1]], hoehe: zusammen, kette: kette });
+                    i++;
+                    continue;
+                }
+                // Der folgende Kasten ist größer als eine Seite. Dann bleibt die
+                // Überschrift für sich, klebt aber am ersten Stück seines Inhalts.
+                raus.push({ teile: [el], hoehe: hoehe, kette: kette, klebt: true });
+                continue;
+            }
+            if (hoehe > nutzbar && el.children.length) {
+                raus.push.apply(raus, einheitenAus(el, kette.concat([el])));
+                continue;
+            }
+            raus.push({ teile: [el], hoehe: hoehe, kette: kette });
+        }
+        return raus;
+    };
+
+    const bloecke = [];
     const stmts = Array.from(quelle.querySelectorAll('.stmt'));
     const quellen = stmts.length ? stmts : [quelle];
     quellen.forEach((stmt, idx) => {
-        const kinder = Array.from(stmt.children);
-        const gruppe = [];
-        for (let i = 0; i < kinder.length; i++) {
-            const el = kinder[i];
-            const istUeberschrift = /^H[1-3]$/.test(el.tagName);
-            if (istUeberschrift && i + 1 < kinder.length) {
-                gruppe.push([el, kinder[i + 1]]); i++;
-            } else gruppe.push([el]);
-        }
-        einheiten.push({ stmt: stmt, gruppen: gruppe,
-                         eigeneSeite: stmt.classList.contains('deckblatt') || idx > 0 });
+        bloecke.push({ stmt: stmt, liste: einheitenAus(stmt, []),
+                       eigeneSeite: stmt.classList.contains('deckblatt') || idx > 0 });
     });
 
-    let seite = null, genutzt = 0;
+    let huelle = null, genutzt = 0, stapel = [];
+    const mitId = [];                                // Kennung nur beim ersten Auftreten
     const neueSeite = vorlage => {
-        seite = document.createElement('div');
+        const seite = document.createElement('div');
         seite.className = 'seite';
-        const huelle = document.createElement('div');
+        huelle = document.createElement('div');
         huelle.className = vorlage ? vorlage.className : 'stmt';
         seite.appendChild(huelle);
         ziel.appendChild(seite);
         genutzt = 0;
-        return huelle;
+        stapel = [];
+    };
+    // Baut die Sammelkästen der Kette auf der aktuellen Seite nach (oder nutzt die
+    // bereits offenen weiter) und liefert den Kasten, in den die Einheit gehört.
+    const behaelterFuer = kette => {
+        let i = 0;
+        while (i < kette.length && i < stapel.length && stapel[i].quelle === kette[i]) i++;
+        stapel.length = i;
+        let hier = i ? stapel[i - 1].ziel : huelle;
+        for (; i < kette.length; i++) {
+            const k = kette[i].cloneNode(false);     // nur die Hülle, ohne Inhalt
+            if (mitId.indexOf(kette[i]) === -1) mitId.push(kette[i]);
+            else k.removeAttribute('id');            // Kennungen nie doppelt vergeben
+            hier.appendChild(k);
+            stapel.push({ quelle: kette[i], ziel: k });
+            hier = k;
+        }
+        return hier;
     };
 
-    einheiten.forEach((block, bi) => {
-        let huelle = (bi === 0 || block.eigeneSeite) ? neueSeite(block.stmt) : seite.firstChild;
-        block.gruppen.forEach(gruppe => {
-            const hoehe = gruppe.reduce((s, el) => s + mmZuPx(el), 0);
-            if (genutzt > 0 && genutzt + hoehe > nutzbar) huelle = neueSeite(block.stmt);
-            gruppe.forEach(el => huelle.appendChild(el));
-            genutzt += hoehe;
-        });
+    bloecke.forEach((block, bi) => {
+        if (bi === 0 || block.eigeneSeite) neueSeite(block.stmt);
+        const liste = block.liste;
+        let zwang = false;                           // muss auf dieselbe Seite wie die Vorige
+        for (let i = 0; i < liste.length; i++) {
+            const e = liste[i];
+            let braucht = e.hoehe;
+            if (e.klebt && liste[i + 1]) braucht += liste[i + 1].hoehe;
+            if (!zwang && genutzt > 0 && genutzt + braucht > nutzbar) neueSeite(block.stmt);
+            const hier = behaelterFuer(e.kette);
+            e.teile.forEach(el => hier.appendChild(el));
+            genutzt += e.hoehe;
+            zwang = !!e.klebt;                       // sonst bliebe die Überschrift allein
+        }
     });
 
     quelle.remove();
-    // Fußzeile mit Seitenzahl – erst jetzt, weil die Gesamtzahl vorher nicht feststeht.
+    /* Fußzeile mit Seitenzahl – erst jetzt, weil die Gesamtzahl vorher nicht feststeht.
+       Gezählt werden die gedruckten Blätter, nicht die Kästen: Ein Kasten mit einem
+       unteilbaren, übergroßen Block belegt mehrere. Seine Fußzeile steht am Kastenende,
+       also auf dem letzten dieser Blätter – dort ist die mitgezählte Zahl die richtige. */
     const seiten = Array.from(ziel.children);
+    const blaetter = seiten.map(s =>
+        Math.max(1, Math.ceil(s.getBoundingClientRect().height / seitenHoehe - 0.005)));
+    const gesamt = blaetter.reduce((a, b) => a + b, 0);
+    let nr = 0;
     seiten.forEach((s, i) => {
+        nr += blaetter[i];
         const f = document.createElement('div');
         f.className = 'seiten-fuss';
-        f.textContent = 'Seite ' + (i + 1) + ' von ' + seiten.length;
+        f.textContent = 'Seite ' + nr + ' von ' + gesamt;
         s.appendChild(f);
     });
-    return seiten.length;
+    return gesamt;
 }
 

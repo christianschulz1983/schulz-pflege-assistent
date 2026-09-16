@@ -1350,12 +1350,56 @@ async function selbsttest() {
                 einzelFuss ? einzelFuss.textContent : null, 'Seite 1 von 1');
             z.remove();
 
-            // Ein Block, der höher ist als eine Seite, darf nicht verschluckt werden
+            /* Ein Block, der höher ist als eine Seite, darf nicht verschluckt werden. Er
+               bleibt in EINEM Kasten (zerschneiden würde ihn zerstören), belegt aber zwei
+               gedruckte Blätter – und genau die muss die Fußzeile zählen. Früher zählte
+               sie hier „1 von 1", während der Drucker zwei Blätter auswarf. */
             ({ q, z } = bau(1, 2000));
-            pruefe('Druck: übergroßer Block bleibt erhalten', seitenAufteilen(q, z), 1);
+            const langeSeiten = seitenAufteilen(q, z);
+            pruefe('Druck: übergroßer Block bleibt ein Stück', z.children.length, 1);
+            pruefe('Druck: seine Blätter werden mitgezählt', langeSeiten, 2);
+            pruefe('Druck: die Fußzeile nennt die letzte Seite',
+                z.querySelector('.seiten-fuss').textContent, 'Seite 2 von 2');
             pruefeWahr('Druck: sein Inhalt steht auf der Seite',
                 z.innerText.includes('Absatz 1'));
+            pruefeWahr('Druck: die Überschrift bleibt bei dem übergroßen Block',
+                z.children[0].innerText.indexOf('Allgemeine Angaben') === 0);
             z.remove();
+
+            /* Sammelkästen werden aufgeteilt. Alle Begründungen stehen zusammen in
+               #stmt-crit. Als ein Stück gemessen galt dieser Kasten als EINE Seite, war
+               aber sechsmal so hoch: Der Browser brach ihn selbst um – mitten in einer
+               Begründung – und druckte sieben Blätter, während die Fußzeile „von 5" zählte. */
+            {
+                const q2 = document.createElement('div');
+                q2.style.cssText = 'position:absolute;left:-10000px;top:0;width:600px';
+                let inner = '';
+                for (let i = 0; i < 6; i++) {
+                    inner += '<div class="crit" data-nr="4.1.' + (i + 1) + '" style="height:400px;margin:0">'
+                          + 'Begruendung ' + (i + 1) + '</div>';
+                }
+                q2.innerHTML = '<div class="stmt"><h2>Befund</h2><div id="stmt-crit">' + inner + '</div></div>';
+                document.body.appendChild(q2);
+                const z2 = document.createElement('div');
+                z2.style.cssText = 'position:absolute;left:-10000px;top:0';
+                document.body.appendChild(z2);
+                const n2 = seitenAufteilen(q2, z2);
+                const kaesten = Array.from(z2.children);
+                pruefe('Druck: der Sammelkasten wird auf Seiten verteilt', n2, 3);
+                pruefe('Druck: so viele Kästen wie gezählte Seiten', kaesten.length, n2);
+                pruefeWahr('Druck: keine Seite läuft über',
+                    kaesten.every(s => s.getBoundingClientRect().height <= 296 * 3.7795275591 + 1));
+                pruefe('Druck: keine Begründung geht verloren', z2.querySelectorAll('.crit').length, 6);
+                pruefeWahr('Druck: der Sammelkasten wird auf jeder Seite nachgebaut',
+                    kaesten.every(s => Array.from(s.querySelectorAll('.crit'))
+                        .every(c => c.parentNode !== s.firstChild && c.parentNode.parentNode === s.firstChild)));
+                pruefe('Druck: die Kennung wird nicht doppelt vergeben',
+                    z2.querySelectorAll('#stmt-crit').length, 1);
+                pruefe('Druck: letzte Seitenzahl passt zur Gesamtzahl',
+                    kaesten[kaesten.length - 1].querySelector('.seiten-fuss').textContent,
+                    'Seite ' + n2 + ' von ' + n2);
+                z2.remove();
+            }
 
             // Das Druckbild selbst
             pruefeWahr('Druck: kein Seitenrand für die Browser-Kopfzeile',

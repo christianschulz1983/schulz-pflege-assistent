@@ -419,6 +419,16 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Datum (21.12.2023). Beim Zusammenführen wird die Zeile in älteren Schriftstücken erkannt und
    richtiggestellt, auch wenn sie noch keine Kennung trägt. Beruft sich die KI im Text auf die
    Fassung von 2017, meldet das `UEBERHOLTE_BEGRIFFE` – geändert wird nichts von allein.
+31. **Der Seitenumbruch geht in Sammelkästen hinein** (`seitenAufteilen`, `js/dokument.js`).
+   Die Begründungen stehen alle zusammen in `#stmt-crit`. Als ein Stück gemessen galt dieser
+   Kasten als EINE Seite, war aber sechsmal so hoch (gemessen: 1522 mm): Der Browser brach ihn
+   selbst um – mitten in einer Begründung – und druckte sieben Blätter, während die Fußzeile
+   „Seite 4 von 5" zählte. Jetzt wird in jeden Kasten hineingegangen, der höher ist als eine
+   Seite, und er wird auf der Folgeseite nachgebaut (Kennung nur beim ersten Mal, sonst wären
+   `id`s doppelt). Eine Überschrift klebt auch dann an ihrem Inhalt, wenn dieser übergroß ist.
+   Die Fußzeile zählt **gedruckte Blätter**, nicht Kästen: Ein unteilbarer übergroßer Block
+   belegt mehrere, und die Fußzeile steht am Kastenende, also auf dem letzten davon.
+   Gemessen wird EINMAL, bevor das erste Element verschoben wird.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -472,7 +482,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1140 Pruefungen.
+Der Selbsttest umfasst 1150 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
