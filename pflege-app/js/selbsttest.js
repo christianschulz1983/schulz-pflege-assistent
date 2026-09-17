@@ -46,7 +46,9 @@ async function selbsttest() {
         zweit: (typeof stateZweit !== 'undefined') ? JSON.parse(JSON.stringify(stateZweit)) : null,
         anlagen: (typeof anlagenSichern === 'function') ? JSON.parse(JSON.stringify(anlagenSichern())) : null,
         // Der Test schreibt Probedateien; sein Nachweis darf nicht im echten stehen bleiben.
-        speicherungen: (() => { try { return localStorage.getItem(SPEICHER_PROTOKOLL); } catch (e) { return null; } })()
+        speicherungen: (() => { try { return localStorage.getItem(SPEICHER_PROTOKOLL); } catch (e) { return null; } })(),
+        // Tests legen Diagnosezeilen an; danach wieder auf die Zeilenzahl des Falls zurück.
+        diagZeilen: (typeof diagRowCount === 'function') ? diagRowCount() : 0
     };
 
     try {
@@ -274,7 +276,8 @@ async function selbsttest() {
         if (document.getElementById('diag-rows-container')) {
             const vorher = diagRowCount();
             ensureDiagRows(9);
-            pruefe('Diagnoseliste wächst auf 9 Zeilen', diagRowCount(), 9);
+            // Ein offener Fall kann schon mehr Zeilen haben – dann bleiben es so viele.
+            pruefe('Diagnoseliste wächst auf 9 Zeilen', diagRowCount(), Math.max(vorher, 9));
             pruefeWahr('Mindestens 6 Zeilen vorhanden', vorher >= 6);
         }
 
@@ -4362,6 +4365,123 @@ async function selbsttest() {
             }
         }
 
+        /* 23. Fazit bei gleichem Pflegegrad.
+           Ergibt die eigene Einschätzung denselben Pflegegrad wie das Gutachten, heißt es
+           „berücksichtigt … hinreichend" und „weiterhin den Pflegegrad". Bei einem höheren
+           Ergebnis bleibt die bisherige Formulierung. Der Pflegegrad wird hier über eine
+           ersetzte Berechnung vorgegeben – nur pg und total, alles andere rechnet echt. */
+        {
+            const ids23 = ['stam-pg-manual', 'stam-pts-manual', 'anh-pg', 'anh-pts', 'stam-antrag', 'stam-betreffend'];
+            const merk23 = { modus: appModus, calc: window.calculateInternal,
+                             extra: JSON.parse(JSON.stringify(erfassungExtra || {})),
+                             felder: ids23.map(id => { const el = document.getElementById(id); return el ? el.value : null; }) };
+            const setze = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+            const fazit = html => {
+                const d = document.createElement('div'); d.innerHTML = html;
+                const p = d.querySelector('#stmt-fazit');
+                return { el: p, text: p ? p.textContent.replace(/\s+/g, ' ').trim() : '' };
+            };
+            const vorgabe = (orig, zweit, eigen) => {
+                window.calculateInternal = s => Object.assign({}, merk23.calc(s),
+                    s === 'own' ? { pg: eigen, total: 60 } : s === 'zweit' ? { pg: zweit, total: 45 } : { pg: orig, total: 50 });
+            };
+            try {
+                pruefe('Pflegegrad lesen: leer, 0 und „kein" sind gleich',
+                    [pflegegradZahl(''), pflegegradZahl(0), pflegegradZahl('kein Pflegegrad')], [0, 0, 0]);
+                pruefe('Pflegegrad lesen: „Pflegegrad 4" und 4', [pflegegradZahl('Pflegegrad 4'), pflegegradZahl(4)], [4, 4]);
+                ['stam-pg-manual', 'stam-pts-manual', 'anh-pg', 'anh-pts'].forEach(id => setze(id, ''));
+                setze('stam-antrag', '2026-03-01'); setze('stam-betreffend', 'Frau Erika Mahl');
+
+                // Widerspruch
+                setzeModus('widerspruch');
+                vorgabe(3, 3, 3);
+                let f = fazit(buildStellungnahme('', {}, ''));
+                pruefe('Widerspruch gleich: Art', f.el && f.el.getAttribute('data-art'), 'gleich');
+                pruefeWahr('Widerspruch gleich: „berücksichtigt … hinreichend"',
+                    /berücksichtigt die tatsächlichen Einschränkungen von Frau Erika Mahl hinreichend\./.test(f.text)
+                    && !/nicht hinreichend/.test(f.text));
+                pruefeWahr('Widerspruch gleich: „weiterhin den Pflegegrad 3 ab dem 01.03.2026 (Antragsdatum)"',
+                    f.text.includes('der gemäß den Richtlinien weiterhin den Pflegegrad 3 ab dem 01.03.2026 (Antragsdatum) rechtfertigt.'));
+                pruefeWahr('Widerspruch gleich: Gutachten mit Pflegegrad und Punkten genannt',
+                    f.text.includes('mit einem Pflegegrad 3 und 50,00 Punkten'));
+                vorgabe(2, 2, 3);
+                f = fazit(buildStellungnahme('', {}, ''));
+                pruefe('Widerspruch höher: Art', f.el && f.el.getAttribute('data-art'), 'abweichend');
+                pruefeWahr('Widerspruch höher: bisherige Formulierung bleibt',
+                    f.text.includes('von Frau Erika Mahl nicht hinreichend.')
+                    && f.text.includes('der gemäß den Richtlinien den Pflegegrad 3 ab dem')
+                    && !f.text.includes('weiterhin'));
+                setze('stam-pg-manual', 'Pflegegrad 3');          // Handeingabe in anderer Schreibweise
+                f = fazit(buildStellungnahme('', {}, ''));
+                pruefe('Widerspruch: Handeingabe „Pflegegrad 3" zählt als gleich', f.el && f.el.getAttribute('data-art'), 'gleich');
+                setze('stam-pg-manual', '');
+
+                // Aktualisieren: aus „nicht hinreichend" wird „hinreichend" …
+                vorgabe(3, 3, 4);
+                const altDoc = buildStellungnahme('', {}, '');
+                vorgabe(3, 3, 3);
+                let z = fazit(mergeStellungnahme(altDoc, buildStellungnahme('', {}, '')));
+                pruefeWahr('Aktualisieren: Fazit wechselt auf „hinreichend … weiterhin"',
+                    !z.text.includes('nicht hinreichend') && z.text.includes('weiterhin den Pflegegrad 3'));
+                // … auch in einem älteren Schriftstück ohne Kennung
+                const ohneId = altDoc.replace(/ id="stmt-fazit" data-art="abweichend"/, '');
+                pruefeWahr('Älteres Schriftstück hat noch keine Kennung', ohneId.indexOf('stmt-fazit') === -1);
+                z = fazit(mergeStellungnahme(ohneId, buildStellungnahme('', {}, '')));
+                pruefeWahr('Älteres Schriftstück: Fazit wird erkannt und angepasst',
+                    !!z.el && !z.text.includes('nicht hinreichend') && z.text.includes('weiterhin'));
+                // … eine Handkorrektur bleibt, solange die Art gleich bleibt
+                const handDoc = buildStellungnahme('', {}, '').replace('hinreichend.', 'hinreichend. HANDKORREKTUR.');
+                z = fazit(mergeStellungnahme(handDoc, buildStellungnahme('', {}, '')));
+                pruefeWahr('Aktualisieren bei gleicher Art: Handkorrektur im Fazit bleibt', z.text.includes('HANDKORREKTUR'));
+
+                // Anhörung: beide Gutachten müssen gleich sein
+                setzeModus('anhoerung');
+                vorgabe(3, 3, 3);
+                f = fazit(buildAnhoerung('', {}, ''));
+                pruefeWahr('Anhörung gleich: „berücksichtigen … hinreichend … weiterhin den Pflegegrad 3"',
+                    /berücksichtigen die tatsächlichen Einschränkungen von Frau Erika Mahl hinreichend\./.test(f.text)
+                    && f.text.includes('weiterhin den Pflegegrad 3 ab dem'));
+                vorgabe(2, 3, 3);
+                f = fazit(buildAnhoerung('', {}, ''));
+                pruefeWahr('Anhörung: Erstgutachten niedriger – bisherige Formulierung',
+                    f.text.includes('nicht hinreichend') && !f.text.includes('weiterhin'));
+
+                // Höherstufungsantrag: Vorgutachten mit gleichem Pflegegrad
+                setzeModus('hoeherstufung');
+                erfassungExtra = Object.assign({}, merk23.extra, { pg: '3', vorgutachten: '2025-11-20' });
+                vorgabe(3, 3, 3);
+                f = fazit(buildHoeherstufung('', {}, '', ''));
+                pruefe('Höherstufung gleich: Art', f.el && f.el.getAttribute('data-art'), 'gleich');
+                pruefeWahr('Höherstufung gleich: Vorgutachten „hinreichend" berücksichtigt',
+                    f.text.startsWith('Das vorliegende Gutachten') && f.text.includes('vom 20.11.2025 mit einem Pflegegrad 3')
+                    && /von Frau Erika Mahl hinreichend\./.test(f.text));
+                pruefeWahr('Höherstufung gleich: „weiterhin den Pflegegrad 3"',
+                    f.text.includes('der gemäß den Richtlinien weiterhin den Pflegegrad 3 ab dem 01.03.2026 (Antragsdatum) rechtfertigt.')
+                    && !f.text.includes('mindestens'));
+                erfassungExtra.pg = '2';
+                f = fazit(buildHoeherstufung('', {}, '', ''));
+                pruefeWahr('Höherstufung höher: bisherige Formulierung bleibt',
+                    f.text.startsWith('Unter Berücksichtigung der oben genannten Einschätzung ergibt sich ein Punktwert von mindestens')
+                    && !f.text.includes('weiterhin'));
+                erfassungExtra.pg = '';
+                vorgabe(0, 0, 3);
+                f = fazit(buildHoeherstufung('', {}, '', ''));
+                pruefe('Höherstufung ohne Pflegegrad des Vorgutachtens: kein Vergleich', f.el && f.el.getAttribute('data-art'), 'abweichend');
+
+                // Erstantrag: es gibt kein Vorgutachten, also nie „weiterhin"
+                setzeModus('erstantrag');
+                erfassungExtra.pg = '3';
+                vorgabe(3, 3, 3);
+                f = fazit(buildHoeherstufung('', {}, '', ''));
+                pruefeWahr('Erstantrag: bisherige Formulierung', f.text.includes('mindestens') && !f.text.includes('weiterhin'));
+            } finally {
+                window.calculateInternal = merk23.calc;
+                erfassungExtra = merk23.extra;
+                ids23.forEach((id, k) => { const el = document.getElementById(id); if (el && merk23.felder[k] !== null) el.value = merk23.felder[k]; });
+                setzeModus(merk23.modus);
+            }
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {
@@ -4384,6 +4504,12 @@ async function selbsttest() {
                 const el = document.getElementById(id);
                 if (el) el.value = sicherung.felder[id];
             });
+            // Von Tests angelegte, leere Diagnosezeilen wieder entfernen
+            const diagBody = document.getElementById('diag-rows-container');
+            if (diagBody && sicherung.diagZeilen) {
+                const behalten = Math.max(sicherung.diagZeilen, maxDiagIndex(sicherung.felder) + 1);
+                while (diagBody.rows.length > behalten) diagBody.deleteRow(-1);
+            }
             const notizFeld = document.getElementById('erstgespraech-notes');
             if (notizFeld) notizFeld.value = erstgespraechNotes || '';
         } catch (e) {}

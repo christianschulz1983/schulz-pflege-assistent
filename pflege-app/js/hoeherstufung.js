@@ -232,6 +232,14 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
     const altPG = erfassungExtra.pg || (rO.pg ? String(rO.pg) : '');
     const vorgutachtenDatum = formatDE(erfassungExtra.vorgutachten || g('stam-begutachtung'));
     const org = g('stam-organisation') || 'Medizinischer Dienst';
+    /* Fazit im Höherstufungsantrag: Ergibt die heutige Einschätzung denselben Pflegegrad wie
+       das Vorgutachten, wird das festgestellt („hinreichend", „weiterhin"). Nur mit bekanntem
+       Pflegegrad des Vorgutachtens – ein leeres Feld hieße sonst „kein Pflegegrad" und ergäbe
+       einen falschen Vergleich. Der Erstantrag hat kein Vorgutachten. */
+    const fazitGleich = istHoeher && pflegegradZahl(altPG) > 0 && gleicherPflegegrad(altPG, rE.pg);
+    const vgPunkte = g('stam-pts-manual')
+        || (Object.keys((stateOrig && stateOrig.values) || {}).length ? f2(rO.total) : '');
+    const antragDatum = formatDE(g('stam-antrag'));
 
     const notesEl = document.getElementById('erstgespraech-notes');
     if (notesEl) erstgespraechNotes = notesEl.value;
@@ -403,7 +411,9 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
     <hr>
 
     <h2>Fazit</h2>
-    <p>Unter Berücksichtigung der oben genannten Einschätzung ergibt sich ein Punktwert von mindestens
-    ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${df('epg', pgWert(rE.pg))} rechtfertigt.</p>
+    ${fazitGleich
+        ? `<p id="stmt-fazit" data-art="gleich">Das vorliegende Gutachten ${df('org', orgGenitiv(org))} vom ${df('vgdatum', vorgutachtenDatum || '—')} mit einem ${df('opgfazit', pgWert(altPG))}${vgPunkte ? ' und ' + df('opts', vgPunkte) + ' Punkten' : ''} berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} hinreichend. Unter Berücksichtigung der oben genannten Einschätzung ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien weiterhin den ${df('epg', pgWert(rE.pg))}${antragDatum ? ' ab dem ' + df('antrag', antragDatum) + ' (Antragsdatum)' : ''} rechtfertigt.</p>`
+        : `<p id="stmt-fazit" data-art="abweichend">Unter Berücksichtigung der oben genannten Einschätzung ergibt sich ein Punktwert von mindestens
+    ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${df('epg', pgWert(rE.pg))} rechtfertigt.</p>`}
   </div>`;
 }

@@ -239,6 +239,9 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
     const origPts = g('stam-pts-manual') || f2(rO.total);
     const zweitPG = g('anh-pg') || String(rZ.pg);
     const zweitPts = g('anh-pts') || f2(rZ.total);
+    /* Fazit: Das Fazit spricht über BEIDE Gutachten. „hinreichend" und „weiterhin" stimmen
+       nur, wenn beide denselben Pflegegrad festgestellt haben wie die eigene Einschätzung. */
+    const fazitGleich = gleicherPflegegrad(origPG, rE.pg) && gleicherPflegegrad(zweitPG, rE.pg);
 
     const analyse = schwellenAnalyse();
     const strittig = analyse.strittig;
@@ -374,7 +377,7 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
     <hr>
 
     <h2>Fazit</h2>
-    <p>Die vorliegenden Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} mit ${df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten sowie vom ${df('zweitdatum', zweitDatum || '—')} mit ${df('zpgfazit', pgSatz(zweitPG))} und ${df('zpts', zweitPts)} Punkten berücksichtigen die tatsächlichen Einschränkungen von ${df('name', name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
+    <p id="stmt-fazit" data-art="${fazitGleich ? 'gleich' : 'abweichend'}">Die vorliegenden Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} mit ${df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten sowie vom ${df('zweitdatum', zweitDatum || '—')} mit ${df('zpgfazit', pgSatz(zweitPG))} und ${df('zpts', zweitPts)} Punkten berücksichtigen die tatsächlichen Einschränkungen von ${df('name', name)} ${fazitGleich ? '' : 'nicht '}hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : (fazitGleich ? 'weiterhin ' : '') + 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
     ${(typeof anlagenVerzeichnisHtml === 'function') ? anlagenVerzeichnisHtml() : ''}
   </div>`;
 }

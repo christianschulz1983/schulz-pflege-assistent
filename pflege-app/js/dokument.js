@@ -52,6 +52,10 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     const pgSatz = v => istKeinPG(v) ? 'kein Pflegegrad' : 'Pflegegrad ' + String(v).trim();  // im Fließtext
     const origPGTxt = pgWert(origPG);
     const eigPGTxt = pgWert(rE.pg);
+    /* Fazit: Ergibt die eigene Einschätzung denselben Pflegegrad wie das Gutachten, hat das
+       Gutachten die Einschränkungen „hinreichend" berücksichtigt, und der Pflegegrad gilt
+       „weiterhin". Bei einem abweichenden Ergebnis bleibt die bisherige Formulierung. */
+    const fazitGleich = gleicherPflegegrad(origPG, rE.pg);
 
     // Abweichende Einzelkriterien ermitteln
     const diffs = computeDiffs();
@@ -167,7 +171,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     <hr>
 
     <h2>Fazit</h2>
-    <p>Das vorliegende Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} ${istKeinPG(origPG) ? 'mit der Feststellung ' + df('opgfazit', 'keines Pflegegrades') : 'mit einem ' + df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
+    <p id="stmt-fazit" data-art="${fazitGleich ? 'gleich' : 'abweichend'}">Das vorliegende Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} ${istKeinPG(origPG) ? 'mit der Feststellung ' + df('opgfazit', 'keines Pflegegrades') : 'mit einem ' + df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} ${fazitGleich ? '' : 'nicht '}hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : (fazitGleich ? 'weiterhin ' : '') + 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
   </div>`;
 }
 
@@ -311,6 +315,30 @@ function mergeStellungnahme(existingHtml, freshHtml) {
         const h1 = cur.querySelector('.stmt h1') || cur.querySelector('h1');
         const p = h1 && h1.nextElementSibling;
         if (p && /^P$/i.test(p.tagName) && /Richtlinien/.test(p.textContent)) p.id = 'stmt-grundlage';
+    }
+    /* FAZIT. Sein Wortlaut hängt davon ab, ob die eigene Einschätzung denselben Pflegegrad
+       ergibt wie das Gutachten („hinreichend … weiterhin") oder einen anderen („nicht
+       hinreichend"). Beim Aktualisieren würden sonst nur die Zahlen darin erneuert – und aus
+       „nicht hinreichend" würde nie „hinreichend". Der Absatz wird deshalb ersetzt, sobald
+       sich die ART geändert hat; bleibt sie gleich, bleibt auch eine Handkorrektur stehen.
+       Ältere Schriftstücke tragen keine Kennung: dort wird der Absatz nach „Fazit" erkannt
+       und die Art aus dem Text gelesen. */
+    const fFazit = fresh.querySelector('#stmt-fazit');
+    if (fFazit) {
+        let cFazit = cur.querySelector('#stmt-fazit');
+        if (!cFazit) {
+            const h = Array.from(cur.querySelectorAll('h2')).find(x => x.textContent.trim() === 'Fazit');
+            const p = h && h.nextElementSibling;
+            if (p && /^P$/i.test(p.tagName)) { cFazit = p; cFazit.id = 'stmt-fazit'; }
+        }
+        if (cFazit) {
+            const text = cFazit.textContent;
+            const artAlt = cFazit.getAttribute('data-art')
+                || ((/\bhinreichend\b/.test(text) && !/nicht\s+hinreichend/.test(text)) ? 'gleich' : 'abweichend');
+            const artNeu = fFazit.getAttribute('data-art');
+            if (artAlt !== artNeu) cFazit.innerHTML = fFazit.innerHTML;
+            cFazit.setAttribute('data-art', artNeu);
+        }
     }
     // Reine Datenblöcke komplett ersetzen (Kopfdaten, Vergleichstabelle, Rechtsgrundlage).
     ['stmt-data', 'stmt-cmp-body', 'stmt-grundlage'].forEach(id => {

@@ -436,6 +436,20 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    „anderer Name" – sonst setzte `getVerfasser` still den ersten Listennamen in fremde
    Schriftstücke. Testdaten nur mit offensichtlichen Fantasienamen und -daten
    (Muster, Beispiel, Probe, 01.01.1950).
+33. **Fazit bei gleichem Pflegegrad: „hinreichend" und „weiterhin".** Ergibt die eigene
+   Einschätzung denselben Pflegegrad wie das Gutachten (`gleicherPflegegrad`, `js/basis.js`;
+   liest „3", „Pflegegrad 3", leer/0/„kein" = kein Pflegegrad), lautet das Fazit „…berücksichtigt
+   die tatsächlichen Einschränkungen … hinreichend … weiterhin den Pflegegrad X …". Ist das
+   Ergebnis höher, bleibt der bisherige Wortlaut („nicht hinreichend"). Geltung:
+   Widerspruch (Gutachten), Anhörung (NUR wenn Erst- UND Zweitgutachten gleich sind – das Fazit
+   spricht über beide), Höherstufungsantrag (Vorgutachten; nur mit bekanntem Pflegegrad, sonst
+   kein Vergleich; „Einschätzung" statt „Korrekturen"; Punkte des Vorgutachtens nur, wenn sie
+   vorliegen). Erstantrag: kein Vorgutachten, also nie „weiterhin". Der Absatz trägt
+   `#stmt-fazit` mit `data-art` (gleich/abweichend); beim Zusammenführen wird er ersetzt, wenn
+   sich die Art ändert – ältere Schriftstücke werden am Text erkannt. Bei gleicher Art bleibt
+   eine Handkorrektur stehen.
+   Der Selbsttest setzt die Diagnosezeilen am Ende auf die Zahl des offenen Falls zurück; ein
+   zweiter Lauf ohne Neuladen war sonst rot („wächst auf 9 Zeilen": ist 12).
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -489,7 +503,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1154 Pruefungen.
+Der Selbsttest umfasst 1175 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

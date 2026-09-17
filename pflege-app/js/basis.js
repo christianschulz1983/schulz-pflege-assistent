@@ -24,6 +24,20 @@ const BRI_GRUNDLAGE_SATZ =
     + 'Begutachtungsinstruments nach § 17 Absatz 1 SGB XI vom ' + BRI_FASSUNG.erlassen
     + ', in Kraft getreten am ' + BRI_FASSUNG.inkraft;
 
+/* PFLEGEGRAD VERGLEICHEN – für das Fazit.
+   Der Pflegegrad liegt in verschiedenen Schreibweisen vor: als Zahl aus der Berechnung,
+   als Eingabe „3", als „Pflegegrad 3", leer oder „kein Pflegegrad". Ein Pflegegrad 0 gibt
+   es nicht; leer, 0 und „kein" bedeuten dasselbe. */
+function pflegegradZahl(v) {
+    const s = String(v == null ? '' : v).trim();
+    if (s === '' || /^kein/i.test(s)) return 0;
+    const m = s.match(/[0-5]/);
+    return m ? Number(m[0]) : 0;
+}
+function gleicherPflegegrad(a, b) {
+    return pflegegradZahl(a) === pflegegradZahl(b);
+}
+
 // API-Schlüssel lokal merken, damit er nur einmal eingetragen werden muss
 const API_KEY_STORAGE = "pflege_assistent_api_key";
 
