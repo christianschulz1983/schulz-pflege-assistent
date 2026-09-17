@@ -56,6 +56,9 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
        Gutachten die Einschränkungen „hinreichend" berücksichtigt, und der Pflegegrad gilt
        „weiterhin". Bei einem abweichenden Ergebnis bleibt die bisherige Formulierung. */
     const fazitGleich = gleicherPflegegrad(origPG, rE.pg);
+    // Liegt die eigene Einschätzung darunter, wird auf das Risiko einer Rückstufung hingewiesen.
+    const fazitNiedriger = niedrigererPflegegrad(origPG, rE.pg);
+    const fazitArt = fazitGleich ? 'gleich' : (fazitNiedriger ? 'niedriger' : 'abweichend');
 
     // Abweichende Einzelkriterien ermitteln
     const diffs = computeDiffs();
@@ -171,7 +174,9 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     <hr>
 
     <h2>Fazit</h2>
-    <p id="stmt-fazit" data-art="${fazitGleich ? 'gleich' : 'abweichend'}">Das vorliegende Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} ${istKeinPG(origPG) ? 'mit der Feststellung ' + df('opgfazit', 'keines Pflegegrades') : 'mit einem ' + df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} ${fazitGleich ? '' : 'nicht '}hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : (fazitGleich ? 'weiterhin ' : '') + 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
+    <p id="stmt-fazit" data-art="${fazitArt}">Das vorliegende Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} ${istKeinPG(origPG) ? 'mit der Feststellung ' + df('opgfazit', 'keines Pflegegrades') : 'mit einem ' + df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} ${fazitGleich ? '' : 'nicht '}hinreichend. ${fazitNiedriger
+        ? `Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Punkten. Es besteht ein geringerer Pflegegrad und das reelle Risiko einer Rückstufung.`
+        : `Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : (fazitGleich ? 'weiterhin ' : '') + 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.`}</p>
   </div>`;
 }
 
@@ -334,7 +339,8 @@ function mergeStellungnahme(existingHtml, freshHtml) {
         if (cFazit) {
             const text = cFazit.textContent;
             const artAlt = cFazit.getAttribute('data-art')
-                || ((/\bhinreichend\b/.test(text) && !/nicht\s+hinreichend/.test(text)) ? 'gleich' : 'abweichend');
+                || (/Rückstufung/.test(text) ? 'niedriger'
+                    : (/\bhinreichend\b/.test(text) && !/nicht\s+hinreichend/.test(text)) ? 'gleich' : 'abweichend');
             const artNeu = fFazit.getAttribute('data-art');
             if (artAlt !== artNeu) cFazit.innerHTML = fFazit.innerHTML;
             cFazit.setAttribute('data-art', artNeu);

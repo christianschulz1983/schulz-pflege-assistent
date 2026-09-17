@@ -237,6 +237,8 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
        Pflegegrad des Vorgutachtens – ein leeres Feld hieße sonst „kein Pflegegrad" und ergäbe
        einen falschen Vergleich. Der Erstantrag hat kein Vorgutachten. */
     const fazitGleich = istHoeher && pflegegradZahl(altPG) > 0 && gleicherPflegegrad(altPG, rE.pg);
+    // Heutige Einschätzung unter dem Vorgutachten: Hinweis auf das Risiko einer Rückstufung.
+    const fazitNiedriger = istHoeher && pflegegradZahl(altPG) > 0 && niedrigererPflegegrad(altPG, rE.pg);
     const vgPunkte = g('stam-pts-manual')
         || (Object.keys((stateOrig && stateOrig.values) || {}).length ? f2(rO.total) : '');
     const antragDatum = formatDE(g('stam-antrag'));
@@ -413,6 +415,8 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
     <h2>Fazit</h2>
     ${fazitGleich
         ? `<p id="stmt-fazit" data-art="gleich">Das vorliegende Gutachten ${df('org', orgGenitiv(org))} vom ${df('vgdatum', vorgutachtenDatum || '—')} mit einem ${df('opgfazit', pgWert(altPG))}${vgPunkte ? ' und ' + df('opts', vgPunkte) + ' Punkten' : ''} berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} hinreichend. Unter Berücksichtigung der oben genannten Einschätzung ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien weiterhin den ${df('epg', pgWert(rE.pg))}${antragDatum ? ' ab dem ' + df('antrag', antragDatum) + ' (Antragsdatum)' : ''} rechtfertigt.</p>`
+        : fazitNiedriger
+        ? `<p id="stmt-fazit" data-art="niedriger">Das vorliegende Gutachten ${df('org', orgGenitiv(org))} vom ${df('vgdatum', vorgutachtenDatum || '—')} mit einem ${df('opgfazit', pgWert(altPG))}${vgPunkte ? ' und ' + df('opts', vgPunkte) + ' Punkten' : ''} berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} nicht hinreichend. Unter Berücksichtigung der oben genannten Einschätzung ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Punkten. Es besteht ein geringerer Pflegegrad und das reelle Risiko einer Rückstufung.</p>`
         : `<p id="stmt-fazit" data-art="abweichend">Unter Berücksichtigung der oben genannten Einschätzung ergibt sich ein Punktwert von mindestens
     ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${df('epg', pgWert(rE.pg))} rechtfertigt.</p>`}
   </div>`;

@@ -37,6 +37,10 @@ function pflegegradZahl(v) {
 function gleicherPflegegrad(a, b) {
     return pflegegradZahl(a) === pflegegradZahl(b);
 }
+// Liegt die eigene Einschätzung UNTER dem Pflegegrad des Gutachtens? Dann droht eine Rückstufung.
+function niedrigererPflegegrad(gutachten, eigen) {
+    return pflegegradZahl(eigen) < pflegegradZahl(gutachten);
+}
 
 // API-Schlüssel lokal merken, damit er nur einmal eingetragen werden muss
 const API_KEY_STORAGE = "pflege_assistent_api_key";

@@ -4371,7 +4371,8 @@ async function selbsttest() {
            Ergebnis bleibt die bisherige Formulierung. Der Pflegegrad wird hier über eine
            ersetzte Berechnung vorgegeben – nur pg und total, alles andere rechnet echt. */
         {
-            const ids23 = ['stam-pg-manual', 'stam-pts-manual', 'anh-pg', 'anh-pts', 'stam-antrag', 'stam-betreffend'];
+            const ids23 = ['stam-pg-manual', 'stam-pts-manual', 'anh-pg', 'anh-pts', 'stam-antrag', 'stam-betreffend',
+                           'stam-organisation', 'stam-begutachtung'];
             const merk23 = { modus: appModus, calc: window.calculateInternal,
                              extra: JSON.parse(JSON.stringify(erfassungExtra || {})),
                              felder: ids23.map(id => { const el = document.getElementById(id); return el ? el.value : null; }) };
@@ -4389,7 +4390,8 @@ async function selbsttest() {
                 pruefe('Pflegegrad lesen: leer, 0 und „kein" sind gleich',
                     [pflegegradZahl(''), pflegegradZahl(0), pflegegradZahl('kein Pflegegrad')], [0, 0, 0]);
                 pruefe('Pflegegrad lesen: „Pflegegrad 4" und 4', [pflegegradZahl('Pflegegrad 4'), pflegegradZahl(4)], [4, 4]);
-                ['stam-pg-manual', 'stam-pts-manual', 'anh-pg', 'anh-pts'].forEach(id => setze(id, ''));
+                ['stam-pg-manual', 'stam-pts-manual', 'anh-pg', 'anh-pts', 'stam-organisation', 'stam-begutachtung']
+                    .forEach(id => setze(id, ''));
                 setze('stam-antrag', '2026-03-01'); setze('stam-betreffend', 'Frau Erika Mahl');
 
                 // Widerspruch
@@ -4474,6 +4476,56 @@ async function selbsttest() {
                 vorgabe(3, 3, 3);
                 f = fazit(buildHoeherstufung('', {}, '', ''));
                 pruefeWahr('Erstantrag: bisherige Formulierung', f.text.includes('mindestens') && !f.text.includes('weiterhin'));
+                erfassungExtra.pg = '';
+
+                /* Eigene Einschätzung NIEDRIGER als das Gutachten: Hinweis auf das Risiko einer
+                   Rückstufung, kein „rechtfertigt" und kein Antragsdatum. */
+                const RUECK = 'Es besteht ein geringerer Pflegegrad und das reelle Risiko einer Rückstufung.';
+                setzeModus('widerspruch');
+                vorgabe(3, 3, 2);
+                f = fazit(buildStellungnahme('', {}, ''));
+                pruefe('Widerspruch niedriger: Art', f.el && f.el.getAttribute('data-art'), 'niedriger');
+                pruefeWahr('Widerspruch niedriger: Wortlaut vollständig',
+                    f.text === 'Das vorliegende Gutachten des Medizinischen Dienstes vom — mit einem Pflegegrad 3 und 50,00 Punkten '
+                        + 'berücksichtigt die tatsächlichen Einschränkungen von Frau Erika Mahl nicht hinreichend. '
+                        + 'Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von 60,00 Punkten. ' + RUECK);
+                // Aktualisieren: aus „weiterhin" (gleich) wird der Rückstufungshinweis
+                vorgabe(3, 3, 3);
+                const gleichDoc = buildStellungnahme('', {}, '');
+                vorgabe(3, 3, 2);
+                z = fazit(mergeStellungnahme(gleichDoc, buildStellungnahme('', {}, '')));
+                pruefeWahr('Aktualisieren: Fazit wechselt auf den Rückstufungshinweis',
+                    z.text.endsWith(RUECK) && !z.text.includes('weiterhin'));
+                // und zurück, wenn die Einschätzung wieder höher ausfällt
+                const rueckDoc = buildStellungnahme('', {}, '');
+                vorgabe(3, 3, 4);
+                z = fazit(mergeStellungnahme(rueckDoc, buildStellungnahme('', {}, '')));
+                pruefeWahr('Aktualisieren: Rückstufungshinweis verschwindet bei höherem Ergebnis',
+                    !z.text.includes('Rückstufung') && z.text.includes('den Pflegegrad 4 ab dem'));
+
+                setzeModus('anhoerung');
+                vorgabe(3, 3, 2);
+                f = fazit(buildAnhoerung('', {}, ''));
+                pruefeWahr('Anhörung niedriger: Rückstufungshinweis',
+                    f.el && f.el.getAttribute('data-art') === 'niedriger'
+                    && f.text.includes('berücksichtigen die tatsächlichen Einschränkungen von Frau Erika Mahl nicht hinreichend.')
+                    && f.text.endsWith('ergibt sich ein Punktwert von 60,00 Punkten. ' + RUECK));
+                vorgabe(2, 3, 3);
+                f = fazit(buildAnhoerung('', {}, ''));
+                pruefeWahr('Anhörung: gleich dem Zweitgutachten ist kein Rückstufungsfall', !f.text.includes('Rückstufung'));
+
+                setzeModus('hoeherstufung');
+                erfassungExtra.pg = '3';
+                vorgabe(3, 3, 2);
+                f = fazit(buildHoeherstufung('', {}, '', ''));
+                pruefeWahr('Höherstufung niedriger: Rückstufungshinweis',
+                    f.el && f.el.getAttribute('data-art') === 'niedriger'
+                    && f.text.startsWith('Das vorliegende Gutachten') && f.text.includes('vom 20.11.2025 mit einem Pflegegrad 3')
+                    && f.text.includes('von Frau Erika Mahl nicht hinreichend.')
+                    && f.text.endsWith('ergibt sich ein Punktwert von 60,00 Punkten. ' + RUECK));
+                setzeModus('erstantrag');
+                f = fazit(buildHoeherstufung('', {}, '', ''));
+                pruefeWahr('Erstantrag: nie ein Rückstufungshinweis', !f.text.includes('Rückstufung'));
             } finally {
                 window.calculateInternal = merk23.calc;
                 erfassungExtra = merk23.extra;

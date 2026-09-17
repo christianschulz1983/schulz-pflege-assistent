@@ -448,6 +448,13 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    `#stmt-fazit` mit `data-art` (gleich/abweichend); beim Zusammenführen wird er ersetzt, wenn
    sich die Art ändert – ältere Schriftstücke werden am Text erkannt. Bei gleicher Art bleibt
    eine Handkorrektur stehen.
+   **Niedrigerer Pflegegrad** (`niedrigererPflegegrad`, `data-art="niedriger"`): „…berücksichtigt
+   … nicht hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein
+   Punktwert von X Punkten. Es besteht ein geringerer Pflegegrad und das reelle Risiko einer
+   Rückstufung." – ohne „rechtfertigt" und ohne Antragsdatum. Widerspruch: unter dem Gutachten;
+   Anhörung: unter dem Zweitgutachten (zuletzt festgestellt); Höherstufungsantrag: unter dem
+   Vorgutachten („Einschätzung" statt „Korrekturen"). Erstantrag: nie. Ältere Schriftstücke
+   ohne Kennung werden am Wort „Rückstufung" erkannt.
    Der Selbsttest setzt die Diagnosezeilen am Ende auf die Zahl des offenen Falls zurück; ein
    zweiter Lauf ohne Neuladen war sonst rot („wächst auf 9 Zeilen": ist 12).
 
@@ -503,7 +510,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1175 Pruefungen.
+Der Selbsttest umfasst 1183 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

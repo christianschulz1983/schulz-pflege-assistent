@@ -242,6 +242,10 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
     /* Fazit: Das Fazit spricht über BEIDE Gutachten. „hinreichend" und „weiterhin" stimmen
        nur, wenn beide denselben Pflegegrad festgestellt haben wie die eigene Einschätzung. */
     const fazitGleich = gleicherPflegegrad(origPG, rE.pg) && gleicherPflegegrad(zweitPG, rE.pg);
+    /* Rückstufungsrisiko: Maßgeblich ist der Pflegegrad, der zuletzt festgestellt wurde – der
+       des Zweitgutachtens. Liegt die eigene Einschätzung darunter, droht eine Rückstufung. */
+    const fazitNiedriger = !fazitGleich && niedrigererPflegegrad(zweitPG, rE.pg);
+    const fazitArt = fazitGleich ? 'gleich' : (fazitNiedriger ? 'niedriger' : 'abweichend');
 
     const analyse = schwellenAnalyse();
     const strittig = analyse.strittig;
@@ -377,7 +381,9 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
     <hr>
 
     <h2>Fazit</h2>
-    <p id="stmt-fazit" data-art="${fazitGleich ? 'gleich' : 'abweichend'}">Die vorliegenden Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} mit ${df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten sowie vom ${df('zweitdatum', zweitDatum || '—')} mit ${df('zpgfazit', pgSatz(zweitPG))} und ${df('zpts', zweitPts)} Punkten berücksichtigen die tatsächlichen Einschränkungen von ${df('name', name)} ${fazitGleich ? '' : 'nicht '}hinreichend. Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : (fazitGleich ? 'weiterhin ' : '') + 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.</p>
+    <p id="stmt-fazit" data-art="${fazitArt}">Die vorliegenden Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} mit ${df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten sowie vom ${df('zweitdatum', zweitDatum || '—')} mit ${df('zpgfazit', pgSatz(zweitPG))} und ${df('zpts', zweitPts)} Punkten berücksichtigen die tatsächlichen Einschränkungen von ${df('name', name)} ${fazitGleich ? '' : 'nicht '}hinreichend. ${fazitNiedriger
+        ? `Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Punkten. Es besteht ein geringerer Pflegegrad und das reelle Risiko einer Rückstufung.`
+        : `Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : (fazitGleich ? 'weiterhin ' : '') + 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.`}</p>
     ${(typeof anlagenVerzeichnisHtml === 'function') ? anlagenVerzeichnisHtml() : ''}
   </div>`;
 }
