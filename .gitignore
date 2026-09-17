@@ -16,3 +16,8 @@ build/
 dist/
 *.spec
 _tess_engine/
+
+# Begutachtungs-Richtlinien als PDF (2,4 MB, amtliche Quelle medizinischerdienst.de).
+# Lokal fuer werkzeuge/bri_abgleich.py; die App nutzt die daraus uebernommenen Texte in
+# pflege-app/bri_texte.js. Die PDF selbst gehoert nicht ins oeffentliche Repository.
+Richtlinien/*.pdf

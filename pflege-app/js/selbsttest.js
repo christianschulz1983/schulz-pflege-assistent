@@ -62,6 +62,42 @@ async function selbsttest() {
         // ---------- 1. Daten vollständig geladen ----------
         pruefe('Kriterienkatalog (ITEMS)', typeof ITEMS !== 'undefined' ? ITEMS.length : 0, 65);
         pruefe('BRi-Texte', typeof BRI_KRITERIEN !== 'undefined' ? Object.keys(BRI_KRITERIEN).length : 0, 65);
+        /* Die BRi-Texte sind Zitatgrundlage für die KI. Die erste Übernahme enthielt Seitenzahlen
+           im Wort („Auf65 forderungen"), eine Fußnote mitten in 4.5.16, Kapitelnummern am Ende
+           und die komplette Einleitung von Modul 4 als angebliche Definition von 4.3.13.
+           Der wörtliche Abgleich mit der PDF läuft außerhalb des Browsers
+           (werkzeuge/bri_abgleich.py); hier werden die Übernahmereste selbst ausgeschlossen. */
+        if (typeof BRI_KRITERIEN !== 'undefined' && typeof BRI_MODULE !== 'undefined') {
+            pruefe('BRi: Einleitungen aller sechs Module', Object.keys(BRI_MODULE).sort(), ['4.1', '4.2', '4.3', '4.4', '4.5', '4.6']);
+            const briTexte = [];
+            Object.keys(BRI_MODULE).forEach(n => briTexte.push(['Modul ' + n, BRI_MODULE[n].text]));
+            Object.keys(BRI_KRITERIEN).forEach(n => {
+                const k = BRI_KRITERIEN[n];
+                briTexte.push([n, k.definition || '']);
+                Object.keys(k.levels || {}).forEach(st => briTexte.push([n + ' ' + st, k.levels[st]]));
+            });
+            const reste = [
+                ['Steuerzeichen', /[\x00-\x08\x0b-\x1f]/],
+                ['Seitenzahl im Wort', /[A-Za-zäöüß]\d{1,3}(?=\s|[a-zäöüß])/],
+                ['Kapitelnummer am Ende', /\s\d+\.\d+(\.\d+)?\s*(\[\s*K?F[^\]]*\].*)?$/],
+                ['Fußnotentext', /Valentini|\(Syn\.:/]
+            ];
+            const funde = [];
+            briTexte.forEach(([ken, t]) => reste.forEach(([name, re]) => { if (re.test(t)) funde.push(ken + ': ' + name); }));
+            pruefe('BRi: keine Übernahmereste (Seitenzahlen, Fußnoten, Kapitelnummern)', funde, []);
+            pruefeWahr('BRi: 4.3.13 enthält keine fremde Modul-4-Einleitung',
+                !/Harninkontinenz|Stuhlkontinenz|Selbstversorgung/.test(BRI_KRITERIEN['4.3.13'].definition));
+            const modul4 = (BRI_MODULE['4.4'] || {}).text || '';      // fehlt es, nur diese Prüfung rot
+            pruefeWahr('BRi: Modul 4 beschreibt die Kontinenzstufen',
+                /Blasenkontrolle\/Harnkontinenz/.test(modul4) && /Komplett inkontinent/.test(modul4));
+            // Ein Zitat aus der Modul-4-Einleitung gilt jetzt als belegt – bei einem Kriterium aus Modul 4
+            if (typeof unbelegteZitate === 'function') {
+                pruefe('BRi: Zitat aus der Modul-4-Einleitung ist bei 4.4.11 belegt',
+                    unbelegteZitate('4.4.11', 'Laut Richtlinien gilt: „Mehrmals täglich unwillkürliche Harnabgänge, aber gesteuerte Blasenentleerung ist noch teilweise möglich".').length, 0);
+                pruefe('BRi: dasselbe Zitat ist bei 4.3.13 NICHT belegt',
+                    unbelegteZitate('4.3.13', 'Laut Richtlinien gilt: „Mehrmals täglich unwillkürliche Harnabgänge, aber gesteuerte Blasenentleerung ist noch teilweise möglich".').length, 1);
+            }
+        }
         pruefe('Praxishinweise', typeof LAIEN_HINWEISE !== 'undefined' ? Object.keys(LAIEN_HINWEISE).length : 0, 58);
         pruefe('Handreichung im Wortlaut', typeof LAIEN_TEXTE !== 'undefined' ? Object.keys(LAIEN_TEXTE).length : 0, 58);
         pruefe('Durchführungsarten', typeof DURCHFUEHRUNGSARTEN !== 'undefined' ? DURCHFUEHRUNGSARTEN.length : 0, 3);

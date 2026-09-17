@@ -40,7 +40,8 @@ pflege-app/
   js/nummerierung.js  Nummerierung des Gutachtens (4.x.y bzw. 5.x.y bei Medicproof)
   js/selbsttest.js    Selbsttest (Knopf oben rechts)
   befund_katalog.js   Befundkatalog, acht Gruppen (nicht von Hand ändern)
-  bri_texte.js        BRi-Originaltexte, 65 Kriterien (nicht von Hand ändern)
+  bri_texte.js        BRi-Originaltexte, 65 Kriterien + 6 Moduleinleitungen (Regel 34)
+werkzeuge/bri_abgleich.py  Prüft bri_texte.js wörtlich gegen Richtlinien/*.pdf (Regel 34)
   laien_hinweise.js   Praxishinweise, 58 Kriterien (Hilfsmittel-Regeln, Fallstricke)
   pflege_server.py    Lokaler Server: PDF-Text, OCR, liefert die App aus
   test_pflege_server.py  Selbsttest für den Server (python test_pflege_server.py)
@@ -457,6 +458,21 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    ohne Kennung werden am Wort „Rückstufung" erkannt.
    Der Selbsttest setzt die Diagnosezeilen am Ende auf die Zahl des offenen Falls zurück; ein
    zweiter Lauf ohne Neuladen war sonst rot („wächst auf 9 Zeilen": ist 12).
+34. **BRi-Texte (`pflege-app/bri_texte.js`) sind wörtlich gegen die PDF geprüft – und bleiben es.**
+   Quelle: Richtlinien vom 21.08.2024, barrierefreie Fassung vom 30.01.2025, lokal unter
+   `Richtlinien/BRi_Pflege_21_08_2024_barrierefrei.pdf` (per `.gitignore` NICHT im Repository).
+   Die erste Übernahme enthielt: Seitenzahlen im Wort („Auf65 forderungen" 4.2.10,
+   „Systematisie57 rung" 4.1.B), Fußnote 11 samt Zeichen mitten in 4.5.16, Kapitelnummern am
+   Textende (4.1.B, 4.2.11, 4.4.13, 4.5.16, 4.6.6), Steuerzeichen – und die KOMPLETTE Einleitung
+   von Modul 4 (Kontinenzstufen) als angebliche Definition von 4.3.13; `BRI_MODULE['4.4']`
+   fehlte deshalb. Die KI bekam also bei 4.3.13 den Kontinenztext als Definition.
+   Nach JEDER Änderung an `bri_texte.js`: `python werkzeuge/bri_abgleich.py` (Rückgabe 0).
+   Das Werkzeug prüft 1. wörtlich (ohne Leerraum/Trennung), 2. im RICHTIGEN Abschnitt
+   ([F 4.x.y] bis zur nächsten Überschrift – fängt angehängte Fremdtexte), 3. auf Übernahmereste.
+   Es bricht ab, wenn es die Überschriften nicht erkennt (vorher fiel Prüfung 2 still aus, weil
+   die Kinder-Grenze schon im Inhaltsverzeichnis lag). Gegenprobe mit dem alten Stand: 18 Funde.
+   Der Selbsttest prüft im Browser: sechs Moduleinleitungen, keine Übernahmereste, 4.3.13 ohne
+   Kontinenztext, Zitat aus Modul 4 bei 4.4.11 belegt und bei 4.3.13 nicht.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -510,7 +526,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1183 Pruefungen.
+Der Selbsttest umfasst 1189 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
