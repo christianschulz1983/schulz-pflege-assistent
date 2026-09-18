@@ -365,6 +365,7 @@ function erfSetzen(tid, i, key, wert) {
         return;
     }
     if (wert === '') delete erfassung[tid][i][key]; else erfassung[tid][i][key] = wert;
+    if (typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Erfassung');
     // Wochenstunden aus Tagen und Stunden je Tag
     if (tid === 'pflegepersonen' && (key === 'tage' || key === 'stunden')) {
         const z = erfassung[tid][i];

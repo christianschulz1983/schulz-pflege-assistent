@@ -51,6 +51,14 @@ function setzeBewertung(spalte, id, wert, quelle) {
         neu: bewertungLesbar(item, wert),
         quelle: BEWERTUNG_QUELLEN[quelle] || quelle
     });
+    // Eine fertige Stellungnahme passt jetzt nicht mehr. Import und Laden ausgenommen:
+    // Beim Import beginnt ein neuer Fall (die Korrektur meldet sich selbst), beim Laden
+    // kommt die Stellungnahme mit.
+    const anlass = { berater: 'Regler', vorschlag: 'Vorschlag übernommen', befund: 'Befunderhebung',
+                     modul5: 'Modul 5 aus der Erfassung' }[quelle];
+    if (anlass && typeof markiereStellungnahmeVeraltet === 'function') {
+        markiereStellungnahmeVeraltet((item ? item.nr + ' ' : '') + '(' + anlass + ')');
+    }
     return true;
 }
 

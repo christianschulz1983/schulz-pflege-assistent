@@ -48,7 +48,18 @@ async function selbsttest() {
         // Der Test schreibt Probedateien; sein Nachweis darf nicht im echten stehen bleiben.
         speicherungen: (() => { try { return localStorage.getItem(SPEICHER_PROTOKOLL); } catch (e) { return null; } })(),
         // Tests legen Diagnosezeilen an; danach wieder auf die Zeilenzahl des Falls zurück.
-        diagZeilen: (typeof diagRowCount === 'function') ? diagRowCount() : 0
+        diagZeilen: (typeof diagRowCount === 'function') ? diagRowCount() : 0,
+        /* Die ANGEZEIGTE Stellungnahme – mit den Handänderungen des Beraters. appealDraft allein
+           genügt nicht: Es wird erst beim Speichern oder Erstellen nachgezogen. Vorher war die
+           Stellungnahme nach dem Selbsttest leer, und das nächste „Speichern" schrieb den leeren
+           Stand in die Falldatei. Ebenso gingen Protokoll, Veraltet-Hinweis und die
+           Begründungen übernommener Vorschläge verloren. */
+        dokument: (() => { const el = document.getElementById('appeal-document');
+            return (el && el.innerHTML.trim()) ? el.innerHTML : (appealDraft || ''); })(),
+        protokoll: (typeof bewertungsProtokoll !== 'undefined') ? JSON.parse(JSON.stringify(bewertungsProtokoll)) : null,
+        veraltet: (typeof stellungnahmeVeraltet !== 'undefined') ? stellungnahmeVeraltet : false,
+        veraltetGruende: (typeof veraltetGruende !== 'undefined') ? veraltetGruende.slice() : [],
+        vorschlagGruende: (typeof vorschlagGruende !== 'undefined') ? JSON.parse(JSON.stringify(vorschlagGruende)) : {}
     };
 
     try {
@@ -2001,8 +2012,9 @@ async function selbsttest() {
             pruefeWahr('Widerspruch erzeugt weiterhin sein Dokument', !!baueDokument('', {}, ''));
 
             // Die Felder gehören in die Falldatei
+            // Tatsächlich in den Falldaten nachsehen, nicht im Quelltext
             pruefeWahr('Anhörungsfelder werden mitgespeichert',
-                saveCase.toString().includes('[id^="anh-"]'));
+                typeof fallDaten === 'function' && Object.keys(fallDaten().stammdaten).some(k => k.indexOf('anh-') === 0));
 
             stateZweit = merkZweitA;
             Object.keys(merkFelderA).forEach(id => {
@@ -4679,10 +4691,52 @@ async function selbsttest() {
                     pruefeWahr('Die Markierung zählt nicht als unbelegtes Zitat',
                         !docEl.querySelector('.begruendung-fehlt[data-warn]'));
                     pruefe('Markierung nur beim leeren Kriterium', docEl.querySelectorAll('.begruendung-fehlt').length, 1);
+
+                    /* 24g. Vorschlag in eine BESTEHENDE Stellungnahme einfügen. Sie enthält 4.1.1 mit
+                       einer Handänderung; dann wird der Vorschlag für 4.4.6 übernommen. Erwartet:
+                       Hinweis „veraltet", nach dem Neu-Erstellen steht 4.4.6 mit Begründung an
+                       seinem Platz, die Handänderung bei 4.1.1 bleibt, der Hinweis verschwindet. */
+                    stateEigene.values[id24('4.4.6')] = 1;                     // Vorschlag noch nicht übernommen
+                    vorschlagGruende = {};
+                    setzeStellungnahme('');
+                    aufrufe24.length = 0;
+                    window.callGeminiWithFallback = async (payload) => {
+                        const text = payload.contents[0].parts[0].text;
+                        aufrufe24.push(text);
+                        const bg = [];
+                        if (text.includes('Kriterium 4.1.1')) bg.push({ nr: '4.1.1', text: 'Hilfe beim Drehen im Bett. ' + abl('überwiegend selbständig') });
+                        if (text.includes('Kriterium 4.4.6')) bg.push({ nr: '4.4.6', text: 'Die Tochter hilft täglich beim Anziehen von Hose und Strümpfen. ' + abl('überwiegend unselbständig') });
+                        return { candidates: [{ content: { parts: [{ text: JSON.stringify({ allgemein: 'Lage.', begruendungen: bg }) }] } }] };
+                    };
+                    await generateAppealText();
+                    const b411 = docEl.querySelector('.crit[data-nr="4.1.1"] div:last-child');
+                    if (b411) b411.textContent = b411.textContent + ' HANDÄNDERUNG 4.1.1';
+                    pruefe('Bestehende Stellungnahme: 4.4.6 noch nicht enthalten', docEl.querySelectorAll('.crit[data-nr="4.4.6"]').length, 0);
+                    vorschlagListe = [{ item: i446, stufe: 2, alt: 1, begruendung: 'Die Tochter hilft täglich beim Anziehen.', fundstelle: '' }];
+                    renderVorschlaege();
+                    const box24g = document.querySelector('#vorschlag-body input[type="checkbox"]');
+                    if (box24g) box24g.checked = true;
+                    uebernehmeVorschlaege();
+                    pruefeWahr('Nach dem Übernehmen: Stellungnahme als veraltet gekennzeichnet (mit Anlass)',
+                        stellungnahmeVeraltet === true && veraltetGruende.includes('4.4.6 (Vorschlag übernommen)'));
+                    aufrufe24.length = 0;
+                    await generateAppealText();
+                    const reihenfolge = Array.from(docEl.querySelectorAll('.crit[data-nr]')).map(e => e.getAttribute('data-nr'));
+                    pruefe('Neu erstellt: 4.4.6 steht an seinem Platz', reihenfolge, ['4.1.1', '4.4.6']);
+                    const b446 = docEl.querySelector('.crit[data-nr="4.4.6"]');
+                    pruefeWahr('Neu erstellt: 4.4.6 mit Begründung und neuer Bewertung',
+                        !!b446 && b446.getAttribute('data-ai') === '1' && b446.textContent.includes('Anziehen von Hose')
+                        && b446.getAttribute('data-vals') === 'überwiegend selbständig|überwiegend unselbständig');
+                    pruefeWahr('Neu erstellt: Handänderung bei 4.1.1 bleibt erhalten',
+                        (docEl.querySelector('.crit[data-nr="4.1.1"]') || {}).textContent.includes('HANDÄNDERUNG 4.1.1'));
+                    pruefeWahr('Neu erstellt: nur 4.4.6 wurde neu formuliert',
+                        aufrufe24.length >= 1 && aufrufe24[0].includes('Kriterium 4.4.6') && !aufrufe24[0].includes('Kriterium 4.1.1'));
+                    pruefe('Neu erstellt: Veraltet-Hinweis verschwindet', stellungnahmeVeraltet, false);
                 }
                 // 24f. Die Grundlagen werden mit dem Fall gespeichert
                 pruefeWahr('Fall speichern sichert die Vorschlagsgründe',
-                    /vorschlagGruende/.test(saveCase.toString()) && /vorschlagGruende/.test(loadCase.toString()));
+                    typeof fallDaten === 'function' && !!fallDaten().vorschlagGruende['4.4.6']
+                    && /vorschlagGruende/.test(loadCase.toString()));
             } finally {
                 window.callGeminiWithFallback = merk24.ki;
                 window.showToast = merk24.toast;
@@ -4698,6 +4752,80 @@ async function selbsttest() {
                 setzeModus(merk24.modus);
                 hideOverlay();
             }
+        }
+
+        /* 25. Jede Änderung wird gespeichert und kommt in der Stellungnahme an.
+           a) Nach jeder Änderung, die die Stellungnahme betrifft, wird sie als veraltet
+              gekennzeichnet – mit Anlass. Vorher nur nach Korrektur, Kontinenz, Unterlagen.
+           b) Die Falldatei enthält Protokoll, Veraltet-Hinweis und Vorschlagsgründe; Laden
+              stellt alles wieder her, auch die von Hand bearbeitete Stellungnahme. */
+        if (typeof markiereStellungnahmeVeraltet === 'function' && typeof fallDaten === 'function') {
+            const id25 = nr => ITEMS.find(i => i.nr === nr).id;
+            const dok25 = '<div class="stmt" data-vorgang="widerspruch"><p>Stellungnahme mit HANDÄNDERUNG 25</p></div>';
+            const probe = (name, fn, soll) => {
+                veraltetZuruecksetzen();
+                fn();
+                pruefe(name, stellungnahmeVeraltet, soll);
+            };
+            setzeModus('widerspruch');
+            setzeStellungnahme(dok25);
+            const i446 = id25('4.4.6');
+            const start446 = stateEigene.values[i446];
+            const anders = v => (v === 2 ? 3 : 2);
+            probe('Veraltet nach übernommenem Vorschlag', () => setzeBewertung('own', i446, anders(stateEigene.values[i446]), 'vorschlag'), true);
+            pruefeWahr('Anlass nennt Kriterium und Weg', veraltetGruende.some(g => g === '4.4.6 (Vorschlag übernommen)'));
+            pruefeWahr('Hinweis über der Stellungnahme nennt den Anlass',
+                veraltetHinweisHtml().includes('4.4.6 (Vorschlag übernommen)') && veraltetHinweisHtml().includes('korrigiert'));
+            probe('Veraltet nach Änderung am Regler', () => setzeBewertung('own', i446, anders(stateEigene.values[i446]), 'berater'), true);
+            probe('Veraltet nach Befunderhebung (Bewertung)', () => setzeBewertung('own', i446, anders(stateEigene.values[i446]), 'befund'), true);
+            probe('Veraltet nach „Modul 5 übernehmen"', () => setzeBewertung('own', id25('4.5.1'), { count: 3, period: 'D' }, 'modul5'), true);
+            probe('Import meldet sich nicht selbst (neuer Fall)', () => setzeBewertung('own', i446, anders(stateEigene.values[i446]), 'import'), false);
+            probe('Laden meldet sich nicht selbst', () => setzeBewertung('own', i446, anders(stateEigene.values[i446]), 'laden'), false);
+            if (typeof setzeBefundText === 'function') probe('Veraltet nach Befundtext', () => setzeBefundText('groesse', undefined, '171'), true);
+            if (typeof erfSetzen === 'function') probe('Veraltet nach Eintrag in der Erfassung', () => erfSetzen('hilfsmittel', 0, 'bezeichnung', 'Rollator'), true);
+            const nf25 = document.getElementById('erstgespraech-notes');
+            if (nf25) probe('Veraltet nach Änderung der Notizen', () => { nf25.value += ' Ergänzung'; nf25.dispatchEvent(new Event('input')); }, true);
+            setzeStellungnahme('');
+            probe('Ohne Stellungnahme keine Veraltet-Kennzeichnung', () => setzeBewertung('own', i446, anders(stateEigene.values[i446]), 'berater'), false);
+
+            // b) Speichern und Laden im Kreis
+            setzeStellungnahme(dok25);
+            veraltetZuruecksetzen();
+            vorschlagGruende = { '4.4.6': { stufe: 2, begruendung: 'Grund 25', fundstelle: 'Fundstelle 25' } };
+            setzeBewertung('own', i446, anders(stateEigene.values[i446]), 'vorschlag');
+            const wert446 = stateEigene.values[i446];
+            const daten = fallDaten();
+            pruefeWahr('Falldatei: Stellungnahme mit Handänderung', (daten.appealDraft || '').includes('HANDÄNDERUNG 25'));
+            pruefeWahr('Falldatei: Protokoll mit Ursprung', Array.isArray(daten.bewertungsProtokoll)
+                && daten.bewertungsProtokoll.some(e => e.nr === '4.4.6' && e.quelle === BEWERTUNG_QUELLEN.vorschlag));
+            pruefeWahr('Falldatei: Veraltet-Hinweis mit Anlass', daten.stellungnahmeVeraltet === true
+                && daten.veraltetGruende.includes('4.4.6 (Vorschlag übernommen)'));
+            pruefeWahr('Falldatei: Vorschlagsgründe', daten.vorschlagGruende && daten.vorschlagGruende['4.4.6'].begruendung === 'Grund 25');
+            const ladeDatei = async d => {
+                const f = new File([JSON.stringify(d)], 'Probe, Fall, Widerspruch.json', { type: 'application/json' });
+                loadCase({ target: { files: [f], value: '' } });
+                await new Promise(r => setTimeout(r, 400));
+            };
+            // Zwischenstand verändern, damit das Laden etwas zu tun hat
+            setzeStellungnahme(''); bewertungsProtokoll = []; veraltetZuruecksetzen(); vorschlagGruende = {};
+            await ladeDatei(daten);
+            pruefeWahr('Laden: Stellungnahme mit Handänderung wieder da',
+                (document.getElementById('appeal-document')?.innerHTML || '').includes('HANDÄNDERUNG 25'));
+            pruefe('Laden: Bewertung wieder da', stateEigene.values[i446], wert446);
+            pruefeWahr('Laden: Protokoll mit Ursprung wieder da, dazu der Ladevermerk',
+                bewertungsProtokoll.some(e => e.nr === '4.4.6' && e.quelle === BEWERTUNG_QUELLEN.vorschlag)
+                && bewertungsProtokoll.some(e => e.quelle === BEWERTUNG_QUELLEN.laden));
+            pruefeWahr('Laden: Veraltet-Hinweis mit Anlass wieder da',
+                stellungnahmeVeraltet === true && veraltetGruende.includes('4.4.6 (Vorschlag übernommen)'));
+            pruefeWahr('Laden: Vorschlagsgründe wieder da', !!vorschlagGruende['4.4.6'] && vorschlagGruende['4.4.6'].fundstelle === 'Fundstelle 25');
+            // Eine aktuelle Stellungnahme darf beim Laden nicht als veraltet erscheinen
+            veraltetZuruecksetzen();
+            const aktuell = fallDaten();
+            pruefe('Falldatei einer aktuellen Stellungnahme: nicht veraltet', aktuell.stellungnahmeVeraltet, false);
+            await ladeDatei(aktuell);
+            pruefe('Laden einer aktuellen Stellungnahme: kein Veraltet-Hinweis', stellungnahmeVeraltet, false);
+            if (start446 === undefined) delete stateEigene.values[i446]; else stateEigene.values[i446] = start446;
+            setzeModus('widerspruch');
         }
 
     } catch (e) {
@@ -4737,6 +4865,19 @@ async function selbsttest() {
             else localStorage.setItem(SPEICHER_PROTOKOLL, sicherung.speicherungen);
         } catch (e) {}
         try { fillTable('own'); calculate('own'); } catch (e) {}
+        // Stellungnahme, Protokoll, Veraltet-Hinweis und Vorschlagsgründe zurück – zuletzt,
+        // weil die Wiederherstellung der Felder oben selbst Veraltet-Hinweise auslöst.
+        try {
+            if (typeof setzeStellungnahme === 'function') setzeStellungnahme(sicherung.dokument);
+            if (sicherung.protokoll && typeof bewertungsProtokoll !== 'undefined') bewertungsProtokoll = sicherung.protokoll;
+            if (typeof vorschlagGruende !== 'undefined') vorschlagGruende = sicherung.vorschlagGruende;
+            if (typeof stellungnahmeVeraltet !== 'undefined') {
+                stellungnahmeVeraltet = sicherung.veraltet;
+                veraltetGruende = sicherung.veraltetGruende;
+                const w = document.getElementById('appeal-veraltet');
+                if (w && typeof veraltetHinweisHtml === 'function') w.innerHTML = veraltetHinweisHtml();
+            }
+        } catch (e) {}
     }
 
     const durchgefallen = pruefungen.filter(p => !p.ok);

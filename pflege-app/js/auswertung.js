@@ -267,7 +267,9 @@ function fallDateiname(betreffend, modus) {
 // Speichert den Fall. Wie beim Word-Dokument über einen „Speichern unter"-Dialog, damit
 // der Ordner frei wählbar ist und wiedergefunden wird. Kennt der Browser den Dialog nicht,
 // landet die Datei wie bisher im Download-Ordner.
-async function saveCase() {
+/* Alles, was zu einem Fall gehört, in einem Objekt. Eigene Funktion, damit der Selbsttest
+   prüfen kann, was tatsächlich gespeichert wird – saveCase selbst öffnet einen Dialog. */
+function fallDaten() {
     const stammdaten={};
     // Auch die Felder des Anhoerungsverfahrens ("anh-") gehoeren in die Falldatei.
     document.querySelectorAll('[id^="stam-"], [id^="diag-"], [id^="anh-"]').forEach(el=>stammdaten[el.id]=el.value);
@@ -281,7 +283,17 @@ async function saveCase() {
                 erfassung: (typeof erfassungSichern === 'function') ? erfassungSichern() : null,
                 anlagen: (typeof anlagenSichern === 'function') ? anlagenSichern() : null,
                 // Begruendungen uebernommener Vorschlaege – Grundlage fuer die Stellungnahme
-                vorschlagGruende: (typeof vorschlagGruende !== 'undefined') ? vorschlagGruende : {}};
+                vorschlagGruende: (typeof vorschlagGruende !== 'undefined') ? vorschlagGruende : {},
+                // Wer hat was geändert (Regler, Vorschlag, Befund, Modul 5, Korrektur)
+                bewertungsProtokoll: (typeof bewertungsProtokoll !== 'undefined') ? bewertungsProtokoll : [],
+                // Passt die gespeicherte Stellungnahme noch zu den Werten?
+                stellungnahmeVeraltet: (typeof stellungnahmeVeraltet !== 'undefined') ? stellungnahmeVeraltet : false,
+                veraltetGruende: (typeof veraltetGruende !== 'undefined') ? veraltetGruende : []};
+    return data;
+}
+
+async function saveCase() {
+    const data = fallDaten();
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
     const dateiname=fallDateiname(document.getElementById('stam-betreffend').value, appModus);
     if (typeof speichereDatei === 'function') {
@@ -318,8 +330,11 @@ function loadCase(e) {
             });
             // Dateien lassen sich nicht mitspeichern; die Prüfansicht zeigt dann nur die Werte.
             if (typeof letzteProvided !== 'undefined') letzteProvided = null;
-            if (typeof stellungnahmeVeraltet !== 'undefined') stellungnahmeVeraltet = false;
+            if (typeof veraltetZuruecksetzen === 'function') veraltetZuruecksetzen();
             protokollLeeren();
+            // Protokoll des gespeicherten Falls übernehmen – sonst war nach dem Laden nicht mehr
+            // nachvollziehbar, welche Bewertung per Vorschlag, Regler oder Befund geändert wurde.
+            if (Array.isArray(data.bewertungsProtokoll)) bewertungsProtokoll = data.bewertungsProtokoll.slice();
             bewertungsProtokoll.push({ zeit: new Date().toLocaleTimeString('de-DE'),
                 spalte: 'Vorgutachten und eigene Einschätzung', nr: '—',
                 titel: 'Bewertungen aus der gespeicherten Datei', alt: 'leer', neu: 'geladen',
@@ -334,6 +349,11 @@ function loadCase(e) {
             if (typeof erfassungLaden === 'function') erfassungLaden(data.erfassung);
             if (typeof anlagenLaden === 'function') anlagenLaden(data.anlagen);
             if (typeof vorschlagGruende !== 'undefined') vorschlagGruende = (data.vorschlagGruende && typeof data.vorschlagGruende === 'object') ? data.vorschlagGruende : {};
+            // War die Stellungnahme beim Speichern veraltet, bleibt der Hinweis erhalten.
+            if (data.stellungnahmeVeraltet && typeof stellungnahmeVeraltet !== 'undefined') {
+                stellungnahmeVeraltet = true;
+                veraltetGruende = Array.isArray(data.veraltetGruende) ? data.veraltetGruende.slice() : [];
+            }
             init();
             setTimeout(() => {
                 // Erst genügend Diagnosezeilen anlegen, sonst gehen Einträge ab Zeile 7 verloren

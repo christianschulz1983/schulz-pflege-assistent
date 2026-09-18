@@ -610,11 +610,7 @@ async function generateAppealText() {
         if (docEl) docEl.innerHTML = finalHtml;
         if (cont) cont.style.display = 'block';
         // Die Stellungnahme gibt jetzt wieder den aktuellen Stand der Bewertungen wieder.
-        if (typeof stellungnahmeVeraltet !== 'undefined') {
-            stellungnahmeVeraltet = false;
-            const w = document.getElementById('appeal-veraltet');
-            if (w) w.innerHTML = '';
-        }
+        if (typeof veraltetZuruecksetzen === 'function') veraltetZuruecksetzen();
         // Überholte Begriffe markieren, bevor sie zum Ausschuss gehen.
         if (docEl && typeof markiereUeberholteBegriffe === 'function') markiereUeberholteBegriffe(docEl);
         // Kriterien ohne Begründung sichtbar machen – nie wieder still nur die Überschrift.

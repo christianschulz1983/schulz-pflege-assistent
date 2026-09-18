@@ -29,6 +29,7 @@ function befundWert(eintrag, seite) {
 function setzeBefund(gruppenId, eintragId, seite, wert) {
     const eintrag = befundEintrag(eintragId);
     if (!eintrag) return;
+    if (typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Befunderhebung');
     const idx = (wert === '') ? null : parseInt(wert, 10);
     // Sobald der Berater den Eintrag anfasst, ist er nicht mehr „aus dem Vorgutachten".
     if (typeof vorbefundAngefasst === 'function') vorbefundAngefasst(befundSchluessel(eintrag, seite));
@@ -70,12 +71,14 @@ function setzeBefundText(eintragId, seite, text) {
     const s = befundSchluessel(eintrag, seite);
     if (typeof vorbefundAngefasst === 'function') vorbefundAngefasst(s);
     if (text && text.trim()) befundTexte[s] = text; else delete befundTexte[s];
+    if (typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Befunderhebung');
     if (eintragId === 'groesse' || eintragId === 'gewicht') berechneBmi();
 }
 
 function setzeBefundZusatz(eintragId, wert) {
     if (wert === '') delete befundWerte[eintragId + '_zw'];
     else befundWerte[eintragId + '_zw'] = parseInt(wert, 10);
+    if (typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Befunderhebung');
 }
 
 // Text der zweiten Auswahl, etwa „in Ruhe" beim Tremor
@@ -370,6 +373,7 @@ function befundExtraSetzen(gruppenId, i, feld, wert) {
     if (!befundExtra[gruppenId] || !befundExtra[gruppenId][i]) return;
     const x = befundExtra[gruppenId][i];
     x[feld] = wert;
+    if (typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Befunderhebung');
     // Bearbeitet heißt geprüft: die Marke „Vorgutachten" entfällt – nur die Marke, nicht das Feld
     if (x._vg) {
         delete x._vg;

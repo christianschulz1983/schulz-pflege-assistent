@@ -488,6 +488,21 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
       `zitat-warnung begruendung-fehlt`, OHNE `data-warn` – zählt nicht als Zitatfehler,
       verschwindet in Druck und Word) und die Schlussmeldung nennt das Kriterium.
    Gegenprobe im Quelltext (a–c zurückgebaut): 10 Prüfungen schlagen an.
+36. **Jede Änderung meldet die Stellungnahme als veraltet – mit Anlass** (`markiereStellungnahmeVeraltet(grund)`,
+   `veraltetZuruecksetzen()` in `js/korrektur.js`). Vorher nur nach Korrektur, Kontinenz und
+   Unterlagen; nach Vorschlag, Regler, Befund, Modul 5, Erfassung und Notizen stand die fertige
+   Stellungnahme ohne Hinweis auf dem alten Stand. Angeschlossen: `setzeBewertung` (Quellen
+   berater/vorschlag/befund/modul5 – NICHT import/laden), `setzeBefund*`, `befundExtraSetzen`,
+   `erfSetzen`, Notizfelder (Erstgespräch, Anhörung, Kassenbegründung). Ohne Stellungnahme
+   passiert nichts. Neue Schreibstellen hier ebenfalls anschließen.
+   **Falldatei** (`fallDaten()` in `js/auswertung.js`, von `saveCase` genutzt und prüfbar):
+   zusätzlich `bewertungsProtokoll`, `stellungnahmeVeraltet`, `veraltetGruende`,
+   `vorschlagGruende`. Vorher war nach dem Laden nicht mehr erkennbar, welche Bewertung per
+   Vorschlag, Regler oder Befund kam.
+   **Selbsttest (Regel 27 erweitert):** sichert auch die ANGEZEIGTE Stellungnahme (nicht nur
+   `appealDraft`, das erst beim Speichern nachgezogen wird), Protokoll, Veraltet-Hinweis und
+   Vorschlagsgründe. Vorher war die Stellungnahme samt Handänderungen nach dem Selbsttest
+   leer, und das nächste „Speichern" schrieb den leeren Stand in die Falldatei.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -541,7 +556,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1206 Pruefungen.
+Der Selbsttest umfasst 1236 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

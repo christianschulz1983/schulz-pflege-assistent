@@ -14,6 +14,30 @@ let korrekturModus = false;
 let specialGeaendert = false;    // Ankreuzfeld „Besondere Bedarfskonstellation" angefasst?
 let letzteProvided = null;       // Kriterien, die beim Einlesen erkannt wurden
 let stellungnahmeVeraltet = false;
+/* WAS SICH SEIT DEM ERSTELLEN GEÄNDERT HAT. Bisher wurde die Stellungnahme nur nach einer
+   Korrektur, einer Kontinenzangabe oder eingefügten Unterlagen als veraltet gekennzeichnet.
+   Ein übernommener Vorschlag, eine Änderung am Regler, in der Befunderhebung, in der
+   Erfassung oder in den Notizen blieb ohne Hinweis – die fertige Stellungnahme gab den alten
+   Stand wieder, und nichts sagte es. Jetzt meldet jede dieser Stellen über
+   markiereStellungnahmeVeraltet(), was sich geändert hat. */
+let veraltetGruende = [];
+
+function markiereStellungnahmeVeraltet(grund) {
+    const vorhanden = (document.getElementById('appeal-document')?.innerHTML || appealDraft || '').trim();
+    if (!vorhanden) return false;                 // ohne Stellungnahme nichts zu veralten
+    stellungnahmeVeraltet = true;
+    if (grund && veraltetGruende.indexOf(grund) === -1) veraltetGruende.push(grund);
+    const w = document.getElementById('appeal-veraltet');
+    if (w) w.innerHTML = veraltetHinweisHtml();
+    return true;
+}
+
+function veraltetZuruecksetzen() {
+    stellungnahmeVeraltet = false;
+    veraltetGruende = [];
+    const w = document.getElementById('appeal-veraltet');
+    if (w) w.innerHTML = '';
+}
 
 function merkeImportDokument(file, mimeType) {
     if (!file) return;
@@ -205,7 +229,7 @@ function uebernehmeKorrektur() {
     fillTable('orig'); fillTable('own'); calculate('orig'); calculate('own'); syncSpecialUI();
     // Steht bereits eine Stellungnahme, passt sie nicht mehr zu den Werten.
     const vorhanden = (document.getElementById('appeal-document')?.innerHTML || appealDraft || '').trim();
-    if (korrigiert && vorhanden) stellungnahmeVeraltet = true;
+    if (korrigiert && vorhanden) markiereStellungnahmeVeraltet('Korrektur der erfassten Daten');
 
     closeReview();
     switchTab(1);
@@ -223,7 +247,9 @@ function uebernehmeKorrektur() {
 // Warnung über der geschriebenen Stellungnahme, solange sie nicht zu den Werten passt.
 function veraltetHinweisHtml() {
     if (!stellungnahmeVeraltet) return '';
-    return '<div class="hinweis-warnung"><b>Bewertungen wurden nach dem Erstellen korrigiert.</b> '
+    const g = veraltetGruende.length > 8 ? veraltetGruende.slice(0, 8).concat(['…']) : veraltetGruende;
+    return '<div class="hinweis-warnung"><b>Nach dem Erstellen wurden Angaben geändert oder korrigiert'
+         + (g.length ? ': ' + escapeHtml(g.join(' · ')) : '') + '.</b> '
          + 'Die untenstehende Stellungnahme gibt noch den früheren Stand wieder. Erstellen Sie sie neu – '
          + 'Ihre eigenen Textänderungen bleiben dabei erhalten, es werden nur die betroffenen '
          + 'Begründungen ersetzt.</div>';

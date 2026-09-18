@@ -202,6 +202,6 @@ function haengeAnNotizen(eintraege) {
     const neu = (alt.trim() ? alt.replace(/\s+$/, '') + '\n\n' : '') + liste.join('\n\n');
     if (feld) { feld.value = neu; if (typeof autoResize === 'function') autoResize(feld); }
     if (typeof erstgespraechNotes !== 'undefined') erstgespraechNotes = neu;
-    if (typeof stellungnahmeVeraltet !== 'undefined') stellungnahmeVeraltet = true;
+    if (typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Unterlagen in die Notizen übernommen');
     return liste.length;
 }

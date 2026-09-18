@@ -82,7 +82,7 @@ function renderAnhoerungBereich() {
                     <textarea id="anh-kassenbegruendung" class="field-input"
                               style="min-height:110px;font-size:12px;line-height:1.6;padding:12px"
                               placeholder="Warum will die Kasse dem Widerspruch nicht abhelfen?"
-                              oninput="autoResize(this)"></textarea>
+                              oninput="autoResize(this); if (typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Begründung der Pflegekasse')"></textarea>
                 </div>
 
                 <div class="field-group" style="margin-top:14px">
@@ -106,7 +106,7 @@ function renderAnhoerungBereich() {
                     <textarea id="anh-notizen" class="field-input"
                               style="min-height:110px;font-size:12px;line-height:1.6;padding:12px"
                               placeholder="Was ist zum Zweitgutachten anzumerken? Diese Notizen fließen in die Begründung ein."
-                              oninput="autoResize(this)"></textarea>
+                              oninput="autoResize(this); if (typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Anmerkungen zum Anhörungsverfahren')"></textarea>
                 </div>
             </div>
         </div>`;

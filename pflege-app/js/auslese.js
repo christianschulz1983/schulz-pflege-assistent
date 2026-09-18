@@ -880,7 +880,7 @@ function applyImportedData(rev) {
     // Merken, welche Kriterien die KI tatsaechlich gelesen hat – die uebrigen sind beim
     // spaeteren Korrigieren die wahrscheinlichsten Kandidaten.
     if (typeof letzteProvided !== 'undefined') letzteProvided = rev.provided || null;
-    if (typeof stellungnahmeVeraltet !== 'undefined') stellungnahmeVeraltet = false;
+    if (typeof veraltetZuruecksetzen === 'function') veraltetZuruecksetzen();
     fillTable('orig'); fillTable('own'); calculate('orig'); calculate('own'); syncSpecialUI();
     // Höherstufungsantrag: die in der Prüfansicht freigegebenen Angaben eintragen
     if (typeof vorbefundImportUebernehmen === 'function') vorbefundImportUebernehmen(rev);

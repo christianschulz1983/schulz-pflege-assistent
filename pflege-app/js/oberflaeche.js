@@ -11,7 +11,7 @@ function renderNBASection(prefix) {
                     <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6">
                         Notieren Sie hier alle Anmerkungen aus dem Erstgespräch – unmittelbar neben der Einschätzung der einzelnen Module. Diese Mitschrift wird beim Erzeugen der Begründung berücksichtigt: sie fließt in die modulbezogene Argumentation ein und erscheint zusätzlich als zusammenfassender Fließtext.
                     </p>
-                    <textarea id="erstgespraech-notes" class="field-input" style="min-height:160px;font-size:13px;line-height:1.6;padding:14px" placeholder="Mitschrift des Erstgesprächs / allgemeine Angaben / Anamnese ..." oninput="erstgespraechNotes = this.value; autoResize(this)"></textarea>
+                    <textarea id="erstgespraech-notes" class="field-input" style="min-height:160px;font-size:13px;line-height:1.6;padding:14px" placeholder="Mitschrift des Erstgesprächs / allgemeine Angaben / Anamnese ..." oninput="erstgespraechNotes = this.value; autoResize(this); if (typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Notizen')"></textarea>
 
                     <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
                         <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:10px">
@@ -254,7 +254,7 @@ function setzeKontinenz(pref, feld, wert) {
     if (!st.kontinenz) st.kontinenz = { harn: null, stuhl: null };
     st.kontinenz[feld] = (wert === '' ? null : Number(wert));
     calculate(pref);
-    if (pref === 'own' && typeof stellungnahmeVeraltet !== 'undefined') stellungnahmeVeraltet = true;
+    if (pref === 'own' && typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Kontinenzangabe');
 }
 
 function renderRow(i, pref) {
