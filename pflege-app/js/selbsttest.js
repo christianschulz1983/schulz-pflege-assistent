@@ -4570,6 +4570,136 @@ async function selbsttest() {
             }
         }
 
+        /* 24. Übernommener Vorschlag bekommt eine Begründung.
+           Gemeldet: Vorschlag für 4.4.6 übernommen, in der Stellungnahme stand dazu nur die
+           Überschrift und der Ableitungssatz. Übernommen wurde nur die Bewertung; Begründung
+           und Fundstelle gingen verloren, die KI ließ das Kriterium aus, und der Ersatzblock
+           blieb still stehen. Nachgestellt: Vorschlag übernehmen, KI lässt 4.4.6 zuerst aus. */
+        if (typeof uebernehmeVorschlaege === 'function' && typeof generateAppealText === 'function') {
+            const merk24 = {
+                modus: appModus, orig: JSON.parse(JSON.stringify(stateOrig)), eigen: JSON.parse(JSON.stringify(stateEigene)),
+                gruende: JSON.parse(JSON.stringify(vorschlagGruende)), liste: vorschlagListe,
+                notes: document.getElementById('erstgespraech-notes') ? document.getElementById('erstgespraech-notes').value : '',
+                doc: (document.getElementById('appeal-document') || {}).innerHTML || '', draft: appealDraft,
+                key: (typeof userApiKey !== 'undefined') ? userApiKey : '', ki: window.callGeminiWithFallback,
+                toast: window.showToast
+            };
+            const id24 = nr => ITEMS.find(i => i.nr === nr).id;
+            const i446 = ITEMS.find(i => i.nr === '4.4.6');
+            let meldung = '';
+            try {
+                setzeModus('widerspruch');
+                ITEMS.forEach(i => {
+                    const l = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0;
+                    stateOrig.values[i.id] = JSON.parse(JSON.stringify(l));
+                    stateEigene.values[i.id] = JSON.parse(JSON.stringify(l));
+                });
+                stateOrig.values[id24('4.4.6')] = 1; stateEigene.values[id24('4.4.6')] = 1;
+                stateEigene.values[id24('4.1.1')] = 1;                         // zweite Abweichung, von Hand
+                vorschlagGruende = {};
+
+                // 24a. Vorschlag übernehmen: Bewertung UND Begründung werden gemerkt
+                vorschlagListe = [{ item: i446, stufe: 2, alt: 1,
+                    begruendung: 'Beim Anziehen von Hose und Strümpfen hilft die Tochter täglich, weil die Person sich nicht bücken kann.',
+                    fundstelle: 'Hilfe beim Anziehen der Strümpfe durch die Tochter' }];
+                renderVorschlaege();
+                const box24 = document.querySelector('#vorschlag-body input[type="checkbox"]');
+                if (box24) box24.checked = true;
+                window.showToast = (t) => { meldung = t; };
+                uebernehmeVorschlaege();
+                pruefe('Vorschlag: Bewertung übernommen', stateEigene.values[id24('4.4.6')], 2);
+                pruefeWahr('Vorschlag: Begründung und Fundstelle gemerkt',
+                    !!vorschlagGruende['4.4.6'] && vorschlagGruende['4.4.6'].stufe === 2
+                    && /Tochter täglich/.test(vorschlagGruende['4.4.6'].begruendung)
+                    && /Strümpfe/.test(vorschlagGruende['4.4.6'].fundstelle));
+
+                // 24b. Die Begründung geht als Grundlage an die KI – nur bei dieser Stufe
+                const d446 = computeDiffs().find(d => d.nr === '4.4.6');
+                const prompt24 = buildBegruendungPrompt([d446], false);
+                pruefeWahr('Prompt: Grundlage des Vorschlags steht beim Kriterium',
+                    prompt24.includes('GRUNDLAGE DIESER BEWERTUNG') && prompt24.includes('Tochter täglich')
+                    && prompt24.includes('Hilfe beim Anziehen der Strümpfe'));
+                pruefeWahr('Prompt: Fundstelle ohne Anführungszeichen wiedergeben', prompt24.includes('OHNE Anführungszeichen'));
+                stateEigene.values[id24('4.4.6')] = 3;                         // danach von Hand geändert
+                pruefeWahr('Prompt: nach Handänderung keine veraltete Grundlage',
+                    !buildBegruendungPrompt([computeDiffs().find(d => d.nr === '4.4.6')], false).includes('GRUNDLAGE DIESER BEWERTUNG'));
+                stateEigene.values[id24('4.4.6')] = 2;
+
+                // 24c. Nummern aus der KI-Antwort
+                const erl = new Set(['4.4.6', '4.1.1']);
+                pruefe('KI-Nummer: „F 4.4.6", „4.4.6: An- …", „5.4.6" werden erkannt',
+                    [kiKriteriumNr('F 4.4.6', erl), kiKriteriumNr('4.4.6: An- und Auskleiden', erl), kiKriteriumNr('5.4.6', erl)],
+                    ['4.4.6', '4.4.6', '4.4.6']);
+                pruefe('KI-Nummer: nicht angefragte Nummer fällt weg', kiKriteriumNr('4.4.7', erl), null);
+
+                // 24d. Ablauf: KI lässt 4.4.6 aus, die App holt es gezielt nach
+                const docEl = document.getElementById('appeal-document');
+                const notizFeld = document.getElementById('erstgespraech-notes');
+                if (docEl && notizFeld) {
+                    if (typeof userApiKey !== 'undefined') userApiKey = 'TEST-OHNE-NETZ';
+                    notizFeld.value = '';                                    // keine Rechtschreibprüfung
+                    setzeStellungnahme('');
+                    const abl = e => `Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „${e}" ableitbar.`;
+                    const aufrufe24 = [];
+                    window.callGeminiWithFallback = async (payload) => {
+                        const text = payload.contents[0].parts[0].text;
+                        aufrufe24.push(text);
+                        const bg = [];
+                        if (aufrufe24.length === 1) {
+                            bg.push({ nr: '4.1.1', text: 'Die Person kann sich im Bett nur mit Hilfe drehen. ' + abl('überwiegend selbständig') });
+                        } else if (text.includes('4.4.6')) {
+                            bg.push({ nr: 'F 4.4.6', text: 'Die Tochter hilft täglich beim Anziehen von Hose und Strümpfen. ' + abl('überwiegend unselbständig') });
+                        }
+                        return { candidates: [{ content: { parts: [{ text: JSON.stringify({ allgemein: aufrufe24.length === 1 ? 'Allgemeine Lage.' : '', begruendungen: bg }) }] } }] };
+                    };
+                    await generateAppealText();
+                    const block = docEl.querySelector('.crit[data-nr="4.4.6"]');
+                    pruefe('Nachholen: genau ein zusätzlicher KI-Aufruf', aufrufe24.length, 2);
+                    pruefeWahr('Nachholen: der zweite Aufruf fragt nur 4.4.6 an',
+                        aufrufe24.length === 2 && aufrufe24[1].includes('Kriterium 4.4.6') && !aufrufe24[1].includes('Kriterium 4.1.1'));
+                    pruefeWahr('Erster Aufruf enthält die Grundlage des Vorschlags', /Tochter täglich/.test(aufrufe24[0] || ''));
+                    pruefeWahr('4.4.6 hat jetzt eine Begründung',
+                        !!block && block.getAttribute('data-ai') === '1' && block.textContent.includes('Anziehen von Hose und Strümpfen'));
+                    pruefeWahr('Keine Fehlt-Markierung, wenn alles da ist', !docEl.querySelector('.begruendung-fehlt'));
+
+                    // 24e. Bleibt es trotzdem leer, wird es sichtbar gemeldet
+                    setzeStellungnahme('');
+                    aufrufe24.length = 0;
+                    window.callGeminiWithFallback = async (payload) => {
+                        aufrufe24.push(payload.contents[0].parts[0].text);
+                        const bg = aufrufe24.length === 1 ? [{ nr: '4.1.1', text: 'Hilfe beim Drehen. ' + abl('überwiegend selbständig') }] : [];
+                        return { candidates: [{ content: { parts: [{ text: JSON.stringify({ allgemein: 'Lage.', begruendungen: bg }) }] } }] };
+                    };
+                    meldung = '';
+                    await generateAppealText();
+                    const leer = docEl.querySelector('.crit[data-nr="4.4.6"]');
+                    pruefeWahr('Weiter leer: Block ist sichtbar markiert',
+                        !!leer && leer.getAttribute('data-ai') === '0' && !!leer.querySelector('.begruendung-fehlt'));
+                    pruefeWahr('Weiter leer: die Meldung nennt das Kriterium', /4\.4\.6/.test(meldung) && /fehlt die Begründung/.test(meldung));
+                    pruefeWahr('Die Markierung zählt nicht als unbelegtes Zitat',
+                        !docEl.querySelector('.begruendung-fehlt[data-warn]'));
+                    pruefe('Markierung nur beim leeren Kriterium', docEl.querySelectorAll('.begruendung-fehlt').length, 1);
+                }
+                // 24f. Die Grundlagen werden mit dem Fall gespeichert
+                pruefeWahr('Fall speichern sichert die Vorschlagsgründe',
+                    /vorschlagGruende/.test(saveCase.toString()) && /vorschlagGruende/.test(loadCase.toString()));
+            } finally {
+                window.callGeminiWithFallback = merk24.ki;
+                window.showToast = merk24.toast;
+                if (typeof userApiKey !== 'undefined') userApiKey = merk24.key;
+                stateOrig = merk24.orig; stateEigene = merk24.eigen;
+                vorschlagGruende = merk24.gruende; vorschlagListe = merk24.liste;
+                const nf = document.getElementById('erstgespraech-notes'); if (nf) nf.value = merk24.notes;
+                const de = document.getElementById('appeal-document'); if (de) de.innerHTML = merk24.doc;
+                appealDraft = merk24.draft;
+                const box = document.getElementById('appeal-result-container');
+                if (box) box.style.display = (merk24.doc || '').trim() ? 'block' : 'none';
+                if (typeof closeVorschlaege === 'function') closeVorschlaege();
+                setzeModus(merk24.modus);
+                hideOverlay();
+            }
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

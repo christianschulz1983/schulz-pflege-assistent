@@ -279,7 +279,9 @@ async function saveCase() {
     const data={stateOrig,stateEigene,stateZweit,stammdaten,erstgespraechNotes,appealDraft,appModus,
                 befund: (typeof befundSichern === 'function') ? befundSichern() : null,
                 erfassung: (typeof erfassungSichern === 'function') ? erfassungSichern() : null,
-                anlagen: (typeof anlagenSichern === 'function') ? anlagenSichern() : null};
+                anlagen: (typeof anlagenSichern === 'function') ? anlagenSichern() : null,
+                // Begruendungen uebernommener Vorschlaege – Grundlage fuer die Stellungnahme
+                vorschlagGruende: (typeof vorschlagGruende !== 'undefined') ? vorschlagGruende : {}};
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
     const dateiname=fallDateiname(document.getElementById('stam-betreffend').value, appModus);
     if (typeof speichereDatei === 'function') {
@@ -331,6 +333,7 @@ function loadCase(e) {
             if (typeof befundLaden === 'function') befundLaden(data.befund);
             if (typeof erfassungLaden === 'function') erfassungLaden(data.erfassung);
             if (typeof anlagenLaden === 'function') anlagenLaden(data.anlagen);
+            if (typeof vorschlagGruende !== 'undefined') vorschlagGruende = (data.vorschlagGruende && typeof data.vorschlagGruende === 'object') ? data.vorschlagGruende : {};
             init();
             setTimeout(() => {
                 // Erst genügend Diagnosezeilen anlegen, sonst gehen Einträge ab Zeile 7 verloren

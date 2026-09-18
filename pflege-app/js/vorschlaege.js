@@ -16,6 +16,33 @@ function briLevel(nr, idx) {
    und schlägt vor, wo das Material eine höhere Bewertung trägt. Übernommen wird nur, was der
    Nutzer bestätigt.                                                                          */
 let vorschlagListe = [];
+/* BEGRÜNDUNG ÜBERNOMMENER VORSCHLÄGE, je Kriterium: { stufe, begruendung, fundstelle }.
+   Gemeldet: Nach dem Übernehmen eines Vorschlags stand in der Stellungnahme zu diesem
+   Kriterium nur die Überschrift. Übernommen wurde bisher allein die Bewertung – Begründung
+   und Fundstelle gingen verloren. Die Begründungs-KI wusste danach nicht mehr, warum das
+   Kriterium höher bewertet ist, und lieferte oft nichts. Jetzt wird beides gemerkt und bei
+   der Begründung mitgegeben – solange die Bewertung noch die übernommene Stufe ist. */
+let vorschlagGruende = {};
+
+/* Kriteriumsnummer aus der KI-Antwort auf die angefragte Nummer zurückführen. Die KI gibt
+   gelegentlich „F 4.4.6", „4.4.6: An- und Auskleiden …" oder – bei Medicproof-Gutachten, die
+   5.x.y zählen – „5.4.6" zurück. Unter so einem Schlüssel fand die App die Begründung nicht
+   und setzte still den Ersatzblock ein. Unbekannte Nummern bleiben unberücksichtigt. */
+function kiKriteriumNr(nr, erlaubt) {
+    const s = String(nr == null ? '' : nr).trim();
+    if (erlaubt.has(s)) return s;
+    const m = s.match(/(\d)\.(\d)\.(\d{1,2}|B)\b/);
+    if (!m) return null;
+    const direkt = m[1] + '.' + m[2] + '.' + m[3];
+    if (erlaubt.has(direkt)) return direkt;
+    const alsVier = '4.' + m[2] + '.' + m[3];              // 5.x.y (Medicproof) -> 4.x.y
+    return (m[1] === '5' && erlaubt.has(alsVier)) ? alsVier : null;
+}
+
+function vorschlagGrundFuer(d) {
+    const g = vorschlagGruende[d.nr];
+    return (g && g.stufe === d.eIdx && (g.begruendung || g.fundstelle)) ? g : null;
+}
 
 // Alle Kriterien, die aktuell genauso wie im Vorgutachten bewertet sind und noch Luft nach oben haben.
 function sammleKandidaten() {
@@ -183,6 +210,7 @@ function uebernehmeVorschlaege() {
         const v = vorschlagListe[parseInt(cb.getAttribute('data-idx'), 10)];
         if (!v) return;
         setzeBewertung('own', v.item.id, v.stufe, 'vorschlag');
+        vorschlagGruende[v.item.nr] = { stufe: v.stufe, begruendung: v.begruendung || '', fundstelle: v.fundstelle || '' };
         n++;
     });
     closeVorschlaege();
@@ -421,6 +449,15 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
         } else {
             p += `Bewertung des Gutachters: „${d.o}"\nMeine Bewertung: „${d.e}"\n`;
             p += `Stufenbezeichnungen: verwende ausschließlich „${d.o}" und „${d.e}" – keine anderen Wörter für diese Stufen.\n`;
+        }
+        // Grundlage eines übernommenen Vorschlags – oft steht dazu nichts in den Notizen
+        const vg = (typeof vorschlagGrundFuer === 'function') ? vorschlagGrundFuer(d) : null;
+        if (vg) {
+            p += 'GRUNDLAGE DIESER BEWERTUNG (von mir geprüft und übernommen – baue die Begründung darauf auf):\n';
+            if (vg.begruendung) p += `Sachverhalt: ${cut(vg.begruendung, 900)}\n`;
+            if (vg.fundstelle) p += `Fundstelle im Gutachten: ${cut(vg.fundstelle, 500)}\n`
+                + 'Gib die Fundstelle OHNE Anführungszeichen wieder („Der Gutachter dokumentiert selbst, dass …") –\n'
+                + 'Anführungszeichen sind wörtlichen BRi-Zitaten vorbehalten.\n';
         }
         if (d.m === 5) {
             // Ohne diesen Hinweis behauptet die KI regelmäßig einen Punktgewinn, den es
@@ -851,7 +888,11 @@ ZWINGEND:
     if (fence) txt = fence[1];
     const data = JSON.parse(txt.trim());
     const map = {};
-    (data.begruendungen || []).forEach(b => { if (b && b.nr && b.text) map[b.nr] = b.text.trim(); });
+    const erlaubt = new Set(strittig.map(d => d.nr));
+    (data.begruendungen || []).forEach(b => {
+        const nr = b && b.text ? kiKriteriumNr(b.nr, erlaubt) : null;
+        if (nr) map[nr] = b.text.trim();
+    });
     return await haltenLaengenGrenzen(map, (data.allgemein || '').trim(), (data.anamnese || '').trim());
 }
 
@@ -981,7 +1022,11 @@ Beachte zwingend:
     if (fence) txt = fence[1];
     const data = JSON.parse(txt.trim());
     const map = {};
-    (data.begruendungen || []).forEach(b => { if (b && b.nr && b.text) map[b.nr] = b.text.trim(); });
+    const erlaubt = new Set(diffs.map(d => d.nr));
+    (data.begruendungen || []).forEach(b => {
+        const nr = b && b.text ? kiKriteriumNr(b.nr, erlaubt) : null;
+        if (nr) map[nr] = b.text.trim();
+    });
     return await haltenLaengenGrenzen(map, (data.allgemein || '').trim(), (data.anamnese || '').trim());
 }
 

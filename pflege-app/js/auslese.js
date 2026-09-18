@@ -852,6 +852,8 @@ function applyImportedData(rev) {
        Anschrift, Medikation und Befund der VORIGEN Person weiter in der Maske – und wurden mit
        dem neuen Fall gespeichert. */
     if (typeof befundLaden === 'function') befundLaden({});
+    // Neuer Fall: Begruendungen frueher uebernommener Vorschlaege gehoeren nicht dazu
+    if (typeof vorschlagGruende !== 'undefined') vorschlagGruende = {};
     if (typeof erfassungLaden === 'function') erfassungLaden({});
     // extracted nur setzen, wenn es eine KI-Zusammenfassung gibt; sonst wird das
     // Vorgutachten aus den (präzisen) Einzelkriterien berechnet.

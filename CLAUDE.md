@@ -473,6 +473,21 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    die Kinder-Grenze schon im Inhaltsverzeichnis lag). Gegenprobe mit dem alten Stand: 18 Funde.
    Der Selbsttest prüft im Browser: sechs Moduleinleitungen, keine Übernahmereste, 4.3.13 ohne
    Kontinenztext, Zitat aus Modul 4 bei 4.4.11 belegt und bei 4.3.13 nicht.
+35. **Kein Kriterium ohne Begründung – und nie still.** Gemeldet: Vorschlag für 4.4.6
+   übernommen, in der Stellungnahme stand nur Überschrift + Ableitungssatz (Ersatzblock).
+   Drei Ursachen, drei Sicherungen:
+   a) `uebernehmeVorschlaege` übernahm nur die Bewertung; Begründung und Fundstelle gingen
+      verloren. Jetzt `vorschlagGruende[nr] = {stufe, begruendung, fundstelle}` (mit dem Fall
+      gespeichert, bei neuem Gutachten geleert). `buildBegruendungPrompt` gibt sie als
+      „GRUNDLAGE DIESER BEWERTUNG" mit – nur solange die Bewertung noch diese Stufe hat
+      (`vorschlagGrundFuer`). Fundstelle OHNE Anführungszeichen, sonst Zitatwarnung.
+   b) Die KI lässt Kriterien aus oder schreibt die Nummer anders („F 4.4.6", „5.4.6").
+      `kiKriteriumNr` führt die Nummer zurück; `generateAppealText` fordert fehlende
+      Begründungen EINMAL gezielt nach (nur diese, ohne Einleitung).
+   c) Bleibt ein Block leer, markiert `markiereFehlendeBegruendungen` ihn rot (Klasse
+      `zitat-warnung begruendung-fehlt`, OHNE `data-warn` – zählt nicht als Zitatfehler,
+      verschwindet in Druck und Word) und die Schlussmeldung nennt das Kriterium.
+   Gegenprobe im Quelltext (a–c zurückgebaut): 10 Prüfungen schlagen an.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -526,7 +541,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1189 Pruefungen.
+Der Selbsttest umfasst 1206 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

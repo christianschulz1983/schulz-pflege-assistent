@@ -244,6 +244,28 @@ function ueberholteBegriffeImText(text) {
     return funde;
 }
 
+/* KRITERIEN OHNE BEGRÜNDUNG. Ein Ersatzblock (data-ai="0") enthält nur Überschrift,
+   gutachterliche Bewertung und Ableitungssatz. Das ging bisher ohne jeden Hinweis in den
+   Versand. Jetzt steht im Block ein Arbeitshinweis (nur am Bildschirm, wie die Zitatwarnung;
+   ohne data-warn, damit er nicht als unbelegtes Zitat gezählt wird). Rückgabe: Nummern. */
+function markiereFehlendeBegruendungen(wurzel, mitKi) {
+    if (!wurzel) return [];
+    wurzel.querySelectorAll('.begruendung-fehlt').forEach(el => el.remove());
+    const nrn = [];
+    wurzel.querySelectorAll('.crit[data-nr][data-ai="0"]').forEach(el => {
+        const nr = el.getAttribute('data-nr');
+        nrn.push(nr);
+        const h = document.createElement('div');
+        h.className = 'zitat-warnung begruendung-fehlt';
+        h.innerText = '⚠ Zu diesem Kriterium fehlt die Begründung – hier steht nur der Ableitungssatz. '
+            + (mitKi ? 'Bitte „Stellungnahme erstellen" erneut drücken (die übrigen Texte bleiben erhalten) '
+                     + 'oder die Begründung selbst ergänzen.'
+                     : 'Ohne API-Schlüssel wird keine Begründung verfasst – bitte Schlüssel eintragen oder selbst ergänzen.');
+        el.appendChild(h);
+    });
+    return nrn;
+}
+
 function markiereUeberholteBegriffe(wurzel) {
     if (!wurzel) return 0;
     // Vorhandene Markierungen zuerst entfernen, damit sie sich beim erneuten Erstellen
@@ -534,6 +556,23 @@ async function generateAppealText() {
                 begruendungen = erg.map || {};
                 allgemeinText = erg.allgemein || '';
                 anamneseKurz = erg.anamnese || '';
+                /* NACHHOLEN. Die KI lässt bei vielen Kriterien gelegentlich eines aus. Dann stand
+                   dort still nur Überschrift und Ableitungssatz (gemeldet für 4.4.6). Fehlende
+                   Begründungen werden EINMAL gezielt nachgefordert – nur diese, ohne Einleitung. */
+                const fehlend = zuErzeugen.filter(d => !(begruendungen[d.nr] || '').trim());
+                if (fehlend.length && zuErzeugen.length > 0) {
+                    showOverlay("Stellungnahme wird erstellt...", fehlend.length + ' fehlende Begründung(en) werden nachgeholt');
+                    try {
+                        const nach = istAnh
+                            ? await generateBegruendungenAnhoerung(fehlend, false, analyse)
+                            : await generateBegruendungen(fehlend, false);
+                        Object.keys((nach && nach.map) || {}).forEach(nr => {
+                            if ((nach.map[nr] || '').trim() && !(begruendungen[nr] || '').trim()) begruendungen[nr] = nach.map[nr];
+                        });
+                    } catch (e2) {
+                        console.warn("Nachholen fehlgeschlagen:", e2);
+                    }
+                }
             } catch (e) {
                 console.warn("Texterstellung übersprungen:", e);
                 showToast("Texte konnten nicht erzeugt werden (" + e.message + "). Es werden die Standardtexte verwendet.", "error");
@@ -578,9 +617,17 @@ async function generateAppealText() {
         }
         // Überholte Begriffe markieren, bevor sie zum Ausschuss gehen.
         if (docEl && typeof markiereUeberholteBegriffe === 'function') markiereUeberholteBegriffe(docEl);
+        // Kriterien ohne Begründung sichtbar machen – nie wieder still nur die Überschrift.
+        const ohneBegruendung = (docEl && !istAntrag) ? markiereFehlendeBegruendungen(docEl, !!keyPresent) : [];
         // Auf nicht belegte BRi-Zitate hinweisen – die müssen vor dem Versand geprüft werden.
         const warnAnzahl = (docEl ? docEl.querySelectorAll('.zitat-warnung[data-warn]').length : 0);
-        if (warnAnzahl) {
+        if (ohneBegruendung.length) {
+            const n = ohneBegruendung.length;
+            showToast(`Achtung: ${n === 1 ? 'Zu Kriterium' : 'Zu den Kriterien'} ${ohneBegruendung.map(x => zeigeNr(x, document.getElementById('stam-organisation')?.value || '')).join(', ')} `
+                + `fehlt die Begründung – dort steht nur der Ableitungssatz. Die Stelle${n > 1 ? 'n sind' : ' ist'} rot markiert. `
+                + (keyPresent ? 'Bitte „Stellungnahme erstellen" erneut drücken.' : 'Ohne API-Schlüssel wird keine Begründung verfasst.')
+                + (warnAnzahl ? ` Außerdem ${warnAnzahl} nicht belegte${warnAnzahl > 1 ? ' Zitate' : 's Zitat'}.` : ''), "error");
+        } else if (warnAnzahl) {
             showToast(`Achtung: In ${warnAnzahl} Begründung${warnAnzahl > 1 ? 'en' : ''} steht ein Zitat, das sich nicht wörtlich in den BRi belegen lässt. Die Stellen sind rot markiert – bitte streichen oder korrigieren.`, "error");
         } else if (hinweisKurzfassung) {
             showToast((merged ? "Aktualisiert." : "Stellungnahme erstellt.") + hinweisKurzfassung, "error");
