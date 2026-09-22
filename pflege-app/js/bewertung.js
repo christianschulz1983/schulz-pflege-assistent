@@ -96,6 +96,33 @@ function vorgutachtenAbweichung() {
     };
 }
 
+/* Handeingaben zu Pflegegrad/Punkten, die den erfassten Einzelkriterien widersprechen –
+   je nach Vorgang für das (Erst-/Vor-)Gutachten und das Zweitgutachten. Siehe
+   gutachtenAngaben in js/basis.js. Rückgabe: lesbare Meldungen. */
+function gutachtenWidersprueche() {
+    const g = id => (document.getElementById(id)?.value || '').trim();
+    const modus = (typeof appModus !== 'undefined') ? appModus : 'widerspruch';
+    const out = [];
+    if (modus === 'erstantrag') return out;              // kein Gutachten
+    const pgHand = (modus === 'hoeherstufung')
+        ? ((typeof erfassungExtra !== 'undefined' && erfassungExtra.pg) || '') : g('stam-pg-manual');
+    const a = gutachtenAngaben(calculateInternal('orig'), pgHand, g('stam-pts-manual'));
+    const name = modus === 'anhoerung' ? 'Erstgutachten' : (modus === 'hoeherstufung' ? 'Vorgutachten' : 'Gutachten');
+    if (a.widerspruch) out.push(gutachtenWiderspruchText(name, a.widerspruch));
+    if (modus === 'anhoerung') {
+        const z = gutachtenAngaben(calculateInternal('zweit'), g('anh-pg'), g('anh-pts'));
+        if (z.widerspruch) out.push(gutachtenWiderspruchText('Zweitgutachten', z.widerspruch));
+    }
+    return out;
+}
+
+function gutachtenWiderspruchHtml() {
+    const l = gutachtenWidersprueche();
+    if (!l.length) return '';
+    return '<div class="hinweis-warnung"><b>Bitte prüfen – eingetragener Pflegegrad bzw. Punktwert passt nicht '
+         + 'zu den erfassten Einzelkriterien:</b><br>' + l.map(escapeHtml).join('<br>') + '</div>';
+}
+
 function abweichungHtml() {
     const a = vorgutachtenAbweichung();
     if (!a) return '';

@@ -2180,8 +2180,12 @@ async function selbsttest() {
             document.getElementById('anh-schreiben-datum').value = '2026-04-21';
             document.getElementById('anh-gutachten-datum').value = '2026-04-08';
             document.getElementById('anh-art').value = DURCHFUEHRUNGSARTEN[1];
-            document.getElementById('anh-pg').value = '1';
-            document.getElementById('anh-pts').value = '25,00';
+            /* Handeingabe PASSEND zu den Kriterien des Zweitgutachtens. Vorher stand hier „1" und
+               „25,00", obwohl die Kriterien etwas anderes ergaben – genau dieser Widerspruch landete
+               im Schriftstück. Er wird jetzt in Abschnitt 26 eigens geprüft. */
+            const rZb = calculateInternal('zweit');
+            document.getElementById('anh-pg').value = String(rZb.pg);
+            document.getElementById('anh-pts').value = punkteDE(rZb.total);
 
             const dok = buildAnhoerung('', {}, '');
             const el = document.createElement('div'); el.innerHTML = dok;
@@ -2197,7 +2201,7 @@ async function selbsttest() {
             pruefeWahr('Anhörung: Kopf nennt das Zweitgutachten',
                 text.includes('Datum Zweitgutachten: 08.04.2026'));
             pruefeWahr('Anhörung: Kopf nennt den Pflegegrad des Zweitgutachtens',
-                text.includes('Pflegegrad: Pflegegrad 1'));
+                text.includes('Pflegegrad: ' + pflegegradWort(rZb.pg)));
             // Drei Spalten
             const kopfzellen = Array.from(el.querySelectorAll('table.cmp thead th')).map(t => t.innerText.trim());
             pruefe('Anhörung: drei Spalten in der Gegenüberstellung',
@@ -4461,7 +4465,11 @@ async function selbsttest() {
                     f.text.includes('von Frau Erika Mahl nicht hinreichend.')
                     && f.text.includes('der gemäß den Richtlinien den Pflegegrad 3 ab dem')
                     && !f.text.includes('weiterhin'));
-                setze('stam-pg-manual', 'Pflegegrad 3');          // Handeingabe in anderer Schreibweise
+                /* Handeingabe in anderer Schreibweise. Das Gutachten hat hier KEINE erfassten
+                   Einzelkriterien (sonst gälte deren Rechnung, siehe gutachtenAngaben). */
+                window.calculateInternal = s => Object.assign({}, merk23.calc(s),
+                    s === 'own' ? { pg: 3, total: 60 } : { pg: 0, total: 0 });
+                setze('stam-pg-manual', 'Pflegegrad 3');
                 f = fazit(buildStellungnahme('', {}, ''));
                 pruefe('Widerspruch: Handeingabe „Pflegegrad 3" zählt als gleich', f.el && f.el.getAttribute('data-art'), 'gleich');
                 setze('stam-pg-manual', '');
@@ -4509,6 +4517,7 @@ async function selbsttest() {
                     f.text.includes('der gemäß den Richtlinien weiterhin den Pflegegrad 3 ab dem 01.03.2026 (Antragsdatum) rechtfertigt.')
                     && !f.text.includes('mindestens'));
                 erfassungExtra.pg = '2';
+                vorgabe(2, 2, 3);                                  // Vorgutachten auch rechnerisch Pflegegrad 2
                 f = fazit(buildHoeherstufung('', {}, '', ''));
                 pruefeWahr('Höherstufung höher: bisherige Formulierung bleibt',
                     f.text.startsWith('Unter Berücksichtigung der oben genannten Einschätzung ergibt sich ein Punktwert von mindestens')
@@ -4826,6 +4835,91 @@ async function selbsttest() {
             pruefe('Laden einer aktuellen Stellungnahme: kein Veraltet-Hinweis', stellungnahmeVeraltet, false);
             if (start446 === undefined) delete stateEigene.values[i446]; else stateEigene.values[i446] = start446;
             setzeModus('widerspruch');
+        }
+
+        /* 26. Pflegegrad und Punkte eines Gutachtens: Handeingabe gegen Einzelkriterien.
+           Gemeldet (Anhörung): Spalte „Vorgutachten" 10,00 Punkte, darunter „Pflegegrad 3",
+           im Fazit „47,5 Punkten", beim Zweitgutachten „10.00" und „mit kein Pflegegrad". */
+        if (typeof gutachtenAngaben === 'function' && typeof buildAnhoerung === 'function') {
+            const merk26 = { modus: appModus, extra: JSON.parse(JSON.stringify(erfassungExtra || {})),
+                             orig: JSON.parse(JSON.stringify(stateOrig)), zweit: JSON.parse(JSON.stringify(stateZweit)),
+                             eigen: JSON.parse(JSON.stringify(stateEigene)) };
+            const set26 = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+            try {
+                // Bausteine
+                pruefe('Punkte: „47,5", „10.00", 25 → deutsch mit zwei Stellen',
+                    [punkteDE('47,5'), punkteDE('10.00'), punkteDE(25), punkteDE('')], ['47,50', '10,00', '25,00', '']);
+                pruefe('„mit …": nie „mit kein Pflegegrad"',
+                    [pflegegradMit(0), pflegegradMit('kein Pflegegrad'), pflegegradMit('3'), pflegegradMit('Pflegegrad 4')],
+                    ['der Feststellung keines Pflegegrades', 'der Feststellung keines Pflegegrades', 'Pflegegrad 3', 'Pflegegrad 4']);
+                pruefe('Pflegegrad-Wort: nie „Pflegegrad Pflegegrad" oder „Pflegegrad 0"',
+                    [pflegegradWort('Pflegegrad 3'), pflegegradWort('3'), pflegegradWort('0'), pflegegradWort('')],
+                    ['Pflegegrad 3', 'Pflegegrad 3', 'kein Pflegegrad', 'kein Pflegegrad']);
+                let a = gutachtenAngaben({ total: 10, pg: 0 }, '3', '47,5');
+                pruefeWahr('Widerspruch Handeingabe/Kriterien: es gilt die Rechnung', a.pg === '0' && a.pts === '10,00' && !!a.widerspruch);
+                a = gutachtenAngaben({ total: 0, pg: 0 }, '3', '47,5');
+                pruefeWahr('Ohne erfasste Kriterien gilt die Handeingabe', a.pg === '3' && a.pts === '47,50' && !a.widerspruch);
+                a = gutachtenAngaben({ total: 50, pg: 3 }, 'Pflegegrad 3', '50');
+                pruefeWahr('Passende Handeingabe: kein Widerspruch, Punkte formatiert', a.pg === 'Pflegegrad 3' && a.pts === '50,00' && !a.widerspruch);
+
+                // Der gemeldete Anhörungsfall
+                const id26 = nr => ITEMS.find(i => i.nr === nr).id;
+                const leer26 = st => ITEMS.forEach(i => { st.values[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+                stateZweit = { special: 0, values: {}, kontinenz: { harn: null, stuhl: null } };
+                [stateOrig, stateZweit, stateEigene].forEach(leer26);
+                ['4.4.1', '4.4.3'].forEach(nr => { stateOrig.values[id26(nr)] = 3; stateZweit.values[id26(nr)] = 3; });
+                ['4.4.1', '4.4.2', '4.4.3', '4.4.4', '4.4.5', '4.4.6'].forEach(nr => { stateEigene.values[id26(nr)] = 3; });
+                setzeModus('anhoerung');
+                if (typeof renderAnhoerungBereich === 'function') renderAnhoerungBereich();
+                set26('stam-pg-manual', '3'); set26('stam-pts-manual', '47,5');
+                set26('anh-pg', ''); set26('anh-pts', '10.00');
+                const rO26 = calculateInternal('orig'), rE26 = calculateInternal('own');
+                const d26 = document.createElement('div'); d26.innerHTML = buildAnhoerung('', {}, '');
+                const pgZeile = Array.from(d26.querySelectorAll('table.cmp tr')).map(tr => Array.from(tr.children).map(c => c.textContent.trim()))
+                    .find(z => z[0] === 'Pflegegrad') || [];
+                pruefe('Anhörung: Pflegegrad-Zeile passt zu den Punkten jeder Spalte',
+                    pgZeile.slice(1), [pflegegradWort(rO26.pg), 'kein Pflegegrad', pflegegradWort(rE26.pg)]);
+                const fz26 = d26.querySelector('#stmt-fazit').textContent.replace(/\s+/g, ' ');
+                pruefeWahr('Anhörung-Fazit: Erstgutachten mit Punkten aus den Kriterien',
+                    fz26.includes('mit der Feststellung keines Pflegegrades und ' + punkteDE(rO26.total) + ' Punkten'));
+                pruefeWahr('Anhörung-Fazit: kein „47,5", kein „10.00", kein „mit kein Pflegegrad"',
+                    !/47,5|10\.00|mit kein Pflegegrad/.test(fz26));
+                const w26 = gutachtenWidersprueche();
+                pruefeWahr('Widerspruch wird gemeldet und nennt beide Werte',
+                    w26.length === 1 && /Erstgutachten/.test(w26[0]) && /Pflegegrad 3/.test(w26[0]) && /47,50/.test(w26[0]));
+                pruefeWahr('Hinweis im Reiter „Auswertung"', /passt nicht/.test(gutachtenWiderspruchHtml()));
+                const dm = document.createElement('div'); dm.innerHTML = buildAnhoerung('', {}, '');
+                const l26 = markiereGutachtenWiderspruch(dm);
+                pruefeWahr('Schriftstück: Arbeitshinweis oben, nicht als Zitatfehler gezählt',
+                    l26.length >= 1 && !!dm.querySelector('.angaben-widerspruch') && !dm.querySelector('.angaben-widerspruch[data-warn]'));
+                set26('stam-pg-manual', ''); set26('stam-pts-manual', '');
+                pruefe('Ohne Handeingabe kein Widerspruch', gutachtenWidersprueche().length, 0);
+
+                // Fehlende Pflichtangaben werden genannt
+                const nameVor = document.getElementById('stam-betreffend').value;
+                set26('stam-betreffend', '');
+                pruefeWahr('Fehlender Name wird genannt', fehlendePflichtangaben().includes('Name der versicherten Person'));
+                set26('stam-betreffend', nameVor);
+
+                // Widerspruch und Deckblatt: nie „Pflegegrad Pflegegrad"
+                setzeModus('widerspruch');
+                [stateOrig, stateEigene].forEach(leer26);                  // Gutachten ohne erfasste Kriterien
+                stateEigene.values[id26('4.4.1')] = 3;
+                set26('stam-pg-manual', 'Pflegegrad 3');
+                const dw = buildStellungnahme('', {}, '');
+                pruefeWahr('Widerspruch: Eingabe „Pflegegrad 3" ergibt kein „Pflegegrad Pflegegrad"',
+                    !/Pflegegrad Pflegegrad/.test(dw) && dw.includes('mit einem <span data-f="opgfazit">Pflegegrad 3</span>'));
+                set26('stam-pg-manual', '');
+                setzeModus('hoeherstufung');
+                erfassungExtra = Object.assign({}, merk26.extra, { pg: '3' });
+                const db = buildDeckblatt();
+                pruefeWahr('Deckblatt: „Bisheriger Pflegegrad: Pflegegrad 3" ohne Doppelung',
+                    db.includes('Pflegegrad 3') && !/Pflegegrad Pflegegrad/.test(db));
+            } finally {
+                stateOrig = merk26.orig; stateZweit = merk26.zweit; stateEigene = merk26.eigen;
+                erfassungExtra = merk26.extra;
+                setzeModus(merk26.modus);
+            }
         }
 
     } catch (e) {

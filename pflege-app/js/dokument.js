@@ -44,12 +44,15 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
 
     const rO = calculateInternal('orig');
     const rE = calculateInternal('own');
-    const origPG = g('stam-pg-manual') || String(rO.pg);
-    const origPts = g('stam-pts-manual') || f2(rO.total);
+    // Handeingabe und Einzelkriterien abgleichen – eine Tabellenspalte darf sich nicht widersprechen
+    const gaO = gutachtenAngaben(rO, g('stam-pg-manual'), g('stam-pts-manual'));
+    const origPG = gaO.pg;
+    const origPts = gaO.pts;
     // Ein Pflegegrad 0 existiert nicht – dort heißt es immer „kein Pflegegrad".
     const istKeinPG = v => { const s = String(v == null ? '' : v).trim(); return s === '' || s === '0' || /^kein/i.test(s); };
-    const pgWert = v => istKeinPG(v) ? 'kein Pflegegrad' : String(v).trim();          // für Datenzeile und Tabelle
-    const pgSatz = v => istKeinPG(v) ? 'kein Pflegegrad' : 'Pflegegrad ' + String(v).trim();  // im Fließtext
+    // Eingaben wie „Pflegegrad 3" oder „3" gleich behandeln – sonst „Pflegegrad Pflegegrad 3"
+    const pgWert = v => { const z = pflegegradZahl(v); return z > 0 ? String(z) : (istKeinPG(v) ? 'kein Pflegegrad' : String(v).trim()); };  // Datenzeile, Tabelle
+    const pgSatz = v => { const z = pflegegradZahl(v); return z > 0 ? 'Pflegegrad ' + z : (istKeinPG(v) ? 'kein Pflegegrad' : String(v).trim()); };  // Fließtext
     const origPGTxt = pgWert(origPG);
     const eigPGTxt = pgWert(rE.pg);
     /* Fazit: Ergibt die eigene Einschätzung denselben Pflegegrad wie das Gutachten, hat das
@@ -264,6 +267,39 @@ function markiereFehlendeBegruendungen(wurzel, mitKi) {
         el.appendChild(h);
     });
     return nrn;
+}
+
+/* Widerspricht der eingetragene Pflegegrad/Punktwert den erfassten Einzelkriterien, steht im
+   Schriftstück die Rechnung aus den Kriterien (gutachtenAngaben). Der Berater muss das
+   wissen, bevor es hinausgeht – Arbeitshinweis oben im Schriftstück, nur am Bildschirm,
+   ohne data-warn (kein Zitatfehler). Rückgabe: die Meldungen. */
+function fehlendePflichtangaben() {
+    const g = id => (document.getElementById(id)?.value || '').trim();
+    const modus = (typeof appModus !== 'undefined') ? appModus : 'widerspruch';
+    const f = [];
+    if (!g('stam-betreffend')) f.push('Name der versicherten Person');
+    if (modus === 'widerspruch' || modus === 'anhoerung') {
+        if (!g('stam-begutachtung')) f.push(modus === 'anhoerung' ? 'Begutachtungsdatum des Erstgutachtens' : 'Begutachtungsdatum');
+        if (!g('stam-antrag')) f.push('Antragsdatum');
+    }
+    if (modus === 'anhoerung' && !g('anh-gutachten-datum')) f.push('Datum des Zweitgutachtens');
+    return f;
+}
+
+function markiereGutachtenWiderspruch(wurzel) {
+    if (!wurzel) return [];
+    wurzel.querySelectorAll('.angaben-widerspruch').forEach(el => el.remove());
+    const l = (typeof gutachtenWidersprueche === 'function') ? gutachtenWidersprueche() : [];
+    // Fehlende Pflichtangaben: sonst stehen „Herr/ Frau" und „vom —" im versandfertigen Text
+    const fehlt = fehlendePflichtangaben();
+    if (fehlt.length) l.push('Es fehlen Angaben, im Schriftstück stehen dafür Platzhalter: ' + fehlt.join(', ') + '.');
+    if (!l.length) return l;
+    const box = document.createElement('div');
+    box.className = 'zitat-warnung angaben-widerspruch';
+    box.innerText = '⚠ Bitte prüfen: ' + l.join(' ');
+    const erstes = wurzel.querySelector('.stmt');
+    if (erstes) erstes.insertBefore(box, erstes.firstChild); else wurzel.insertBefore(box, wurzel.firstChild);
+    return l;
 }
 
 function markiereUeberholteBegriffe(wurzel) {
@@ -615,16 +651,26 @@ async function generateAppealText() {
         if (docEl && typeof markiereUeberholteBegriffe === 'function') markiereUeberholteBegriffe(docEl);
         // Kriterien ohne Begründung sichtbar machen – nie wieder still nur die Überschrift.
         const ohneBegruendung = (docEl && !istAntrag) ? markiereFehlendeBegruendungen(docEl, !!keyPresent) : [];
+        // Eingetragener Pflegegrad/Punktwert gegen die Einzelkriterien (gutachtenAngaben)
+        const angabenWiderspruch = docEl ? markiereGutachtenWiderspruch(docEl) : [];
         // Auf nicht belegte BRi-Zitate hinweisen – die müssen vor dem Versand geprüft werden.
         const warnAnzahl = (docEl ? docEl.querySelectorAll('.zitat-warnung[data-warn]').length : 0);
+        /* SCHLUSSMELDUNG: alle offenen Punkte in EINER Meldung, jeder vollständig. Vorher
+           verdrängte der erste Punkt die übrigen – eine fehlende Begründung wurde dann nur
+           noch als Anzahl genannt, ohne das Kriterium. */
+        const offen = [];
         if (ohneBegruendung.length) {
             const n = ohneBegruendung.length;
-            showToast(`Achtung: ${n === 1 ? 'Zu Kriterium' : 'Zu den Kriterien'} ${ohneBegruendung.map(x => zeigeNr(x, document.getElementById('stam-organisation')?.value || '')).join(', ')} `
+            offen.push(`${n === 1 ? 'Zu Kriterium' : 'Zu den Kriterien'} ${ohneBegruendung.map(x => zeigeNr(x, document.getElementById('stam-organisation')?.value || '')).join(', ')} `
                 + `fehlt die Begründung – dort steht nur der Ableitungssatz. Die Stelle${n > 1 ? 'n sind' : ' ist'} rot markiert. `
-                + (keyPresent ? 'Bitte „Stellungnahme erstellen" erneut drücken.' : 'Ohne API-Schlüssel wird keine Begründung verfasst.')
-                + (warnAnzahl ? ` Außerdem ${warnAnzahl} nicht belegte${warnAnzahl > 1 ? ' Zitate' : 's Zitat'}.` : ''), "error");
-        } else if (warnAnzahl) {
-            showToast(`Achtung: In ${warnAnzahl} Begründung${warnAnzahl > 1 ? 'en' : ''} steht ein Zitat, das sich nicht wörtlich in den BRi belegen lässt. Die Stellen sind rot markiert – bitte streichen oder korrigieren.`, "error");
+                + (keyPresent ? 'Bitte „Stellungnahme erstellen" erneut drücken.' : 'Ohne API-Schlüssel wird keine Begründung verfasst.'));
+        }
+        if (warnAnzahl) {
+            offen.push(`In ${warnAnzahl} Begründung${warnAnzahl > 1 ? 'en' : ''} steht ein Zitat, das sich nicht wörtlich in den BRi belegen lässt – rot markiert, bitte streichen oder korrigieren.`);
+        }
+        angabenWiderspruch.forEach(t => offen.push(t));
+        if (offen.length) {
+            showToast('Achtung: ' + offen.join(' ') + (hinweisKurzfassung || ''), "error");
         } else if (hinweisKurzfassung) {
             showToast((merged ? "Aktualisiert." : "Stellungnahme erstellt.") + hinweisKurzfassung, "error");
         } else {

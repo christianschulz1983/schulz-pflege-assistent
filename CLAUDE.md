@@ -503,6 +503,19 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    `appealDraft`, das erst beim Speichern nachgezogen wird), Protokoll, Veraltet-Hinweis und
    Vorschlagsgründe. Vorher war die Stellungnahme samt Handänderungen nach dem Selbsttest
    leer, und das nächste „Speichern" schrieb den leeren Stand in die Falldatei.
+37. **Pflegegrad und Punkte eines Gutachtens nur über `gutachtenAngaben(r, pgFeld, ptsFeld)`**
+   (`js/basis.js`) – in Widerspruch, Anhörung (Erst- und Zweitgutachten), Höherstufungsantrag
+   und Deckblatt. Gemeldet: Spalte „Vorgutachten" 10,00 Punkte, darunter „Pflegegrad 3", im
+   Fazit „47,5 Punkte" – die Handeingabe ging ungeprüft vor, der Reiter „Vergleich" rechnete
+   mit den Kriterien. Regel: Widerspricht die Handeingabe den erfassten Kriterien, gilt die
+   Rechnung (dieselbe Tabellenspalte) und es wird gemeldet (`gutachtenWidersprueche`, Reiter
+   „Auswertung", Arbeitshinweis oben im Schriftstück, Schlussmeldung). Ohne erfasste Kriterien
+   gilt die Handeingabe. Punkte immer über `punkteDE` („47,50", nie „10.00"); nach „mit"
+   `pflegegradMit` (nie „mit kein Pflegegrad"); `pflegegradWort` statt `'Pflegegrad ' + x`
+   (Eingabe „Pflegegrad 3" ergab „Pflegegrad Pflegegrad 3", 0 ergab „Pflegegrad 0").
+   `fehlendePflichtangaben` nennt fehlenden Namen und fehlende Daten, statt still „Herr/ Frau"
+   und „vom —" zu drucken. Die Schlussmeldung von „Stellungnahme erstellen" nennt ALLE offenen
+   Punkte vollständig (vorher verdrängte der erste die übrigen).
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -556,7 +569,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1236 Pruefungen.
+Der Selbsttest umfasst 1252 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

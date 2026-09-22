@@ -160,7 +160,9 @@ function buildDeckblatt() {
     if (cm && !/^(herr|frau)/i.test(name)) name = (cm[2] + ' ' + cm[1]).trim();
     if (!name) name = 'Herr/ Frau';
     const kasse = g('stam-kasse') || 'Pflegekasse';
-    const pgAlt = erfassungExtra.pg;
+    // Derselbe geprüfte Wert wie im Antrag selbst – Deckblatt und Antrag dürfen sich nicht widersprechen
+    const gaD = gutachtenAngaben(calculateInternal('orig'), erfassungExtra.pg, g('stam-pts-manual'));
+    const pgAlt = gaD.widerspruch ? gaD.pg : erfassungExtra.pg;
     // Doppelpunkt direkt hinter der Bezeichnung; die Angaben bleiben in ihrer Spalte
     // (Breite von .k in STELLUNGNAHME_CSS).
     const dataRow = (k, v) => `<div class="data-row"><span class="k">${esc(k)}:</span> <span>${esc(v || '')}</span></div>`;
@@ -183,7 +185,7 @@ function buildDeckblatt() {
       ${dataRow('Versicherte Person', name)}
       ${dataRow('geboren am', formatDE(g('stam-geboren')))}
       ${dataRow('Versicherungs-Nr.', g('stam-versnr'))}
-      ${hoeher && pgAlt ? dataRow('Bisheriger Pflegegrad', 'Pflegegrad ' + pgAlt) : ''}
+      ${hoeher && pgAlt ? dataRow('Bisheriger Pflegegrad', pflegegradWort(pgAlt)) : ''}
     </div>
 
     <p>Sehr geehrte Damen und Herren,</p>
@@ -228,8 +230,11 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
     const rO = calculateInternal('orig');
     const rE = calculateInternal('own');
     const istKeinPG = v => { const s = String(v == null ? '' : v).trim(); return s === '' || s === '0' || /^kein/i.test(s); };
-    const pgWert = v => istKeinPG(v) ? 'kein Pflegegrad' : 'Pflegegrad ' + String(v).trim();
-    const altPG = erfassungExtra.pg || (rO.pg ? String(rO.pg) : '');
+    // „Pflegegrad 3" und „3" gleich behandeln – sonst „Pflegegrad Pflegegrad 3"
+    const pgWert = v => { const z = pflegegradZahl(v); return z > 0 ? 'Pflegegrad ' + z : (istKeinPG(v) ? 'kein Pflegegrad' : String(v).trim()); };
+    // Pflegegrad des Vorgutachtens: Handeingabe gegen die erfassten Kriterien abgleichen
+    const gaV = gutachtenAngaben(rO, erfassungExtra.pg, g('stam-pts-manual'));
+    const altPG = gaV.widerspruch ? gaV.pg : (erfassungExtra.pg || (rO.pg ? String(rO.pg) : ''));
     const vorgutachtenDatum = formatDE(erfassungExtra.vorgutachten || g('stam-begutachtung'));
     const org = g('stam-organisation') || 'Medizinischer Dienst';
     /* Fazit im Höherstufungsantrag: Ergibt die heutige Einschätzung denselben Pflegegrad wie
@@ -239,8 +244,9 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
     const fazitGleich = istHoeher && pflegegradZahl(altPG) > 0 && gleicherPflegegrad(altPG, rE.pg);
     // Heutige Einschätzung unter dem Vorgutachten: Hinweis auf das Risiko einer Rückstufung.
     const fazitNiedriger = istHoeher && pflegegradZahl(altPG) > 0 && niedrigererPflegegrad(altPG, rE.pg);
-    const vgPunkte = g('stam-pts-manual')
-        || (Object.keys((stateOrig && stateOrig.values) || {}).length ? f2(rO.total) : '');
+    const vgPunkte = gaV.widerspruch ? gaV.pts
+        : (g('stam-pts-manual') ? punkteDE(g('stam-pts-manual'))
+           : (Object.keys((stateOrig && stateOrig.values) || {}).length ? f2(rO.total) : ''));
     const antragDatum = formatDE(g('stam-antrag'));
 
     const notesEl = document.getElementById('erstgespraech-notes');

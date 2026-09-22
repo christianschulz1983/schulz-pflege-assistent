@@ -91,6 +91,7 @@ function renderAuswertung() {
                     einem von Ihnen angehakten Vorschlag stammt.
                 </p>
                 ${abweichungHtml()}
+                ${typeof gutachtenWiderspruchHtml === 'function' ? gutachtenWiderspruchHtml() : ''}
                 ${protokollHtml()}
             </div>
         </div>

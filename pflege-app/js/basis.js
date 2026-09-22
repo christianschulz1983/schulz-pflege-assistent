@@ -37,6 +37,65 @@ function pflegegradZahl(v) {
 function gleicherPflegegrad(a, b) {
     return pflegegradZahl(a) === pflegegradZahl(b);
 }
+/* PUNKTE IM SCHRIFTSTÜCK: immer mit Komma und zwei Nachkommastellen („47,50").
+   Handeingaben kamen unverändert ins Dokument – „10.00" mit Punkt, „47,5" mit einer Stelle. */
+function punkteDE(v) {
+    const s = String(v == null ? '' : v).trim().replace(/\s+/g, '');
+    if (!s) return '';
+    const n = Number(s.replace(',', '.'));
+    return isFinite(n) ? n.toFixed(2).replace('.', ',') : s;
+}
+
+// Pflegegrad im Fließtext nach „mit": „mit Pflegegrad 3" – aber nie „mit kein Pflegegrad".
+function pflegegradMit(v) {
+    const z = pflegegradZahl(v);
+    return z > 0 ? 'Pflegegrad ' + z : 'der Feststellung keines Pflegegrades';
+}
+
+/* PFLEGEGRAD UND PUNKTE EINES GUTACHTENS – EINE Stelle für alle Vorlagen.
+   Gemeldet (Anhörung): In der Spalte „Vorgutachten" ergaben die gewichteten Punkte 10,00,
+   darunter stand „Pflegegrad 3", im Fazit „47,5 Punkte". Die Handeingabe („Pflegegrad
+   (Gutachten)", „Gesamtpunkte (Gutachten)") ging den erfassten Einzelkriterien vor – ohne
+   Abgleich. Der Reiter „Vergleich" rechnet dagegen mit den Kriterien; App und Schriftstück
+   nannten verschiedene Pflegegrade.
+   Regel: Sind Einzelkriterien erfasst und widerspricht die Handeingabe ihnen, gilt das, was
+   in derselben Tabellenspalte steht – die Rechnung aus den Kriterien. Die Abweichung wird
+   gemeldet (App und Schriftstück), damit der Berater die falsche Angabe berichtigt. Ohne
+   erfasste Kriterien (z. B. Aktenlage ohne Einzelwerte) gilt die Handeingabe.
+   r = calculateInternal(spalte); pgFeld/ptsFeld = Handeingaben (Text). */
+function gutachtenAngaben(r, pgFeld, ptsFeld) {
+    const pgHand = String(pgFeld == null ? '' : pgFeld).trim();
+    const ptsHand = String(ptsFeld == null ? '' : ptsFeld).trim();
+    const total = Number(r && r.total) || 0;
+    const pgRech = Number(r && r.pg) || 0;
+    const ptsRech = punkteDE(total);
+    const kriterienErfasst = total > 0;
+    const ptsHandZahl = ptsHand ? Number(ptsHand.replace(/\s+/g, '').replace(',', '.')) : null;
+    const pgWiderspricht = !!pgHand && kriterienErfasst && pflegegradZahl(pgHand) !== pgRech;
+    const ptsWiderspricht = ptsHandZahl !== null && isFinite(ptsHandZahl) && kriterienErfasst
+        && Math.abs(ptsHandZahl - total) > 0.01;
+    if (pgWiderspricht || ptsWiderspricht) {
+        return { pg: String(pgRech), pts: ptsRech,
+                 widerspruch: { hand: { pg: pgHand, pts: ptsHand ? punkteDE(ptsHand) : '' },
+                                rechnung: { pg: pgRech, pts: ptsRech } } };
+    }
+    return { pg: pgHand || String(pgRech), pts: ptsHand ? punkteDE(ptsHand) : ptsRech, widerspruch: null };
+}
+
+// Lesbare Meldung zu einem Widerspruch aus gutachtenAngaben (für App und Schriftstück)
+function gutachtenWiderspruchText(bezeichnung, w) {
+    if (!w) return '';
+    const hand = [w.hand.pg ? pflegegradWort(w.hand.pg) : '', w.hand.pts ? w.hand.pts + ' Punkte' : ''].filter(Boolean).join(', ');
+    return bezeichnung + ': Eingetragen ist ' + hand + ', die erfassten Einzelkriterien ergeben '
+        + w.rechnung.pts + ' Punkte (' + pflegegradWort(w.rechnung.pg) + '). Im Schriftstück steht die '
+        + 'Rechnung aus den Kriterien – bitte die falsche Angabe berichtigen.';
+}
+
+function pflegegradWort(v) {
+    const z = pflegegradZahl(v);
+    return z > 0 ? 'Pflegegrad ' + z : 'kein Pflegegrad';
+}
+
 // Liegt die eigene Einschätzung UNTER dem Pflegegrad des Gutachtens? Dann droht eine Rückstufung.
 function niedrigererPflegegrad(gutachten, eigen) {
     return pflegegradZahl(eigen) < pflegegradZahl(gutachten);
