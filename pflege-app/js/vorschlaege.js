@@ -164,11 +164,15 @@ Zwingende Regeln:
 /* Die Auswahlliste wird von mehreren Stellen benutzt (Widerspruchspunkte, Befundvorschläge,
    Übernahme aus dem Vorgutachten). Jede setzt beim Öffnen ihren eigenen Zweck – so kann keine
    Liste mit dem Übernahmeknopf einer anderen stehen bleiben. */
-function vorschlagOverlayZweck(titel, aufruf) {
+function vorschlagOverlayZweck(titel, aufruf, knopfText) {
     const kopf = document.querySelector('#vorschlag-overlay .rh-title');
     if (kopf) kopf.innerText = titel;
     const knopf = document.querySelector('#vorschlag-overlay .review-header .btn-primary');
-    if (knopf) knopf.setAttribute('onclick', aufruf);
+    if (knopf) {
+        knopf.setAttribute('onclick', aufruf);
+        // Beschriftung je Zweck (die Anlagenauswahl vor dem Drucken heißt „PDF erstellen")
+        knopf.innerText = knopfText || '✓ Ausgewählte übernehmen';
+    }
 }
 
 function renderVorschlaege() {

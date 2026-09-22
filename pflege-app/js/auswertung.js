@@ -348,6 +348,8 @@ function loadCase(e) {
             // beim nächsten Speichern in die Datei dieses Falls.
             if (typeof setzeStellungnahme === 'function') setzeStellungnahme(data.appealDraft || "");
             else appealDraft = data.appealDraft || "";
+            // Dateien der vorigen Person aus dem Arbeitsspeicher (js/anhang.js)
+            if (typeof unterlagenZuruecksetzen === 'function') unterlagenZuruecksetzen(false);
             /* Die ursprüngliche Stellungnahme des Widerspruchs – Quelle der Anhörung. Sie gehört
                zu DIESEM Fall; die eines zuvor geladenen Falls darf nicht stehen bleiben. */
             if (typeof widerspruchStellungnahme !== 'undefined') {

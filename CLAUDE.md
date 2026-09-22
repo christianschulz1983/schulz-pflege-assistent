@@ -32,6 +32,7 @@ pflege-app/
   js/vergleich.js     Dreiervergleich und Schwellenwertrechnung
   js/anlagen.js       Anlagen: Zuordnung zum Kriterium, Verzeichnis im Dokument
   js/belege.js        Ärztliche Unterlagen als Beleg (Widerspruch, Anhörung): Auslesen, Abgleich
+  js/anhang.js        Anlagen an die PDF anhängen (alle Vorgänge), Fallwechsel leert Unterlagen
   js/namenspruefung.js Abgleich der eingelesenen Namen gegen den Dokumenttext
   js/befund.js        Befunderhebung (Erstantrag, Höherstufung)
   js/erfassung.js     Pflegepersonen, Aufenthalte, Versorgung, Übernahme in Modul 5
@@ -571,6 +572,20 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    `mergeStellungnahme` hält `#stmt-belege` und `#stmt-anlagen` aktuell. Gespeichert wird die
    Auswertung, nicht die Datei (`belegDateien` nur im Arbeitsspeicher).
 
+41. **Anlagen an die PDF anhängen – alle Vorgänge** (`js/anhang.js`). „Drucken / PDF" fragt
+   zuerst, welche Unterlagen angehängt werden (`zeigeAnhangAuswahl`, **nichts vorausgewählt**,
+   Unterlagen ohne Datei nicht wählbar). Widerspruch/Anhörung: die Anlagenliste; Anträge: die
+   hochgeladenen Arztberichte (`antragBerichtDateien`, gemerkt in `leseArztberichte`).
+   `druckeStellungnahme(anhaenge)` öffnet das Druckfenster sofort (Pop-up-Blocker), wandelt die
+   Unterlagen mit pdf.js in Bilder (150 dpi, JPEG, höchstens 60 Seiten je Unterlage) und setzt
+   sie hinter die Stellungnahme, je Seite „Anlage N – Seite x von y"; gedruckt wird erst, wenn
+   alle Bilder geladen sind. Grenze: Anlagen als Bild, Text nicht markierbar.
+   **Fallwechsel** (`unterlagenZuruecksetzen`): Neues Gutachten eingelesen → Dateien, Anlagen
+   und gemerkte Widerspruchs-Stellungnahme geleert (vorher blieben die Anlagen der vorigen
+   Person stehen); „Fall laden" → Dateien im Arbeitsspeicher geleert.
+   `vorschlagOverlayZweck(titel, aufruf, knopfText)` setzt auch die Beschriftung zurück.
+   Selbsttest im **vorderen** Tab laufen lassen – im Hintergrund bremst der Browser pdf.js aus.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -623,7 +638,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1342 Pruefungen.
+Der Selbsttest umfasst 1365 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

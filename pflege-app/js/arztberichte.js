@@ -55,6 +55,8 @@ async function leseArztberichte(event) {
         const datei = dateien[i];
         // Für die spätere Korrektur merken, damit die Unterlage danebengelegt werden kann
         if (typeof merkeImportDokument === 'function') merkeImportDokument(datei, datei.type);
+        // Für „Anlagen an die PDF anhängen" (js/anhang.js)
+        if (typeof merkeAntragBericht === 'function') merkeAntragBericht(datei);
         updateOverlay(`Datei ${i + 1} von ${dateien.length}: ${datei.name}`, Math.round((i / dateien.length) * 90));
         try {
             const teile = await berichtTeile(datei);

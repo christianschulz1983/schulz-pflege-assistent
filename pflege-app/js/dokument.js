@@ -865,10 +865,35 @@ function speicherungenHtml() {
 function printAppealText() {
     const docEl = document.getElementById('appeal-document');
     if (!docEl || !docEl.innerHTML.trim()) { showToast("Bitte zuerst die Stellungnahme erstellen.", "error"); return; }
+    // Liegen Unterlagen vor, zuerst fragen, welche angehängt werden sollen (js/anhang.js)
+    const kandidaten = (typeof anhangKandidaten === 'function') ? anhangKandidaten() : [];
+    if (kandidaten.length && typeof zeigeAnhangAuswahl === 'function') { zeigeAnhangAuswahl(kandidaten); return; }
+    druckeStellungnahme([]);
+}
+
+/* Das Druckfenster. anhaenge: ausgewählte Unterlagen [{ titel, datei }] – sie werden in
+   Bilder umgewandelt und hinter die Stellungnahme gesetzt. Das Fenster öffnet SOFORT (im
+   Klick, sonst greift der Pop-up-Blocker) und zeigt, bis die Anlagen fertig sind, einen
+   Hinweis. */
+async function druckeStellungnahme(anhaenge) {
+    const docEl = document.getElementById('appeal-document');
+    if (!docEl || !docEl.innerHTML.trim()) { showToast("Bitte zuerst die Stellungnahme erstellen.", "error"); return; }
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
         showToast("Druckfenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.", "error");
         return;
+    }
+    let anhangTeil = '', anhangFehler = [];
+    if (anhaenge && anhaenge.length && typeof anhaengeVorbereiten === 'function') {
+        printWindow.document.write('<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Anlagen werden vorbereitet</title></head>'
+            + '<body style="font-family:Arial,sans-serif;padding:40px;color:#333"><p id="st">Anlagen werden vorbereitet …</p></body></html>');
+        printWindow.document.close();
+        const r = await anhaengeVorbereiten(anhaenge, (i, n, t) => {
+            try { printWindow.document.getElementById('st').textContent = 'Anlage ' + (i + 1) + ' von ' + n + ' wird vorbereitet: ' + t; } catch (e) {}
+        });
+        anhangTeil = anhangHtml(r.fertig);
+        anhangFehler = r.fehler;
+        printWindow.document.open();
     }
     const title = escapeHtml(document.getElementById('stam-betreffend').value || 'Stellungnahme');
     const kopie = docEl.cloneNode(true);
@@ -883,17 +908,27 @@ function printAppealText() {
        und die leeren Zeilen darin wirken als oberer und unterer Rand. */
     printWindow.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Pflegefachliche Stellungnahme - ${title}</title><style>${STELLUNGNAHME_CSS}
 ${DRUCK_CSS}
+${(anhangTeil && typeof ANHANG_CSS !== 'undefined') ? ANHANG_CSS : ''}
     </style></head><body>
       <div id="mess">${kopie.innerHTML}</div>
       <div id="seiten"></div>
+      ${anhangTeil}
       <script>${seitenAufteilen.toString()}
-      window.onload=function(){
+      var gedruckt = false;
+      function los(){
+        if (gedruckt) return; gedruckt = true;
         try { seitenAufteilen(document.getElementById('mess'), document.getElementById('seiten')); }
         catch (e) { console.warn('Seitenaufteilung fehlgeschlagen', e);
                     document.getElementById('mess').style.display=''; }
-        window.print();
-      };<\/script></body></html>`);
+        // Erst drucken, wenn alle Anlagenbilder geladen sind
+        Promise.all(Array.from(document.images).map(function(i){ return i.complete ? 1
+            : new Promise(function(r){ i.onload = i.onerror = r; }); })).then(function(){ window.print(); });
+      }
+      // Nach document.open() feuert „load" nicht in jedem Browser erneut
+      if (document.readyState === 'complete') setTimeout(los, 200); else window.onload = los;
+      <\/script></body></html>`);
     printWindow.document.close();
+    if (anhangFehler.length) showToast('Nicht angehängt: ' + anhangFehler.join(' | '), 'error');
 }
 
 /* DRUCKBILD.
