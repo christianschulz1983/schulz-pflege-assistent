@@ -285,6 +285,9 @@ function fallDaten() {
                 anlagen: (typeof anlagenSichern === 'function') ? anlagenSichern() : null,
                 // Begruendungen uebernommener Vorschlaege – Grundlage fuer die Stellungnahme
                 vorschlagGruende: (typeof vorschlagGruende !== 'undefined') ? vorschlagGruende : {},
+                // Anhörung: die ursprüngliche Stellungnahme des Widerspruchs (Quelle je Kriterium)
+                stellungnahmeWiderspruch: (typeof widerspruchStellungnahme !== 'undefined') ? widerspruchStellungnahme : '',
+                stellungnahmeKerne: (typeof widerspruchKerne !== 'undefined') ? widerspruchKerne : {},
                 // Wer hat was geändert (Regler, Vorschlag, Befund, Modul 5, Korrektur)
                 bewertungsProtokoll: (typeof bewertungsProtokoll !== 'undefined') ? bewertungsProtokoll : [],
                 // Passt die gespeicherte Stellungnahme noch zu den Werten?
@@ -345,6 +348,14 @@ function loadCase(e) {
             // beim nächsten Speichern in die Datei dieses Falls.
             if (typeof setzeStellungnahme === 'function') setzeStellungnahme(data.appealDraft || "");
             else appealDraft = data.appealDraft || "";
+            /* Die ursprüngliche Stellungnahme des Widerspruchs – Quelle der Anhörung. Sie gehört
+               zu DIESEM Fall; die eines zuvor geladenen Falls darf nicht stehen bleiben. */
+            if (typeof widerspruchStellungnahme !== 'undefined') {
+                widerspruchStellungnahme = '';
+                widerspruchKerne = (data.stellungnahmeKerne && typeof data.stellungnahmeKerne === 'object') ? data.stellungnahmeKerne : {};
+                if (data.stellungnahmeWiderspruch) widerspruchStellungnahme = String(data.stellungnahmeWiderspruch);
+                else merkeWiderspruchStellungnahme(data.appealDraft || '');
+            }
             setzeModus(data.appModus || 'widerspruch');   // ältere Fälle sind immer Widersprüche
             if (typeof befundLaden === 'function') befundLaden(data.befund);
             if (typeof erfassungLaden === 'function') erfassungLaden(data.erfassung);

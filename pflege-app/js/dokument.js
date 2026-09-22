@@ -260,7 +260,7 @@ function markiereFehlendeBegruendungen(wurzel, mitKi) {
         nrn.push(nr);
         const h = document.createElement('div');
         h.className = 'zitat-warnung begruendung-fehlt';
-        h.innerText = '⚠ Zu diesem Kriterium fehlt die Begründung – hier steht nur der Ableitungssatz. '
+        h.innerText = '⚠ Zu diesem Kriterium fehlt die Begründung – hier steht nur der Ersatztext aus den Wertungen. '
             + (mitKi ? 'Bitte „Stellungnahme erstellen" erneut drücken (die übrigen Texte bleiben erhalten) '
                      + 'oder die Begründung selbst ergänzen.'
                      : 'Ohne API-Schlüssel wird keine Begründung verfasst – bitte Schlüssel eintragen oder selbst ergänzen.');
@@ -365,6 +365,12 @@ function mergeStellungnahme(existingHtml, freshHtml) {
     // Nur die Kriterienblöcke neu aufbauen. Von Hand überarbeitete „Allgemeine Angaben"
     // bleiben erhalten – sie tragen die falsche Form nicht.
     const artGewechselt = !!fArt && cArt !== fArt;
+    /* Anhörung und Widerspruch sind verschiedene Schriftstücke: Einleitung („erhebt" gegen
+       „aufrecht"), Tabelle (zwei gegen drei Spalten), Allgemeine Angaben und Fazit. Blieb die
+       Widerspruchs-Stellungnahme nach „Fall laden" im Feld, wanderten ihre Einleitung, ihr
+       Tabellenkopf und – wenn die KI ausfiel – ihre Allgemeinen Angaben in die Anhörung.
+       Dann wird neu aufgebaut; die alte Stellungnahme ist als Quelle gesondert gemerkt. */
+    if (artGewechselt && (fArt === 'anhoerung' || cArt === 'anhoerung')) return fresh.innerHTML;
     if (artGewechselt) cur.querySelectorAll('.crit[data-nr]').forEach(el => el.remove());
     // Inline-Datenfelder (Name, Daten, Kennzahlen) anhand von data-f übernehmen
     const vals = {};
@@ -554,6 +560,9 @@ async function generateAppealText() {
         const schluessel = d => istAnh ? lagenSchluessel(d) : (istAntrag ? d.sig : (d.o + '|' + d.e));
         const vorhandenEl = document.getElementById('appeal-document');
         const vorhandenHtml = (vorhandenEl && vorhandenEl.innerHTML.trim()) ? vorhandenEl.innerHTML : (appealDraft || '');
+        // Anhörung: Steht noch die Widerspruchs-Stellungnahme im Feld, wird sie als Quelle
+        // gemerkt, BEVOR die Anhörung sie ersetzt (siehe merkeWiderspruchStellungnahme).
+        if (istAnh && typeof merkeWiderspruchStellungnahme === 'function') merkeWiderspruchStellungnahme(vorhandenHtml);
         const bereitsDa = {};
         if (vorhandenHtml) {
             const tmp = document.createElement('div'); tmp.innerHTML = vorhandenHtml;

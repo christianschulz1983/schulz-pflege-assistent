@@ -10,6 +10,8 @@
 const ANHOERUNG_FELDER = [
     { id: 'anh-schreiben-datum', l: 'Datum Anhörungsschreiben', typ: 'date' },
     { id: 'anh-frist',           l: 'Frist zur Stellungnahme',  typ: 'text', platz: 'Datum oder Angabe wie „zwei Wochen"' },
+    // Nicht im Kopf, aber im Text: „In meiner pflegefachlichen Stellungnahme vom …"
+    { id: 'anh-ps-datum',        l: 'Datum meiner Stellungnahme (Widerspruch)', typ: 'date' },
     { id: 'anh-gutachten-datum', l: 'Datum Zweitgutachten',     typ: 'date' },
     { id: 'anh-art',             l: 'Durchführungsart Zweitgutachten', typ: 'select', opt: () => DURCHFUEHRUNGSARTEN },
     { id: 'anh-pg',              l: 'Pflegegrad (Zweitgutachten)',   typ: 'text' },
@@ -83,6 +85,19 @@ function renderAnhoerungBereich() {
                               style="min-height:110px;font-size:12px;line-height:1.6;padding:12px"
                               placeholder="Warum will die Kasse dem Widerspruch nicht abhelfen?"
                               oninput="autoResize(this); if (typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Begründung der Pflegekasse')"></textarea>
+                </div>
+
+                <div class="field-group" style="margin-top:14px">
+                    <label class="field-label">Befund und Begründungen des Zweitgutachtens</label>
+                    <p style="font-size:11px;color:var(--text-muted);line-height:1.55;margin-bottom:6px">
+                        Wird beim Einlesen gefüllt – bitte prüfen. Nur was hier steht, darf die Begründung
+                        dem Zweitgutachten zuschreiben („Das Zweitgutachten bestätigt im Befund …“). Der
+                        Befund des Erstgutachtens steht weiterhin auf Reiter 1 unter den Stammdaten.
+                    </p>
+                    <textarea id="anh-zweit-befund" class="field-input"
+                              style="min-height:110px;font-size:12px;line-height:1.6;padding:12px"
+                              placeholder="Befund, Erläuterungen und wörtliche Begründungen des Zweitgutachtens"
+                              oninput="autoResize(this); if (typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Befund des Zweitgutachtens')"></textarea>
                 </div>
 
                 <div class="field-group" style="margin-top:14px">
@@ -178,6 +193,24 @@ function uebernehmeAnhoerung(rev) {
     const kb = document.getElementById('anh-kassenbegruendung');
     if (kb && a.kassenbegruendung && !kb.value.trim()) { kb.value = a.kassenbegruendung; autoResize(kb); }
 
+    /* KOPF VOLLSTÄNDIG. In den Vorlagen stehen Geburtsdatum, Versicherungs-Nr. und
+       Antragsdatum immer im Kopf; in älteren Falldateien fehlen sie oft. Das Zweitgutachten
+       nennt sie ebenfalls. Gefüllt wird NUR ein leeres Feld – die Angaben des geladenen
+       Widerspruchsfalls haben Vorrang und werden nie überschrieben. */
+    const st = rev.stam || {};
+    [['stam-betreffend', st.betreffend], ['stam-geboren', st.geboren], ['stam-kasse', st.kasse],
+     ['stam-versnr', st.versnr], ['stam-antrag', st.antrag], ['stam-bescheid', st.bescheid],
+     ['stam-organisation', st.organisation]].forEach(([id, wert]) => {
+        const el = document.getElementById(id);
+        if (el && wert && !String(el.value || '').trim()) el.value = wert;
+    });
+    // Befund und Begründungen des Zweitgutachtens – eigene Quelle, getrennt vom Erstgutachten
+    const zb = document.getElementById('anh-zweit-befund');
+    if (zb && !zb.value.trim()) {
+        const roh = String(rev.befund || '').trim() || String(rev.text || '').trim().slice(0, 8000);
+        if (roh) { zb.value = roh; autoResize(zb); }
+    }
+
     // Nachweis im Bewertungsprotokoll
     if (typeof bewertungsProtokoll !== 'undefined') {
         bewertungsProtokoll.push({
@@ -190,6 +223,97 @@ function uebernehmeAnhoerung(rev) {
 
     fillTable('own'); calculate('own'); calculate('zweit'); syncSpecialUI();
     aktualisiereAnhoerungStatus();
+}
+
+/* ==================================================================================
+   DIE URSPRÜNGLICHE STELLUNGNAHME DES WIDERSPRUCHS.
+   Jede Begründung der Anhörung soll sagen, was in der pflegefachlichen Stellungnahme
+   stand – und warum das Zweitgutachten sie nicht widerlegt. Dafür braucht es deren Text.
+   Nach „Fall laden" steht er im Dokumentfeld; mit der ersten Anhörung wird er dort aber
+   ersetzt. Deshalb wird er hier gesondert gemerkt und mit dem Fall gespeichert.
+   Ausweichweg (PDF der alten Stellungnahme): dort liefert die Auslese je Kriterium die
+   Kernaussage (widerspruchKerne). */
+let widerspruchStellungnahme = '';
+let widerspruchKerne = {};
+
+// Merkt den Text, wenn er eine Widerspruchs-Stellungnahme ist. Rückgabe: gemerkt?
+function merkeWiderspruchStellungnahme(html) {
+    const h = String(html || '');
+    if (!h.trim()) return false;
+    const d = document.createElement('div'); d.innerHTML = h;
+    const v = d.querySelector('[data-vorgang]');
+    const art = v ? v.getAttribute('data-vorgang') : '';
+    // Ältere Schriftstücke tragen keine Kennung – das waren immer Widersprüche.
+    if (art && art !== 'widerspruch') return false;
+    if (!d.querySelector('.crit[data-nr]')) return false;
+    widerspruchStellungnahme = h;
+    return true;
+}
+
+// Was die Stellungnahme zu einem Kriterium ausgeführt hat (reiner Text, ohne Kopfzeilen)
+function widerspruchKern(nr) {
+    if (widerspruchKerne && widerspruchKerne[nr]) return String(widerspruchKerne[nr]).trim();
+    if (!widerspruchStellungnahme) return '';
+    const d = document.createElement('div'); d.innerHTML = widerspruchStellungnahme;
+    const c = Array.from(d.querySelectorAll('.crit[data-nr]')).find(x => x.getAttribute('data-nr') === nr);
+    if (!c) return '';
+    return Array.from(c.children)
+        .filter(ch => !ch.classList.contains('ct') && !ch.classList.contains('zitat-warnung')
+                   && !ch.classList.contains('m5-wirkung'))
+        .map(ch => (ch.textContent || '').replace(/\s+/g, ' ').trim())
+        .filter(t => t && !/^(Gutachterliche Bewertung|Meine Beurteilung|Beigefügt):/.test(t))
+        .join(' ');
+}
+
+/* AUFBAU JE KRITERIUM (Vorgabe des Verfassers): was das Erstgutachten sagt (kurz), was die
+   Stellungnahme festgestellt hat, warum das Zweitgutachten falsch ist, warum die
+   Stellungnahme nach den Richtlinien zutrifft. Die Bezeichnungen setzt die App – die KI
+   liefert nur die Inhalte. So kann kein Teil still fehlen. */
+const ANH_TEILE = [
+    { key: 'erstgutachten',  label: 'Erstgutachten' },
+    { key: 'stellungnahme',  label: 'Pflegefachliche Stellungnahme' },
+    { key: 'zweitgutachten', label: 'Zweitgutachten' },
+    { key: 'richtlinien',    label: 'Würdigung nach den Begutachtungs-Richtlinien' }
+];
+const ANH_TEIL_MUSTER = new RegExp('^(' + ANH_TEILE.map(t => t.label).join('|') + '):\\s*');
+
+function anhAbleitungssatz(bText) {
+    return 'Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „' + bText + '“ ableitbar.';
+}
+
+/* Setzt die vier Teile zu EINEM Text zusammen (Absätze mit Bezeichnung). Der Text läuft
+   danach durch dieselben Wege wie jede Begründung (Länge, Zitatprüfung, Zusammenführen).
+   Fehlt der Ableitungssatz, hängt die App ihn an – er ist Pflicht. */
+function anhoerungBegruendungZusammen(b, bText) {
+    if (!b) return '';
+    const ohneLabel = t => String(t || '').trim().replace(ANH_TEIL_MUSTER, '');
+    const teile = ANH_TEILE.map(t => ({ label: t.label, text: ohneLabel(b[t.key]) })).filter(t => t.text);
+    if (!teile.length) return String(b.text || '').trim();
+    const ganz = teile.map(t => t.text).join(' ');
+    if (bText && !(/ableitbar/.test(ganz) && ganz.includes(bText))) {
+        const letzter = teile.find(t => t.label === ANH_TEILE[3].label);
+        if (letzter) letzter.text += ' ' + anhAbleitungssatz(bText);
+        else teile.push({ label: ANH_TEILE[3].label, text: anhAbleitungssatz(bText) });
+    }
+    return teile.map(t => t.label + ': ' + t.text).join('\n\n');
+}
+
+/* Ersatz ohne KI: dieselben vier Teile, nur aus dem, was feststeht. Keine Behauptung, die
+   nicht aus den Wertungen oder dem Text der Stellungnahme folgt. */
+function anhoerungErsatzBegruendung(l) {
+    const kern = widerspruchKern(l.nr);
+    const kurz = kern.length > 600 ? kern.slice(0, 600).replace(/\s+\S*$/, '') + ' …' : kern;
+    const zweit = {
+        nicht: `Das Zweitgutachten hält an der Wertung „${l.zText}“ fest. Die in der pflegefachlichen Stellungnahme dargelegten Einschränkungen widerlegt es damit nicht.`,
+        teilweise: `Das Zweitgutachten hebt die Wertung auf „${l.zText}“ an und erkennt damit einen Unterstützungsbedarf an, bleibt aber hinter der in der Stellungnahme begründeten Stufe zurück.`,
+        verschlechtert: `Das Zweitgutachten senkt die Wertung auf „${l.zText}“ ab. Die in der pflegefachlichen Stellungnahme dargelegten Einschränkungen widerlegt es damit nicht.`
+    }[l.lage] || `Das Zweitgutachten bewertet mit „${l.zText}“.`;
+    return [
+        'Erstgutachten: Das Erstgutachten bewertete mit „' + l.eText + '“.',
+        'Pflegefachliche Stellungnahme: ' + (kurz || 'In meiner pflegefachlichen Stellungnahme habe ich eine Wertung mit „' + l.bText + '“ begründet.'),
+        'Zweitgutachten: ' + zweit,
+        ANH_TEILE[3].label + ': ' + anhAbleitungssatz(l.bText)
+    ].join('\n\n');
 }
 
 // ==================================================================================
@@ -277,10 +401,15 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
         ? strittig.map(l => {
             const txt = (bg[l.nr] || '').trim();
             // Nummern auf die Zählung des Gutachtens umstellen (bei Medicproof 5.x.y).
-            const txtAnz = nummernImText(txt, org);
-            let body = txtAnz
-                ? txtAnz.split(/\n\s*\n/).map(p => `<div>${esc(p.trim()).replace(/\n/g, '<br>')}</div>`).join('')
-                : `<div>Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „${esc(l.bText)}“ ableitbar.</div>`;
+            // Ohne KI-Text: die vier Teile aus dem, was feststeht (anhoerungErsatzBegruendung).
+            const txtAnz = nummernImText(txt || anhoerungErsatzBegruendung(l), org);
+            // Die vier Teile tragen ihre Bezeichnung fett – wie „MD-Einwand:" in den Vorlagen.
+            const absatz = p => {
+                const m = p.match(ANH_TEIL_MUSTER);
+                return m ? `<div><b>${esc(m[1])}:</b> ${esc(p.slice(m[0].length)).replace(/\n/g, '<br>')}</div>`
+                         : `<div>${esc(p).replace(/\n/g, '<br>')}</div>`;
+            };
+            let body = txtAnz.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean).map(absatz).join('');
             if (txt) {
                 // Geprüft wird der Originaltext – die BRi kennt nur ihre eigene Nummerierung.
                 const offen = unbelegteZitate(l.nr, txt);
@@ -320,7 +449,9 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
     const allgemein = kiText
         ? nummernImText(kiText, org).split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
           + (verweis ? `<p class="anh-verweis">${esc(verweis)}</p>` : '')
-        : anhoerungAllgemeinStandard(analyse, org, begut, zweitDatum, origPts, zweitPts, pgSatz, origPG, zweitPG, notizenAnh);
+        : anhoerungAllgemeinStandard(analyse, { org, begut, art, zweitDatum, zweitArt, origPts, zweitPts,
+              origPG, zweitPG, ePts: f2(rE.total), ePG: rE.pg, psDatum: formatDE(g('anh-ps-datum')),
+              notizen: notizenAnh });
 
     // Doppelpunkt direkt hinter der Bezeichnung; die Angaben bleiben in ihrer Spalte
     // (Breite von .k in STELLUNGNAHME_CSS).
@@ -420,17 +551,29 @@ function anhoerungVerweisSatz(analyse, org) {
     // ist genau das Abzählen, das dieser Abschnitt nicht enthalten soll.
     const gesamt = a.gefolgt.length + a.strittig.length;
     const zahlwort = n => n === 1 ? 'einem' : String(n);
+    /* „Teilweise gefolgt" ist etwas anderes als „nicht gefolgt". Gemeldet wurde ein Schriftstück,
+       das in einem Satz „teilweise berücksichtigt" und im nächsten „in keinem Punkt gefolgt"
+       sagte. Nachbesserungen werden deshalb eigens benannt. */
+    const kriterien = n => n === 1 ? 'einem Kriterium' : n + ' Kriterien';
+    const teilw = a.strittig.filter(l => l.lage === 'teilweise').length;
+    const schlechter = a.strittig.filter(l => l.lage === 'verschlechtert').length;
+    const unveraendert = a.strittig.length - teilw - schlechter;
+    const rest = [];
+    if (teilw) rest.push('in ' + kriterien(teilw) + ' bessert es nach, ohne die begründete Stufe zu erreichen');
+    if (schlechter) rest.push('in ' + kriterien(schlechter) + ' senkt es die Wertung sogar ab');
+    if (unveraendert && rest.length) rest.push('in den übrigen bleibt es bei der bisherigen Wertung');
     if (!a.gefolgt.length) {
         return 'Den in der pflegefachlichen Stellungnahme beanstandeten Kriterien ist das '
-             + 'Zweitgutachten in keinem Punkt gefolgt.';
+             + 'Zweitgutachten in keinem Punkt ' + (teilw ? 'vollständig ' : '') + 'gefolgt'
+             + (rest.length ? '; ' + rest.join(', ') : '') + '.';
     }
     if (!a.strittig.length) {
         return 'Das Zweitgutachten folgt der pflegefachlichen Stellungnahme in allen '
              + gesamt + ' beanstandeten Kriterien.';
     }
     return 'Das Zweitgutachten folgt der pflegefachlichen Stellungnahme in '
-         + zahlwort(a.gefolgt.length) + ' von ' + gesamt + ' beanstandeten Kriterien; in den '
-         + 'übrigen bleibt es bei der bisherigen Wertung.';
+         + zahlwort(a.gefolgt.length) + ' von ' + gesamt + ' beanstandeten Kriterien; '
+         + (rest.length ? rest.join(', ') : 'in den übrigen bleibt es bei der bisherigen Wertung') + '.';
 }
 
 /* Steht der Verweis schon im Text der KI? Dann wird er nicht ein zweites Mal angehängt –
@@ -445,37 +588,48 @@ function anhoerungVerweisVorhanden(text) {
     return nenntStellungnahme && nenntVerhaeltnis;
 }
 
-function anhoerungAllgemeinStandard(a, org, begut, zweitDatum, origPts, zweitPts, pgSatz, origPG, zweitPG, notizen) {
+/* Ohne KI: kurz und prägnant, im Dreiklang Erstgutachten – Stellungnahme – Zweitgutachten
+   (Vorgabe des Verfassers). Nur Gerechnetes und Eingetragenes, keine Behauptung darüber
+   hinaus. Die Begründung je Kriterium steht unter „Befund und Stellungnahme". */
+function anhoerungAllgemeinStandard(a, f) {
     const esc = escapeHtml;
     const f2 = n => Number(n).toFixed(2).replace('.', ',');
     // Die genannten Zahlen sind dieselben wie in der Gegenüberstellung – sonst stünde im
     // Text etwas anderes als in der Tabelle.
-    // „führte zu kein Pflegegrad" wäre falsch – im Dativ heißt es „zu keinem Pflegegrad".
-    const dativ = v => { const s = pgSatz(v); return /^kein/i.test(s) ? 'keinem Pflegegrad' : s; };
-    let p = `<p>Das Gutachten ${esc(orgGenitiv(org))} vom ${esc(begut || '—')} führte zu ${esc(dativ(origPG))} `
-          + `bei ${esc(origPts)} gewichteten Punkten. Das im Anhörungsverfahren erstellte Gutachten vom `
-          + `${esc(zweitDatum || '—')} kommt zu ${esc(dativ(zweitPG))} bei ${esc(zweitPts)} gewichteten Punkten.</p>`;
-    if (a.gefolgt.length) {
-        p += `<p>In ${a.gefolgt.length} Kriterium/Kriterien ist der Medizinische Dienst den Ausführungen der `
-           + `pflegefachlichen Stellungnahme gefolgt (${esc(a.gefolgt.map(l => zeigeNr(l.nr, org)).join(', '))}). `
-           + `Dies bestätigt die Tragfähigkeit der dort erhobenen Befunde.</p>`;
-    }
-    if (a.strittig.length) {
-        p += `<p>In ${a.strittig.length} Kriterium/Kriterien blieb es bei der bisherigen Wertung `
-           + `(${esc(a.strittig.map(l => zeigeNr(l.nr, org)).join(', '))}), obwohl sich die Befundlage nicht geändert hat.</p>`;
+    // „zu kein Pflegegrad" wäre falsch – im Dativ heißt es „zu keinem Pflegegrad".
+    const dativ = v => { const s = pflegegradWort(v); return /^kein/i.test(s) ? 'keinem Pflegegrad' : s; };
+    // „mit 10,00 Punkten keinen Pflegegrad begründet" liest sich schief – ohne Pflegegrad
+    // wird die Bewertung genannt, nicht ihr Fehlen.
+    const begruendet = pflegegradZahl(f.ePG) > 0
+        ? 'mit ' + f.ePts + ' Punkten den ' + pflegegradWort(f.ePG) + ' begründet'
+        : 'eine Bewertung mit ' + f.ePts + ' Punkten begründet';
+    const artZ = String(f.zweitArt || '').trim();
+    const aktenlage = /aktenlage/i.test(artZ);
+    let p = `<p>Das Erstgutachten ${esc(orgGenitiv(f.org))} vom ${esc(f.begut || '—')} kam mit ${esc(f.origPts)} `
+          + `gewichteten Punkten zu ${esc(dativ(f.origPG))}. In meiner pflegefachlichen Stellungnahme`
+          + `${f.psDatum ? ' vom ' + esc(f.psDatum) : ''} habe ich ${a.lagen.length === 1 ? 'ein Kriterium' : esc(String(a.lagen.length)) + ' Kriterien'} `
+          + `beanstandet und ${esc(begruendet)}. Das Zweitgutachten vom `
+          + `${esc(f.zweitDatum || '—')}${artZ ? ' (' + esc(artZ) + ')' : ''} kommt zu ${esc(dativ(f.zweitPG))} `
+          + `mit ${esc(f.zweitPts)} Punkten.</p>`;
+    // Worin gefolgt wurde und worin nicht – gerechnet, ohne Nummernreihe
+    const verweis = anhoerungVerweisSatz(a, f.org);
+    let fehler = verweis ? esc(verweis) : '';
+    if (aktenlage && a.strittig.length) {
+        fehler += (fehler ? ' ' : '') + 'Das Zweitgutachten wurde nach Aktenlage erstellt; eine persönliche '
+                + 'Befunderhebung zu den in der Stellungnahme vorgetragenen Einschränkungen fand damit nicht statt.';
     }
     // Der Abstand zur Schwelle wird nur genannt, wenn die Angabe des Gutachtens zu seinen
     // eigenen Kriterien passt. Sonst wäre die Aussage nicht belastbar.
-    if (a.naechsteSchwelle !== null && !a.abweichung) {
-        p += `<p>Das Zweitgutachten bleibt mit ${esc(f2(a.basis.total))} gewichteten Punkten um `
-           + `${esc(f2(a.fehlendePunkte))} Punkte unter der für den nächsten Pflegegrad maßgeblichen Schwelle `
-           + `von ${esc(f2(a.naechsteSchwelle))} Punkten.`;
+    if (a.naechsteSchwelle !== null && !a.abweichung && a.strittig.length) {
+        fehler += ` Es bleibt mit ${esc(f2(a.basis.total))} Punkten um ${esc(f2(a.fehlendePunkte))} Punkte unter der `
+                + `Schwelle von ${esc(f2(a.naechsteSchwelle))} Punkten.`;
         if (a.kipper.length) {
-            p += ` Bereits die richtlinienkonforme Wertung eines einzelnen der strittigen Kriterien `
-               + `(${esc(a.kipper.map(l => zeigeNr(l.nr, org)).join(', '))}) würde diese Schwelle überschreiten.`;
+            fehler += ` Bereits die richtlinienkonforme Wertung eines einzelnen der strittigen Kriterien `
+                    + `(${esc(a.kipper.map(l => zeigeNr(l.nr, f.org)).join(', '))}) würde diese Schwelle überschreiten.`;
         }
-        p += `</p>`;
     }
+    if (fehler.trim()) p += `<p>${fehler.trim()}</p>`;
+    const notizen = f.notizen;
     if ((notizen || '').trim()) {
         p += (notizen || '').trim().split(/\r?\n\s*\r?\n/)
             .map(t => `<p>${esc(t.trim()).replace(/\n/g, '<br>')}</p>`).join('');

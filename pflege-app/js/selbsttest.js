@@ -59,7 +59,10 @@ async function selbsttest() {
         protokoll: (typeof bewertungsProtokoll !== 'undefined') ? JSON.parse(JSON.stringify(bewertungsProtokoll)) : null,
         veraltet: (typeof stellungnahmeVeraltet !== 'undefined') ? stellungnahmeVeraltet : false,
         veraltetGruende: (typeof veraltetGruende !== 'undefined') ? veraltetGruende.slice() : [],
-        vorschlagGruende: (typeof vorschlagGruende !== 'undefined') ? JSON.parse(JSON.stringify(vorschlagGruende)) : {}
+        vorschlagGruende: (typeof vorschlagGruende !== 'undefined') ? JSON.parse(JSON.stringify(vorschlagGruende)) : {},
+        // Anhörung: die gemerkte Stellungnahme des Widerspruchs (Quelle je Kriterium)
+        wsQuelle: (typeof widerspruchStellungnahme !== 'undefined') ? widerspruchStellungnahme : '',
+        wsKerne: (typeof widerspruchKerne !== 'undefined') ? JSON.parse(JSON.stringify(widerspruchKerne)) : {}
     };
 
     try {
@@ -2247,7 +2250,9 @@ async function selbsttest() {
             // Baueweiche und Längengrenzen
             pruefeWahr('Anhörung: baueDokument nutzt die eigene Vorlage',
                 baueDokument('', {}, '') === buildAnhoerung('', {}, ''));
-            pruefe('Anhörung: acht Sätze erlaubt', satzGrenze(), 8);
+            // Seit den vier Teilen je Kriterium (Erstgutachten, Stellungnahme, Zweitgutachten,
+            // Richtlinien) zehn Sätze – vorher acht.
+            pruefe('Anhörung: zehn Sätze erlaubt', satzGrenze(), 10);
             setzeModus('widerspruch');
             pruefe('Widerspruch: weiterhin fünf Sätze', satzGrenze(), 5);
             pruefeWahr('Widerspruch nutzt weiterhin seine Vorlage',
@@ -4922,6 +4927,133 @@ async function selbsttest() {
             }
         }
 
+        /* 27. Anhörung nach den Vorlagen des Verfassers (alle PS-Anhörungsschreiben 2025/2026).
+           Gemeldet: Kopfdaten unvollständig, Begründungen ohne Bezug auf die eigene
+           Stellungnahme. Vorgabe: Allgemeine Angaben kurz im Dreiklang Erstgutachten –
+           Stellungnahme – Zweitgutachten; je Kriterium ausführlich in vier Teilen. */
+        if (typeof anhoerungBegruendungZusammen === 'function' && typeof buildAnhoerung === 'function') {
+            const merk27 = { modus: appModus, orig: JSON.parse(JSON.stringify(stateOrig)),
+                             zweit: JSON.parse(JSON.stringify(stateZweit)), eigen: JSON.parse(JSON.stringify(stateEigene)),
+                             quelle: widerspruchStellungnahme, kerne: JSON.parse(JSON.stringify(widerspruchKerne)) };
+            const set27 = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+            const txt27 = h => { const d = document.createElement('div'); d.innerHTML = h; return d.textContent.replace(/\s+/g, ' '); };
+            try {
+                // (a) Vier Teile, Bezeichnungen von der App, Ableitungssatz Pflicht
+                let z = anhoerungBegruendungZusammen({ erstgutachten: 'E-Satz.', stellungnahme: 'S-Satz.',
+                    zweitgutachten: 'Zweitgutachten: Z-Satz.', richtlinien: 'R-Satz.' }, 'überwiegend selbständig');
+                const labels = z.split('\n\n').map(p => p.split(':')[0]);
+                pruefe('Vier Teile in fester Reihenfolge', labels,
+                    ['Erstgutachten', 'Pflegefachliche Stellungnahme', 'Zweitgutachten', 'Würdigung nach den Begutachtungs-Richtlinien']);
+                pruefeWahr('Selbst geschriebene Bezeichnung wird nicht verdoppelt', !z.includes('Zweitgutachten: Zweitgutachten:'));
+                pruefeWahr('Fehlender Ableitungssatz wird ergänzt',
+                    z.endsWith('Wertung mit „überwiegend selbständig“ ableitbar.'));
+                z = anhoerungBegruendungZusammen({ erstgutachten: 'E.', stellungnahme: 'S.', zweitgutachten: 'Z.',
+                    richtlinien: 'Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „überwiegend selbständig“ ableitbar.' },
+                    'überwiegend selbständig');
+                pruefe('Vorhandener Ableitungssatz steht nur einmal', z.split('ableitbar').length, 2);
+                const m27 = anhoerungAntwortZuMap({ begruendungen: [
+                    { nr: '4.4.2', erstgutachten: 'E.', stellungnahme: 'S.', zweitgutachten: 'Z.', richtlinien: 'R.' },
+                    { nr: '9.9.9', erstgutachten: 'erfunden' }] }, [{ nr: '4.4.2', bText: 'überwiegend selbständig' }]);
+                pruefe('KI-Antwort: nur bekannte Kriterien', Object.keys(m27), ['4.4.2']);
+
+                // (b) Quelle: die ursprüngliche Stellungnahme des Widerspruchs
+                const wsDoc = '<div class="stmt" data-vorgang="widerspruch"><p>Frau Test erhebt Widerspruch.</p>'
+                    + '<div id="stmt-crit"><div class="crit" data-nr="4.4.2" data-vals="a|b" data-ai="1">'
+                    + '<div class="ct">4.4.2: Körperpflege im Bereich des Kopfes</div><div>Gutachterliche Bewertung: „selbständig“</div>'
+                    + '<div>Die Armhebung endet in Kinnhöhe; das Kämmen übernimmt die Tochter.</div></div></div></div>';
+                widerspruchStellungnahme = ''; widerspruchKerne = {};
+                pruefeWahr('Anhörungsschriftstück wird nicht als Quelle gemerkt',
+                    !merkeWiderspruchStellungnahme('<div class="stmt" data-vorgang="anhoerung"><div class="crit" data-nr="4.4.2"></div></div>'));
+                pruefeWahr('Widerspruchs-Stellungnahme wird als Quelle gemerkt', merkeWiderspruchStellungnahme(wsDoc));
+                pruefe('Kern je Kriterium ohne Kopfzeilen', widerspruchKern('4.4.2'),
+                    'Die Armhebung endet in Kinnhöhe; das Kämmen übernimmt die Tochter.');
+                widerspruchKerne = { '4.4.2': 'Kern aus der PDF.' };
+                pruefe('Ausweichweg: Kern aus der gelesenen PDF hat Vorrang', widerspruchKern('4.4.2'), 'Kern aus der PDF.');
+                widerspruchKerne = {};
+                const fd27 = fallDaten();
+                pruefeWahr('Falldatei enthält die ursprüngliche Stellungnahme', (fd27.stellungnahmeWiderspruch || '').includes('Kinnhöhe'));
+
+                // (c) Schriftstück: Kopf, Allgemeine Angaben, Kriterienblock
+                const id27 = nr => ITEMS.find(i => i.nr === nr).id;
+                const leer27 = st => ITEMS.forEach(i => { st.values[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+                stateZweit = { special: 0, values: {}, kontinenz: { harn: null, stuhl: null } };
+                [stateOrig, stateZweit, stateEigene].forEach(leer27);
+                stateEigene.values[id27('4.4.2')] = 1;                          // nicht gefolgt
+                stateEigene.values[id27('4.4.5')] = 2; stateZweit.values[id27('4.4.5')] = 1;   // teilweise
+                setzeModus('anhoerung');
+                renderAnhoerungBereich();
+                ['stam-pg-manual', 'stam-pts-manual', 'anh-pg', 'anh-pts'].forEach(id => set27(id, ''));
+                set27('stam-organisation', 'Medizinischer Dienst Nord'); set27('stam-begutachtung', '2026-01-10');
+                set27('stam-bescheid', '2026-01-20'); set27('anh-gutachten-datum', '2026-03-05');
+                const art27 = DURCHFUEHRUNGSARTEN.find(x => /aktenlage/i.test(x)) || '';
+                set27('anh-ps-datum', '2026-02-12'); set27('anh-art', art27);
+                set27('anh-notizen', '');
+                const d27 = buildAnhoerung('', {}, '');
+                const t27 = txt27(d27);
+                const allg = txt27(d27.split('id="stmt-notes"')[1].split('</div>')[0]);
+                pruefeWahr('Allgemeine Angaben: Erstgutachten mit Datum der Begutachtung',
+                    allg.includes('Das Erstgutachten des Medizinischen Dienstes Nord vom 10.01.2026'));
+                pruefeWahr('Allgemeine Angaben: Bezug auf die eigene Stellungnahme mit Datum',
+                    allg.includes('In meiner pflegefachlichen Stellungnahme vom 12.02.2026 habe ich 2 Kriterien beanstandet'));
+                pruefeWahr('Allgemeine Angaben: Zweitgutachten mit Datum und Art',
+                    allg.includes('Das Zweitgutachten vom 05.03.2026 (' + art27 + ') kommt zu keinem Pflegegrad'));
+                pruefeWahr('Allgemeine Angaben: Bescheiddatum nicht als Gutachtendatum', !allg.includes('20.01.2026'));
+                pruefeWahr('Allgemeine Angaben: teilweise gefolgt nicht als „in keinem Punkt gefolgt"',
+                    allg.includes('in keinem Punkt vollständig gefolgt') && allg.includes('bessert es nach'));
+                pruefeWahr('Allgemeine Angaben: Aktenlage mit Bezug auf die Stellungnahme',
+                    allg.includes('nach Aktenlage erstellt') && allg.includes('in der Stellungnahme vorgetragenen'));
+                pruefeWahr('Allgemeine Angaben: keine Nummernreihe', !/\d\.\d\.\d/.test(allg.replace(/\(4\.\d\.\d+(, 4\.\d\.\d+)*\)/, '')));
+                pruefeWahr('Allgemeine Angaben: kurz (höchstens Drittelseite)', zaehleWoerter(allg) <= allgemeinWortGrenze());
+                const blk = d27.split('data-nr="4.4.2"')[1].split('class="crit"')[0];
+                ['Erstgutachten:', 'Pflegefachliche Stellungnahme:', 'Zweitgutachten:', 'Würdigung nach den Begutachtungs-Richtlinien:']
+                    .forEach(lb => pruefeWahr('Ersatzblock ohne KI: Teil „' + lb + '"', blk.includes('<b>' + lb + '</b>')));
+                pruefeWahr('Ersatzblock nennt den Inhalt der ursprünglichen Stellungnahme', blk.includes('Kinnhöhe'));
+                pruefeWahr('Ersatzblock endet mit dem Ableitungssatz', txt27(blk).includes('Wertung mit „überwiegend selbständig“ ableitbar.'));
+                pruefeWahr('Ersatzblock bleibt als nicht von der KI markiert (Nachholen)',
+                    /data-nr="4\.4\.2"[^>]*data-ai="0"/.test(d27));
+                pruefeWahr('Kriterienblock nennt weiter nur die gutachterliche Bewertung im Kopf',
+                    t27.includes('Gutachterliche Bewertung:') && !t27.includes('Meine Beurteilung:'));
+                pruefeWahr('Schriftstück sagt weiterhin nicht „Anhörungsgutachten"', !/Anhörungsgutachten/.test(t27));
+                pruefe('Allgemeine Angaben der Anhörung: Drittelseite', [allgemeinWortGrenze(), allgemeinZeichenGrenze()], [180, 1300]);
+
+                // (d) Kein Zusammenführen über die Vorgangsart hinweg
+                const zus = mergeStellungnahme(wsDoc, d27);
+                pruefeWahr('Widerspruch → Anhörung: neu aufgebaut, keine alte Einleitung',
+                    !zus.includes('erhebt Widerspruch') && zus.includes('aufrecht'));
+                const zd = document.createElement('div'); zd.innerHTML = zus;
+                pruefe('Widerspruch → Anhörung: Tabellenkopf mit drei Gutachtenspalten',
+                    zd.querySelectorAll('table.cmp thead tr:first-child th').length, 4);
+
+                // (e) Kopf vollständig: leere Felder aus dem Zweitgutachten, nichts überschreiben
+                set27('stam-versnr', ''); set27('stam-antrag', ''); set27('stam-kasse', 'Kasse aus dem Fall');
+                set27('anh-zweit-befund', '');
+                const vm27 = {}; ITEMS.forEach(i => { vm27[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+                uebernehmeAnhoerung({ stam: { versnr: 'X000000000', antrag: '2025-12-01', kasse: 'Andere Kasse', pg: '', pts: '',
+                                              begutachtung: '', art: '' },
+                    anh: {}, valuesMap: vm27, special: 0, befund: 'Befund des Zweitgutachtens: Nackengriff unvollständig.' });
+                pruefe('Kopf: leere Versicherungs-Nr. wird gefüllt', document.getElementById('stam-versnr').value, 'X000000000');
+                pruefe('Kopf: leeres Antragsdatum wird gefüllt', document.getElementById('stam-antrag').value, '2025-12-01');
+                pruefe('Kopf: vorhandene Kasse bleibt', document.getElementById('stam-kasse').value, 'Kasse aus dem Fall');
+                pruefeWahr('Befund des Zweitgutachtens hat ein eigenes Feld',
+                    document.getElementById('anh-zweit-befund').value.includes('Nackengriff'));
+
+                // (f) Die KI-Anweisung trägt die Fakten und die Quellen
+                const ap27 = generateBegruendungenAnhoerung.toString();
+                pruefeWahr('KI erhält die Kopfdaten als Fakten', ap27.includes('FAKTEN (verbindlich'));
+                pruefeWahr('KI: Bescheiddatum ist kein Gutachtendatum', ap27.includes('KEIN Gutachtendatum'));
+                pruefeWahr('KI: Befund des Zweitgutachtens getrennt vom Erstgutachten',
+                    ap27.includes('BEFUND UND BEGRÜNDUNGEN DES ZWEITGUTACHTENS') && ap27.includes('BEFUND DES ERSTGUTACHTENS'));
+                pruefeWahr('KI: ursprüngliche Begründung je Kriterium', ap27.includes('MEINE DAMALIGE BEGRÜNDUNG'));
+                pruefeWahr('KI: vier Felder je Kriterium',
+                    ['erstgutachten', 'stellungnahme', 'zweitgutachten', 'richtlinien'].every(k => ap27.includes(k + ': { type: "STRING" }')));
+                pruefeWahr('KI: „gefolgt" nur, wenn gerechnet', ap27.includes('in KEINEM beanstandeten Kriterium'));
+            } finally {
+                stateOrig = merk27.orig; stateZweit = merk27.zweit; stateEigene = merk27.eigen;
+                widerspruchStellungnahme = merk27.quelle; widerspruchKerne = merk27.kerne;
+                setzeModus(merk27.modus);
+            }
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {
@@ -4965,6 +5097,9 @@ async function selbsttest() {
             if (typeof setzeStellungnahme === 'function') setzeStellungnahme(sicherung.dokument);
             if (sicherung.protokoll && typeof bewertungsProtokoll !== 'undefined') bewertungsProtokoll = sicherung.protokoll;
             if (typeof vorschlagGruende !== 'undefined') vorschlagGruende = sicherung.vorschlagGruende;
+            if (typeof widerspruchStellungnahme !== 'undefined') {
+                widerspruchStellungnahme = sicherung.wsQuelle; widerspruchKerne = sicherung.wsKerne;
+            }
             if (typeof stellungnahmeVeraltet !== 'undefined') {
                 stellungnahmeVeraltet = sicherung.veraltet;
                 veraltetGruende = sicherung.veraltetGruende;

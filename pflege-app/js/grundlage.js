@@ -19,6 +19,9 @@
 
 // Kriterien, die aus der Stellungnahme gelesen wurden (Kennungen). Nur für die Anzeige.
 let rekonstruierteKriterien = [];
+// Kernaussage je Kriterium aus der gelesenen Stellungnahme. Erst mit der Übernahme wird sie
+// zur Quelle der Anhörung (widerspruchKerne) – eine abgebrochene Prüfung hinterlässt nichts.
+let grundlageKerneOffen = {};
 
 function stellungnahmeAnweisung() {
     return `Du liest eine PFLEGEFACHLICHE STELLUNGNAHME (Widerspruch) von Familiara.
@@ -39,6 +42,8 @@ Kriterium zurück:
   gutachten die Wertung des Gutachters in Anführungszeichen hinter „Gutachterliche Bewertung"
   eigene    die Wertung, die der Verfasser vertritt – sie steht im Begründungstext, meist im
             Schlusssatz („… ist somit eine Wertung mit „X" ableitbar"). Nimm den Wortlaut.
+  kern      die Kernaussage der Begründung in höchstens zwei Sätzen: welche Einschränkung und
+            welcher Hilfebedarf dort festgestellt werden. Nur, was im Text steht – nichts erfinden.
 
 REGELN, die den häufigsten Fehler verhindern:
 1. Führe NUR Kriterien auf, die im Abschnitt „Befund und Stellungnahme" einen eigenen
@@ -183,7 +188,8 @@ async function leseStellungnahmeDatei(datei) {
         type: 'OBJECT',
         properties: {
             kriterien: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
-                crit: { type: 'STRING' }, gutachten: { type: 'STRING' }, eigene: { type: 'STRING' }
+                crit: { type: 'STRING' }, gutachten: { type: 'STRING' }, eigene: { type: 'STRING' },
+                kern: { type: 'STRING' }
             }, required: ['crit'] } },
             eigene_modul_1_weight: { type: 'NUMBER' }, eigene_modul_2_weight: { type: 'NUMBER' },
             eigene_modul_3_weight: { type: 'NUMBER' }, eigene_modul_4_weight: { type: 'NUMBER' },
@@ -211,6 +217,7 @@ async function leseStellungnahmeDatei(datei) {
 function stellungnahmeZuImport(antwort, volltext) {
     const werte = [];
     rekonstruierteKriterien = [];
+    grundlageKerneOffen = {};
     const nichtZuordenbar = [];
 
     ITEMS.forEach(i => {
@@ -229,6 +236,7 @@ function stellungnahmeZuImport(antwort, volltext) {
         const nr = String(k.crit || '').trim().replace(/^5\./, '4.');
         const item = ITEMS.find(i => i.nr === nr);
         if (!item) { if (k.crit) nichtZuordenbar.push(String(k.crit)); return; }
+        if (k.kern && String(k.kern).trim()) grundlageKerneOffen[nr] = String(k.kern).trim();
         const wert = wertungAusText(nr, k.eigene);
         if (wert === null) { nichtZuordenbar.push(nr + ' („' + (k.eigene || '') + '")'); return; }
         const eintrag = werte.find(w => w.id === item.id);
@@ -273,6 +281,8 @@ function uebernehmeAlteStellungnahme(rev) {
         // Anzeigetext und würde von setzeBewertung zu Recht abgewiesen.
         if (setzeBewertung('own', i.id, wert, 'import')) n++;
     });
+    // Die Kernaussagen der Stellungnahme werden Quelle der Anhörungsbegründungen
+    if (typeof widerspruchKerne !== 'undefined') widerspruchKerne = Object.assign({}, grundlageKerneOffen);
     if (typeof fillTable === 'function') { fillTable('own'); calculate('own'); }
     if (typeof aktualisiereGrundlageStatus === 'function') aktualisiereGrundlageStatus();
     return n;

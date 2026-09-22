@@ -17,9 +17,14 @@ const LAENGE = {
     anamneseWoerterMax: 130,
     begruendungSaetzeMax: 5,
     begruendungWoerterMax: 150,
-    // Anhoerungsverfahren: weniger Kriterien, dafuer tiefer begruendet.
-    begruendungSaetzeAnhoerung: 8,
-    begruendungWoerterAnhoerung: 230,
+    // Anhoerungsverfahren: weniger Kriterien, dafuer tiefer begruendet – vier Teile je
+    // Kriterium (Erstgutachten, Stellungnahme, Zweitgutachten, Richtlinien).
+    begruendungSaetzeAnhoerung: 10,
+    begruendungWoerterAnhoerung: 280,
+    // Die Allgemeinen Angaben der Anhoerung dagegen „kurz praegnant" (Vorgabe des
+    // Verfassers): eine DRITTELSEITE statt der halben Seite des Widerspruchs.
+    allgemeinAnhoerungZeichenMax: 1300,
+    allgemeinAnhoerungWoerterMax: 180,
     /* Antrag: statt einer Begründung je Kriterium ein Absatz je Lebensbereich (Modul).
        Sechs Absätze zu höchstens 110 Wörtern sind gut eine Seite – vorher standen dort
        leicht fünfzehn Begründungen zu je 150 Wörtern, also vier bis fünf Seiten. */
@@ -47,14 +52,19 @@ function wortGrenze() {
 }
 // Der einleitende Abschnitt: halbe Seite im Widerspruch und in der Anhörung,
 // Drittelseite im Antrag („Aktuelle Situation").
+function istAnhoerungsModus() {
+    return (typeof appModus !== 'undefined') && appModus === 'anhoerung';
+}
 function allgemeinWortGrenze() {
+    if (istAnhoerungsModus()) return LAENGE.allgemeinAnhoerungWoerterMax;
     return istAntragsModus() ? LAENGE.antragAktuellWoerterMax : LAENGE.allgemeinWoerterMax;
 }
 function allgemeinZeichenGrenze() {
+    if (istAnhoerungsModus()) return LAENGE.allgemeinAnhoerungZeichenMax;
     return istAntragsModus() ? LAENGE.antragAktuellZeichenMax : LAENGE.allgemeinZeichenMax;
 }
 function allgemeinSeitenText() {
-    return istAntragsModus() ? 'eine DRITTEL A4-Seite' : 'eine HALBE A4-Seite';
+    return (istAntragsModus() || istAnhoerungsModus()) ? 'eine DRITTEL A4-Seite' : 'eine HALBE A4-Seite';
 }
 
 // Abkürzungen und Nummern, an denen NICHT getrennt werden darf.

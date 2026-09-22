@@ -730,15 +730,33 @@ Schreibe im Aufbau, Ton und in der Wortwahl exakt wie die folgenden Beispiele de
 ${getStilBeispiele()}
 === ENDE STILBEISPIELE ===
 
-DIE BESONDERE LAGE – darum geht es hier:
-Der Medizinische Dienst ist der pflegefachlichen Stellungnahme in mehreren Punkten GEFOLGT.
-Das belegt die Tragfähigkeit der dort erhobenen Befunde. In den entscheidenden Punkten ist er
-ihr aber NICHT gefolgt. Genau darauf zielt jede Begründung: Warum ist es nicht nachvollziehbar,
-dass hier an der alten Wertung festgehalten wurde, obwohl dieselbe Befundlage anderswo zur
-Korrektur geführt hat?
+DIE LAGE – darum geht es hier:
+${analyse && analyse.gefolgt.length
+    ? `Der Medizinische Dienst ist der pflegefachlichen Stellungnahme in ${analyse.gefolgt.length} Kriterien GEFOLGT.
+Das belegt die Tragfähigkeit der dort erhobenen Befunde. In den übrigen Punkten ist er ihr NICHT
+gefolgt. Genau darauf zielt jede Begründung: Warum ist es nicht nachvollziehbar, dass hier an der
+Wertung festgehalten wurde, obwohl dieselbe Befundlage anderswo zur Korrektur geführt hat?`
+    : `Der Medizinische Dienst ist der pflegefachlichen Stellungnahme in KEINEM beanstandeten Kriterium
+vollständig gefolgt. Behaupte NICHT, er sei ihr gefolgt oder habe sie „teilweise berücksichtigt",
+wenn das unten nicht ausdrücklich als „teilweise gefolgt" angegeben ist.`}
 
-${laengenVorgabeBegruendung()}
-Eine nummerierte Aufzählung (1., 2., 3.) ist hier zulässig, wenn sie die Argumentation schärft.
+AUFBAU JE KRITERIUM – vier Felder, die Bezeichnungen setzt die App (schreibe sie NICHT selbst):
+  erstgutachten   EIN kurzer Satz: die Wertung des Erstgutachtens und – nur wenn im Befund des
+                  Erstgutachtens belegt – worauf sie sich stützte.
+  stellungnahme   Ein bis zwei Sätze: was MEINE pflegefachliche Stellungnahme zu diesem Kriterium
+                  festgestellt hat (Einschränkung, Hilfebedarf, Befund). Quelle ist „MEINE DAMALIGE
+                  BEGRÜNDUNG"; fehlt sie, nur die vertretene Wertung und das Material – nichts erfinden.
+  zweitgutachten  Zwei bis drei Sätze: die Wertung des Zweitgutachtens und WARUM sie falsch ist –
+                  immer mit Verweis auf den Inhalt der Stellungnahme (die dort dargelegte
+                  Einschränkung wird nicht widerlegt, der eigene Befund bestätigt sie, die Begründung
+                  bleibt pauschal …). Nutze die angegebenen Erwiderungsmuster.
+  richtlinien     Zwei bis drei Sätze: der Maßstab der Begutachtungs-Richtlinien für dieses Kriterium
+                  und warum die Stellungnahme danach zutrifft. Letzter Satz genau:
+                  „Laut gutachterlichen Richtlinien SGB XI ist somit eine Wertung mit „<Meine Beurteilung>“ ableitbar."
+Dem Zweitgutachten darfst du NUR zuschreiben, was unter „BEFUND UND BEGRÜNDUNGEN DES
+ZWEITGUTACHTENS" steht. Der Befund des Erstgutachtens ist ein anderes Dokument.
+
+${laengenVorgabeBegruendung()} Die Grenze gilt für alle vier Felder zusammen.
 
 DIE SECHS ERWIDERUNGSMUSTER. Zu jedem Kriterium ist angegeben, welche in Betracht kommen.
 Verwende nur die genannten und nur, soweit das Material sie trägt:
@@ -766,15 +784,35 @@ ZWINGEND:
 - Modul 5, Kriterien 4.5.1 bis 4.5.14: Ist keine Maßnahme festgestellt, lautet die Bewertung
   „${M5_KEINE_WERTUNG}". Schreibe dafür niemals „0" oder „0x pro Woche".
 - Sachlich-fachlicher Gutachterstil in der dritten Person. Keine Unterstellungen ohne Beleg im Material.
-- Gib NUR den Begründungstext zurück.`;
+- Gib je Kriterium die vier Felder zurück (und, falls verlangt, „allgemein").`;
 
     let prompt = '';
-    const vName = (document.getElementById('stam-betreffend')?.value || '').trim();
+    const wertF = id => (document.getElementById(id)?.value || '').trim();
+    const vName = wertF('stam-betreffend');
     if (vName) prompt += `VERSICHERTE PERSON: ${vName}\n`;
-    prompt += `DURCHFÜHRUNGSART DES ZWEITGUTACHTENS: ${zweitArt || 'nicht angegeben'}\n\n`;
+
+    /* FAKTEN. Gemeldet: Die Allgemeinen Angaben nannten als Datum des Erstgutachtens das
+       Bescheiddatum und „unverändert Pflegegrad 1", obwohl kein Pflegegrad festgestellt war –
+       die KI kannte weder Daten noch Pflegegrade und hat geraten. Jetzt erhält sie alles, was
+       im Kopf steht, mit denselben Werten wie das Schriftstück (gutachtenAngaben). */
+    const rOrig = calculateInternal('orig');
+    const gaO = gutachtenAngaben(rOrig, wertF('stam-pg-manual'), wertF('stam-pts-manual'));
+    const gaZ = gutachtenAngaben(calculateInternal('zweit'), wertF('anh-pg'), wertF('anh-pts'));
+    const rEig = calculateInternal('own');
+    const dat = id => formatDE(wertF(id)) || 'nicht angegeben';
+    prompt += `FAKTEN (verbindlich – verwende genau diese Angaben, keine anderen):\n`
+        + `- Gutachtenorganisation: ${wertF('stam-organisation') || 'Medizinischer Dienst'}\n`
+        + `- Erstgutachten: Begutachtung am ${dat('stam-begutachtung')}, ${wertF('stam-art') || 'Durchführungsart nicht angegeben'}, `
+        + `${pflegegradWort(gaO.pg)}, ${gaO.pts} Punkte\n`
+        + `- Bescheid vom ${dat('stam-bescheid')} (das ist NICHT das Datum eines Gutachtens)\n`
+        + `- Meine pflegefachliche Stellungnahme: ${wertF('anh-ps-datum') ? 'vom ' + dat('anh-ps-datum') + ', ' : ''}`
+        + `${pflegegradWort(rEig.pg)}, ${punkteDE(rEig.total)} Punkte, ${analyse.lagen.length} beanstandete Kriterien\n`
+        + `- Zweitgutachten: vom ${dat('anh-gutachten-datum')}, ${zweitArt || 'Durchführungsart nicht angegeben'}, `
+        + `${pflegegradWort(gaZ.pg)}, ${gaZ.pts} Punkte\n`
+        + `- Anhörungsschreiben der Kasse vom ${dat('anh-schreiben-datum')}\n\n`;
 
     prompt += `RECHENERGEBNIS (belastbar, nicht zu verändern):\n`
-        + `- Erstgutachten: ${calculateInternal('orig').total.toFixed(2).replace('.', ',')} Punkte\n`
+        + `- Erstgutachten: ${rOrig.total.toFixed(2).replace('.', ',')} Punkte\n`
         + `- Zweitgutachten: ${analyse.basis.total.toFixed(2).replace('.', ',')} Punkte\n`
         + `- Eigene Beurteilung: ${analyse.gesamt.total.toFixed(2).replace('.', ',')} Punkte\n`;
     if (analyse.naechsteSchwelle !== null) {
@@ -787,6 +825,13 @@ ZWINGEND:
         // nicht als Nummernliste abgezählt.
         prompt += `- GEFOLGT ist das Zweitgutachten der Stellungnahme in ${analyse.gefolgt.length} Kriterien: `
                 + analyse.gefolgt.map(l => l.titel + ' (' + l.nr + ')').join(', ') + '\n';
+    } else {
+        prompt += `- GEFOLGT ist das Zweitgutachten der Stellungnahme in KEINEM Kriterium.\n`;
+    }
+    const teilweise = analyse.strittig.filter(l => l.lage === 'teilweise');
+    if (teilweise.length) {
+        prompt += `- TEILWEISE nachgebessert (nicht bis zur begründeten Stufe): `
+                + teilweise.map(l => l.titel + ' (' + l.nr + ')').join(', ') + '\n';
     }
     if (analyse.kipper.length) {
         prompt += `- Allein die Korrektur folgender Kriterien würde den Pflegegrad ändern: `
@@ -803,14 +848,21 @@ ZWINGEND:
     if (kassenbegruendung) {
         prompt += 'BEGRÜNDUNG DER PFLEGEKASSE AUS DEM ANHÖRUNGSSCHREIBEN:\n' + cut(kassenbegruendung, 3000) + '\n\n';
     }
-    const befund = (document.getElementById('stam-befund')?.value || '').trim();
-    if (befund) prompt += 'BEFUNDTEXT DES GUTACHTERS:\n' + cut(befund, 5000) + '\n\n';
+    const befund = wertF('stam-befund');
+    if (befund) prompt += 'BEFUND DES ERSTGUTACHTENS:\n' + cut(befund, 4000) + '\n\n';
+    const befundZweit = wertF('anh-zweit-befund');
+    prompt += 'BEFUND UND BEGRÜNDUNGEN DES ZWEITGUTACHTENS:\n'
+        + (befundZweit ? cut(befundZweit, 6000) : 'liegt nicht vor – schreibe dem Zweitgutachten keinen Befund und kein Zitat zu.')
+        + '\n\n';
 
     prompt += 'STRITTIG GEBLIEBENE KRITERIEN (hierzu je eine Begründung):\n\n';
     strittig.forEach(l => {
         const b = briFor(l.nr);
         prompt += `--- Kriterium ${l.nr}: ${l.titel} ---\n`;
         prompt += `Erstgutachten: „${l.eText}"\nZweitgutachten: „${l.zText}"\nMeine Beurteilung: „${l.bText}"\n`;
+        const kern = (typeof widerspruchKern === 'function') ? widerspruchKern(l.nr) : '';
+        prompt += 'MEINE DAMALIGE BEGRÜNDUNG IN DER STELLUNGNAHME: '
+            + (kern ? cut(kern, 1500) : 'liegt nicht vor') + '\n';
         prompt += `Lage: ${VERGLEICH_LAGEN[l.lage].titel} – ${VERGLEICH_LAGEN[l.lage].text}\n`;
         prompt += `Passende Erwiderungsmuster: ${erwiderungsMuster(l, analyse).join(', ')}\n`;
         if (l.kipptAllein) prompt += `Bereits dieses eine Kriterium würde den Pflegegrad ändern.\n`;
@@ -832,31 +884,35 @@ ZWINGEND:
            ist immer derselbe: Der Medizinische Dienst folgt der Stellungnahme in
            mehreren Punkten – das bestätigt ihre Tragfähigkeit –, aber gerade nicht in
            den entscheidenden, sodass die Schwelle knapp unterschritten bleibt. */
+        /* Vorgabe des Verfassers: „nicht zu ausführlich, kurz prägnant" – IMMER den Bezug
+           zwischen Erstgutachten, eigener Stellungnahme und Zweitgutachten herstellen und die
+           Fehler des Zweitgutachtens mit Verweis auf den Inhalt der Stellungnahme benennen.
+           Die ausführliche Begründung steht je Kriterium unter „Befund und Stellungnahme". */
         prompt += 'ZUSÄTZLICHE AUFGABE – Abschnitt „Allgemeine Angaben":\n'
                 + laengenVorgabeAllgemein('Allgemeine Angaben') + '\n'
-                + 'ZWECK: Das AUFZEIGEN VON LÜCKEN UND WIDERSPRÜCHEN im Zweitgutachten – mehr nicht.\n'
-                + 'Verfasse ihn NEU, als zusammenhängenden Fließtext in 3 knappen Absätzen. Halte dich\n'
-                + 'an Aufbau und Tonfall der folgenden Vorlage; die Formulierungen stammen aus meinen\n'
-                + 'eigenen Stellungnahmen und sind bewusst so gewählt:\n\n'
-                + 'ABSATZ 1 – die Diskrepanz benennen. Muster:\n'
-                + '  „Die vorliegenden Gutachten des <Organisation> vom <Datum 1> und vom <Datum 2>\n'
-                + '   weisen mit einer Bewertung von <Punkte> gewichteten Punkten und <der erneuten\n'
-                + '   Ablehnung eines Pflegegrades / der Feststellung des Pflegegrades N> eine fachlich\n'
-                + '   nicht nachvollziehbare Diskrepanz zwischen der Befunderhebung und der\n'
-                + '   abschließenden Bewertung auf."\n'
-                + '  Nenne dabei auch die Durchführungsart des Zweitgutachtens, wenn sie von der des\n'
-                + '  Erstgutachtens abweicht (etwa Aktenlage statt Hausbesuch).\n\n'
-                + 'ABSATZ 2 – worin gefolgt wurde. Muster:\n'
-                + '  „Es ist auffällig, dass der Medizinische Dienst im Zweitgutachten in wesentlichen\n'
-                + '   Modulpunkten – wie <Kriteriumsname (Nummer)>, <Kriteriumsname (Nummer)> und\n'
-                + '   <Kriteriumsname (Nummer)> – den fachlich fundierten Korrekturhinweisen der\n'
-                + '   pflegefachlichen Stellungnahme folgt. Diese Übereinstimmung unterstreicht die\n'
-                + '   Validität der dort erhobenen Befunde."\n'
+                + 'ZWECK: KURZ UND PRÄGNANT den Bezug zwischen Erstgutachten, meiner pflegefachlichen\n'
+                + 'Stellungnahme und dem Zweitgutachten herstellen und die Fehler des Zweitgutachtens\n'
+                + 'benennen – jeweils mit Verweis auf den Inhalt der Stellungnahme. Nicht ausführlich:\n'
+                + 'die Einzelbegründung steht unter „Befund und Stellungnahme".\n'
+                + 'Fließtext in 3 knappen Absätzen, im Tonfall meiner Vorlagen:\n\n'
+                + 'ABSATZ 1 – der Dreiklang in Zahlen, AUSSCHLIESSLICH aus den FAKTEN oben:\n'
+                + '  Erstgutachten (Datum der Begutachtung, Pflegegrad, Punkte) – meine Stellungnahme\n'
+                + '  (was sie beanstandet und begründet hat, Ergebnis) – Zweitgutachten (Datum,\n'
+                + '  Durchführungsart, Pflegegrad, Punkte). Das Bescheiddatum ist KEIN Gutachtendatum.\n'
+                + '  Ist kein Pflegegrad festgestellt, schreibe genau das – nie „Pflegegrad 1".\n\n'
+                + 'ABSATZ 2 – worin das Zweitgutachten der Stellungnahme gefolgt ist. Muster:\n'
+                + '  „Das Zweitgutachten folgt der pflegefachlichen Stellungnahme unter anderem bei\n'
+                + '   <Kriteriumsname (Nummer)> und <Kriteriumsname (Nummer)>; das bestätigt die\n'
+                + '   Tragfähigkeit der dort erhobenen Befunde."\n'
                 + '  ZWINGEND: Nenne HÖCHSTENS DREI Kriterien, und zwar mit NAMEN und Nummer aus der\n'
                 + '  Liste oben. Zähle NIEMALS alle auf – eine lange Nummernreihe gehört nicht in\n'
-                + '  diesen Abschnitt. Wurde in keinem Punkt gefolgt, schreibe das in einem Satz.\n\n'
-                + 'ABSATZ 3 – worin nicht gefolgt wurde. Muster:\n'
-                + '  „Dennoch lässt die Auswertung den Schluss zu, dass den Änderungen der\n'
+                + '  diesen Abschnitt. Wurde in keinem Punkt gefolgt, schreibe das in einem Satz –\n'
+                + '  und dann NICHT zugleich „teilweise berücksichtigt".\n\n'
+                + 'ABSATZ 3 – die Fehler des Zweitgutachtens, knapp, je mit Bezug auf die Stellungnahme:\n'
+                + '  etwa Aktenlage trotz der in der Stellungnahme vorgetragenen Einschränkungen, der\n'
+                + '  eigene Befund bestätigt die Stellungnahme, die Bewertung bleibt dennoch, Begründung\n'
+                + '  pauschal ohne Auseinandersetzung mit der Stellungnahme – nur was das Material trägt.\n'
+                + '  Wo passend: „Dennoch lässt die Auswertung den Schluss zu, dass den Änderungen der\n'
                 + '   pflegefachlichen Stellungnahme nicht vollständig gefolgt wurde, sodass die für\n'
                 + '   den Pflegegrad N maßgebliche Hürde von <Schwelle> Punkten knapp unterschritten\n'
                 + '   bleibt." Nutze dafür die oben genannten Zahlen.\n'
@@ -874,7 +930,10 @@ ZWINGEND:
         properties: {
             allgemein: { type: "STRING" },
             begruendungen: { type: "ARRAY", items: { type: "OBJECT",
-                properties: { nr: { type: "STRING" }, text: { type: "STRING" } }, required: ["nr", "text"] } }
+                properties: { nr: { type: "STRING" }, erstgutachten: { type: "STRING" },
+                              stellungnahme: { type: "STRING" }, zweitgutachten: { type: "STRING" },
+                              richtlinien: { type: "STRING" } },
+                required: ["nr", "erstgutachten", "stellungnahme", "zweitgutachten", "richtlinien"] } }
         },
         required: ["begruendungen"]
     };
@@ -887,13 +946,24 @@ ZWINGEND:
     const fence = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
     if (fence) txt = fence[1];
     const data = JSON.parse(txt.trim());
+    return await haltenLaengenGrenzen(anhoerungAntwortZuMap(data, strittig),
+        (data.allgemein || '').trim(), (data.anamnese || '').trim());
+}
+
+/* Antwort der KI -> Begründung je Kriterium. Die vier Teile werden mit ihren Bezeichnungen
+   zu einem Text zusammengesetzt (anhoerungBegruendungZusammen); der Ableitungssatz wird
+   ergänzt, wenn er fehlt. Eigene Funktion, damit der Selbsttest sie ohne KI prüfen kann. */
+function anhoerungAntwortZuMap(data, strittig) {
     const map = {};
     const erlaubt = new Set(strittig.map(d => d.nr));
-    (data.begruendungen || []).forEach(b => {
-        const nr = b && b.text ? kiKriteriumNr(b.nr, erlaubt) : null;
-        if (nr) map[nr] = b.text.trim();
+    ((data && data.begruendungen) || []).forEach(b => {
+        const nr = b ? kiKriteriumNr(b.nr, erlaubt) : null;
+        if (!nr) return;
+        const l = strittig.find(d => d.nr === nr);
+        const text = anhoerungBegruendungZusammen(b, l ? l.bText : '');
+        if (text) map[nr] = text;
     });
-    return await haltenLaengenGrenzen(map, (data.allgemein || '').trim(), (data.anamnese || '').trim());
+    return map;
 }
 
 

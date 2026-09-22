@@ -96,8 +96,8 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Anamnesetextes, höchstens eine **Viertelseite** (`anamneseAufgabe()`, Grenzen in
    `LAENGE.anamnese*`), ohne Bewertung, Stufen, Punkte oder Aussagen zur Verschlechterung.
    Danach **„Aktuelle Situation"** aus Notizen und Unterschieden, höchstens eine
-   **Drittelseite** (`allgemeinWortGrenze()` – Widerspruch und Anhörung behalten die halbe
-   Seite). Ohne Vorgutachten entfällt der erste Abschnitt ganz. Die Kurzfassung entsteht im
+   **Drittelseite** (`allgemeinWortGrenze()` – der Widerspruch behält die halbe Seite, die
+   Anhörung hat seit Regel 38 ebenfalls eine Drittelseite). Ohne Vorgutachten entfällt der erste Abschnitt ganz. Die Kurzfassung entsteht im
    **selben** KI-Aufruf wie die Begründungen – ein zweiter Abruf würde das Limit reißen.
    **Nie der Rohtext als Ersatz:** Fällt die KI aus, entfällt der Abschnitt und die
    Schlussmeldung sagt es. Früher stand dann der ganze Anamnesetext da – im Fall des
@@ -126,7 +126,7 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    fest; neu eingelesen wird nur das Anhörungsgutachten in `stateZweit`. Vorlage: zwei
    Gutachtenblöcke im Kopf, Einleitung mit **„aufrecht"**, neu verfasste Allgemeine Angaben,
    **drei Spalten** in der Gegenüberstellung, nur die **strittig gebliebenen** Kriterien,
-   Fazit mit beiden Gutachten. Bis zu 8 Sätze je Begründung, eigene Stilvorlage
+   Fazit mit beiden Gutachten. Bis zu 10 Sätze je Begründung (Regel 38), eigene Stilvorlage
    (`pflege_stilbeispiele_anhoerung`). Anhörungsschreiben bleiben Stilvorlage **nur** hier.
    In den **Allgemeinen Angaben** steht **immer** ein Verweis darauf, wie sich das
    Anhörungsgutachten zur ursprünglichen Stellungnahme verhält – worin ihm gefolgt wurde
@@ -516,6 +516,25 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    `fehlendePflichtangaben` nennt fehlenden Namen und fehlende Daten, statt still „Herr/ Frau"
    und „vom —" zu drucken. Die Schlussmeldung von „Stellungnahme erstellen" nennt ALLE offenen
    Punkte vollständig (vorher verdrängte der erste die übrigen).
+38. **Anhörung nach allen PS-Anhörungsschreiben 2025/2026** (Auswertung der Struktur, keine
+   Inhalte übernommen). **Allgemeine Angaben kurz** (Drittelseite, `LAENGE.allgemeinAnhoerung*`)
+   im Dreiklang Erstgutachten – eigene Stellungnahme (`anh-ps-datum`) – Zweitgutachten, die
+   Fehler des Zweitgutachtens immer mit Bezug auf den Inhalt der Stellungnahme.
+   **Je Kriterium vier Teile** (`ANH_TEILE`): Erstgutachten (kurz) – Pflegefachliche
+   Stellungnahme – Zweitgutachten (warum falsch) – Würdigung nach den Begutachtungs-Richtlinien
+   mit Ableitungssatz. Die KI liefert die vier Felder, die **App setzt die Bezeichnungen** und
+   ergänzt einen fehlenden Ableitungssatz (`anhoerungBegruendungZusammen`); ohne KI entsteht
+   derselbe Aufbau aus den Wertungen (`anhoerungErsatzBegruendung`, bleibt `data-ai="0"`).
+   Im Kriterienkopf bleibt es bei „Gutachterliche Bewertung" (Regel 9b). Bis zu 10 Sätze.
+   **Quelle „meine Stellungnahme"**: `widerspruchStellungnahme` (nach „Fall laden" bzw. vor dem
+   ersten Erstellen gemerkt, in der Falldatei als `stellungnahmeWiderspruch`), im Ausweichweg
+   `widerspruchKerne` aus der PDF. **Die KI erhält alle Kopfdaten als FAKTEN** – gemeldet waren
+   das Bescheiddatum als Gutachtendatum und „unverändert Pflegegrad 1" bei keinem Pflegegrad –
+   und den Befund des Zweitgutachtens getrennt (`anh-zweit-befund`). „Gefolgt" behauptet sie
+   nur, wenn gerechnet; „teilweise gefolgt" heißt nie „in keinem Punkt gefolgt"
+   (`anhoerungVerweisSatz`). Leere Kopffelder füllt das Einlesen des Zweitgutachtens, ohne
+   Vorhandenes zu überschreiben. `mergeStellungnahme` führt **nie** Widerspruch und Anhörung
+   zusammen – sonst wanderten Einleitung, Tabellenkopf und Allgemeine Angaben mit.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -569,7 +588,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1252 Pruefungen.
+Der Selbsttest umfasst 1293 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
