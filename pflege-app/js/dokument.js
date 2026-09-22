@@ -788,7 +788,8 @@ async function speichereDatei(blob, dateiname, kennung, erfolgstext, startOrdner
     const endung = '.' + (dateiname.split('.').pop() || 'doc').toLowerCase();
     const typen = {
         '.doc': { beschreibung: 'Word-Dokument', mime: 'application/msword' },
-        '.json': { beschreibung: 'Fall-Datei', mime: 'application/json' }
+        '.json': { beschreibung: 'Fall-Datei', mime: 'application/json' },
+        '.pdf': { beschreibung: 'PDF-Dokument', mime: 'application/pdf' }
     }[endung] || { beschreibung: 'Datei', mime: blob.type || 'application/octet-stream' };
 
     if (typeof window.showSaveFilePicker === 'function') {
@@ -865,35 +866,18 @@ function speicherungenHtml() {
 function printAppealText() {
     const docEl = document.getElementById('appeal-document');
     if (!docEl || !docEl.innerHTML.trim()) { showToast("Bitte zuerst die Stellungnahme erstellen.", "error"); return; }
-    // Liegen Unterlagen vor, zuerst fragen, welche angehängt werden sollen (js/anhang.js)
-    const kandidaten = (typeof anhangKandidaten === 'function') ? anhangKandidaten() : [];
-    if (kandidaten.length && typeof zeigeAnhangAuswahl === 'function') { zeigeAnhangAuswahl(kandidaten); return; }
-    druckeStellungnahme([]);
+    druckeStellungnahme();
 }
 
-/* Das Druckfenster. anhaenge: ausgewählte Unterlagen [{ titel, datei }] – sie werden in
-   Bilder umgewandelt und hinter die Stellungnahme gesetzt. Das Fenster öffnet SOFORT (im
-   Klick, sonst greift der Pop-up-Blocker) und zeigt, bis die Anlagen fertig sind, einen
-   Hinweis. */
-async function druckeStellungnahme(anhaenge) {
+/* Das Druckfenster. Arztberichte werden NICHT hier angehängt, sondern danach als echte
+   PDF-Seiten über „PDF mit Anlagen zusammenfügen" (js/anhang.js). */
+function druckeStellungnahme() {
     const docEl = document.getElementById('appeal-document');
     if (!docEl || !docEl.innerHTML.trim()) { showToast("Bitte zuerst die Stellungnahme erstellen.", "error"); return; }
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
         showToast("Druckfenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.", "error");
         return;
-    }
-    let anhangTeil = '', anhangFehler = [];
-    if (anhaenge && anhaenge.length && typeof anhaengeVorbereiten === 'function') {
-        printWindow.document.write('<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Anlagen werden vorbereitet</title></head>'
-            + '<body style="font-family:Arial,sans-serif;padding:40px;color:#333"><p id="st">Anlagen werden vorbereitet …</p></body></html>');
-        printWindow.document.close();
-        const r = await anhaengeVorbereiten(anhaenge, (i, n, t) => {
-            try { printWindow.document.getElementById('st').textContent = 'Anlage ' + (i + 1) + ' von ' + n + ' wird vorbereitet: ' + t; } catch (e) {}
-        });
-        anhangTeil = anhangHtml(r.fertig);
-        anhangFehler = r.fehler;
-        printWindow.document.open();
     }
     const title = escapeHtml(document.getElementById('stam-betreffend').value || 'Stellungnahme');
     const kopie = docEl.cloneNode(true);
@@ -908,11 +892,9 @@ async function druckeStellungnahme(anhaenge) {
        und die leeren Zeilen darin wirken als oberer und unterer Rand. */
     printWindow.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Pflegefachliche Stellungnahme - ${title}</title><style>${STELLUNGNAHME_CSS}
 ${DRUCK_CSS}
-${(anhangTeil && typeof ANHANG_CSS !== 'undefined') ? ANHANG_CSS : ''}
     </style></head><body>
       <div id="mess">${kopie.innerHTML}</div>
       <div id="seiten"></div>
-      ${anhangTeil}
       <script>${seitenAufteilen.toString()}
       var gedruckt = false;
       function los(){
@@ -920,7 +902,7 @@ ${(anhangTeil && typeof ANHANG_CSS !== 'undefined') ? ANHANG_CSS : ''}
         try { seitenAufteilen(document.getElementById('mess'), document.getElementById('seiten')); }
         catch (e) { console.warn('Seitenaufteilung fehlgeschlagen', e);
                     document.getElementById('mess').style.display=''; }
-        // Erst drucken, wenn alle Anlagenbilder geladen sind
+        // Erst drucken, wenn alle Bilder (Logo) geladen sind
         Promise.all(Array.from(document.images).map(function(i){ return i.complete ? 1
             : new Promise(function(r){ i.onload = i.onerror = r; }); })).then(function(){ window.print(); });
       }
@@ -928,7 +910,6 @@ ${(anhangTeil && typeof ANHANG_CSS !== 'undefined') ? ANHANG_CSS : ''}
       if (document.readyState === 'complete') setTimeout(los, 200); else window.onload = los;
       <\/script></body></html>`);
     printWindow.document.close();
-    if (anhangFehler.length) showToast('Nicht angehängt: ' + anhangFehler.join(' | '), 'error');
 }
 
 /* DRUCKBILD.

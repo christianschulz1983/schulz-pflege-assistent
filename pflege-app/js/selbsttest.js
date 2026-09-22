@@ -5253,101 +5253,98 @@ async function selbsttest() {
             }
         }
 
-        /* 30. Anlagen an die PDF anhängen – alle Vorgänge (js/anhang.js).
-           Wunsch: beim Erstellen der PDF per Häkchen Arztberichte auswählen, die dann in der
-           PDF stehen. Test-PDF und Testbild werden hier erzeugt – keine echten Unterlagen. */
-        if (typeof anhangKandidaten === 'function') {
+        /* 30. Stellungnahme und Arztberichte zu EINER PDF zusammenfügen (js/anhang.js).
+           Wunsch: Anlagen „wie die Stellungnahme als PDF" anhängen – echte Seiten, kein Bild.
+           Alle Test-PDFs entstehen hier mit pdf-lib – keine echten Unterlagen. */
+        if (typeof pdfZusammenfuegen === 'function') {
             const merk30 = { modus: appModus, anl: JSON.parse(JSON.stringify(anlagen)), bd: Object.assign({}, belegDateien),
                              ab: antragBerichtDateien.slice(), ws: widerspruchStellungnahme, wk: JSON.parse(JSON.stringify(widerspruchKerne)),
-                             open: window.open, druck: window.druckeStellungnahme };
-            const dokEl = document.getElementById('appeal-document');
-            const merkDok = dokEl ? dokEl.innerHTML : null;
-            const miniPdf = () => {
-                const objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
-                              '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] >>'];
-                let s = '%PDF-1.4\n'; const off = [];
-                objs.forEach((o, i) => { off.push(s.length); s += (i + 1) + ' 0 obj\n' + o + '\nendobj\n'; });
-                const x = s.length;
-                s += 'xref\n0 ' + (objs.length + 1) + '\n0000000000 65535 f \n' + off.map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('')
-                   + 'trailer\n<< /Size ' + (objs.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + x + '\n%%EOF';
-                return new File([s], 'Test-Bericht.pdf', { type: 'application/pdf' });
+                             speichern: window.speichereDatei };
+            const testPdf = async (seiten, text) => {
+                const d = await PDFLib.PDFDocument.create();
+                const f = await d.embedFont(PDFLib.StandardFonts.Helvetica);
+                for (let k = 0; k < seiten; k++) { const s = d.addPage([595.28, 841.89]); s.drawText(text + ' ' + (k + 1), { x: 50, y: 700, size: 14, font: f }); }
+                return d.save();
             };
             try {
-                const pdf30 = miniPdf();
-                // (a) Umwandlung: zwei Seiten, Querformat begrenzt
-                const r30 = await anhangSeitenBilder(pdf30);
-                pruefe('PDF-Anlage: jede Seite wird ein Bild', r30.bilder.length, 2);
-                pruefeWahr('PDF-Anlage: Bilder als JPEG', r30.bilder.every(b => b.startsWith('data:image/jpeg')));
-                const breite = src => new Promise(ok => { const i = new Image(); i.onload = () => ok(i.naturalWidth); i.onerror = () => ok(-1); i.src = src; });
-                pruefeWahr('PDF-Anlage: Querformatseite nicht überbreit', (await breite(r30.bilder[1])) <= ANHANG_BREITE_PX);
-                const cv = document.createElement('canvas'); cv.width = 2000; cv.height = 1000;
-                const blob = await new Promise(ok => cv.toBlob(ok, 'image/png'));
-                const bild = await anhangSeitenBilder(new File([blob], 'Foto.png', { type: 'image/png' }));
-                pruefe('Bild-Anlage: auf Druckbreite verkleinert', await breite(bild.bilder[0]), ANHANG_BREITE_PX);
-                let fehl30 = null; try { await anhangSeitenBilder(new File(['x'], 'brief.docx', { type: 'application/msword' })); } catch (e) { fehl30 = e; }
-                pruefeWahr('Nicht unterstützter Dateityp wird gemeldet', !!fehl30 && /nicht unterstützt/.test(fehl30.message));
+                pruefeWahr('pdf-lib ist geladen (liegt der App bei)', typeof PDFLib !== 'undefined' && typeof PDFLib.PDFDocument === 'function');
+                const stell = await testPdf(3, 'Stellungnahme');
+                const bericht = new File([await testPdf(2, 'Entlassbericht')], 'Entlassbericht.pdf', { type: 'application/pdf' });
+                const cv = document.createElement('canvas'); cv.width = 800; cv.height = 600;
+                cv.getContext('2d').fillRect(0, 0, 10, 10);
+                const png = new File([await new Promise(ok => cv.toBlob(ok, 'image/png'))], 'Verordnung.png', { type: 'image/png' });
+                const kaputt = new File(['kein pdf'], 'defekt.pdf', { type: 'application/pdf' });
+                const erg = await pdfZusammenfuegen(stell, [
+                    { titel: 'Anlage 1: Krankenhausbericht', datei: bericht },
+                    { titel: 'Anlage 2: Verordnung', datei: png },
+                    { titel: 'Anlage 3: Defekt', datei: kaputt }]);
+                pruefe('Zusammenfügen: Stellungnahme + Originalseiten + Bildseite', erg.seiten, 3 + 2 + 1);
+                pruefe('Zusammenfügen: angehängte Anlagen', erg.angehaengt, 2);
+                pruefeWahr('Zusammenfügen: defekte Unterlage wird gemeldet, bricht nicht ab', erg.fehler.length === 1 && /Anlage 3/.test(erg.fehler[0]));
+                const zurueck = await PDFLib.PDFDocument.load(erg.bytes);
+                pruefe('Ergebnis ist eine gültige PDF mit allen Seiten', zurueck.getPageCount(), 6);
+                // Die Seiten des Berichts sind Originalseiten mit Text (kein Bild): Text über pdf.js lesen
+                if (typeof pdfjsLib !== 'undefined') {
+                    const doc = await pdfjsLib.getDocument({ data: erg.bytes.slice(0) }).promise;
+                    const textSeite = async n => (await (await doc.getPage(n)).getTextContent()).items.map(i => i.str).join(' ');
+                    const s1 = await textSeite(1), s4 = await textSeite(4), s6 = await textSeite(6);
+                    pruefeWahr('Seite 1 ist die Stellungnahme', s1.includes('Stellungnahme 1'));
+                    pruefeWahr('Anlagenseite bleibt Text (Originalseite)', s4.includes('Entlassbericht 1'));
+                    pruefeWahr('Anlagenseite trägt „Anlage N – Seite x von y"', s4.includes('Anlage 1: Krankenhausbericht') && s4.includes('Seite 1 von 2'));
+                    pruefeWahr('Bildseite trägt ihre Anlagennummer', s6.includes('Anlage 2: Verordnung'));
+                }
+                let fehl30 = null; try { await pdfZusammenfuegen(new TextEncoder().encode('kein pdf'), []); } catch (e) { fehl30 = e; }
+                pruefeWahr('Falsche Datei als Stellungnahme wird abgewiesen', !!fehl30);
 
-                // (b) Druckfenster mit Anlagen
-                let html30 = '';
-                const fake = { document: { write: s => { html30 += s; }, close: () => {}, open: () => { html30 = ''; },
-                                           getElementById: () => null } };
-                window.open = () => fake;
-                if (dokEl) dokEl.innerHTML = '<div class="stmt"><p>Probe</p></div>';
-                await druckeStellungnahme([{ titel: 'Anlage 1: Krankenhausbericht', datei: pdf30 }]);
-                pruefeWahr('PDF: Anlagenseiten mit Kopfzeile', html30.includes('Anlage 1: Krankenhausbericht – Seite 1 von 2')
-                    && html30.includes('Anlage 1: Krankenhausbericht – Seite 2 von 2'));
-                pruefe('PDF: je Seite ein Bild', (html30.match(/<img src="data:image\/jpeg/g) || []).length, 2);
-                pruefeWahr('PDF: Anlagen stehen hinter der Stellungnahme', html30.indexOf('class="anh-seite"') > html30.indexOf('id="seiten"'));
-                pruefeWahr('PDF: jede Anlagenseite beginnt ein neues Blatt', html30.includes('.anh-seite{') && ANHANG_CSS.includes('break-before:page'));
-                pruefeWahr('PDF: gedruckt wird erst nach dem Laden der Bilder', html30.includes('document.images') && html30.includes('window.print()'));
-                html30 = '';
-                await druckeStellungnahme([]);
-                pruefeWahr('PDF ohne Anlagen: wie bisher, ohne Anhangsseiten', html30.includes('id="seiten"') && !html30.includes('class="anh-seite"'));
-
-                // (c) Auswahlfenster: Widerspruch mit Anlagenliste
+                // Fenster: Widerspruch mit Anlagenliste
                 setzeModus('widerspruch');
-                anlagen = [{ id: 't30a', bezeichnung: 'Entlassbericht', art: 'Krankenhausbericht', datum: '', kriterium: '', bemerkung: '', dateiname: 'Test-Bericht.pdf', bestaetigt: [] },
+                anlagen = [{ id: 't30a', bezeichnung: 'Entlassbericht', art: 'Krankenhausbericht', datum: '', kriterium: '', bemerkung: '', dateiname: 'Entlassbericht.pdf', bestaetigt: [] },
                            { id: 't30b', bezeichnung: 'Altbericht', art: '', datum: '', kriterium: '', bemerkung: '', dateiname: 'alt.pdf', bestaetigt: [] }];
                 Object.keys(belegDateien).forEach(k => delete belegDateien[k]);
-                belegDateien['t30a'] = pdf30;
-                let gedruckt = null;
-                window.druckeStellungnahme = a => { gedruckt = a; };
-                printAppealText();
+                belegDateien['t30a'] = bericht;
+                zeigeZusammenfuegen();
                 const boxen = Array.from(document.querySelectorAll('#vorschlag-body input[data-anhang]'));
-                pruefeWahr('Vor dem Drucken: Auswahlfenster mit den Unterlagen', document.getElementById('vorschlag-overlay').classList.contains('active') && boxen.length === 2);
-                pruefeWahr('Auswahl: nichts vorausgewählt', boxen.every(b => !b.checked));
-                pruefeWahr('Auswahl: Unterlage ohne Datei nicht wählbar', boxen[1].disabled && !boxen[0].disabled);
-                pruefe('Auswahl: Knopf heißt „PDF erstellen"', document.querySelector('#vorschlag-overlay .review-header .btn-primary').textContent.trim(), '🖨 PDF erstellen');
+                pruefeWahr('Fenster: Unterlagen zur Auswahl', document.getElementById('vorschlag-overlay').classList.contains('active') && boxen.length === 2);
+                pruefeWahr('Fenster: nichts vorausgewählt', boxen.every(b => !b.checked));
+                pruefeWahr('Fenster: Unterlage ohne Datei nicht wählbar', boxen[1].disabled && !boxen[0].disabled);
+                pruefeWahr('Fenster: Schritt 1 fragt nach der gespeicherten Stellungnahme', !!document.getElementById('zusammen-stellungnahme'));
+                pruefe('Fenster: Knopf', document.querySelector('#vorschlag-overlay .review-header .btn-primary').textContent.trim(), '📎 Zusammenfügen und speichern');
+                // Ohne gewählte Stellungnahme nichts speichern
+                let gespeichert = null;
+                window.speichereDatei = async (blob, name) => { gespeichert = { blob, name }; return true; };
                 boxen[0].checked = true;
-                druckeMitAnlagen();
-                pruefeWahr('Auswahl: nur die angehakte Unterlage wird angehängt', Array.isArray(gedruckt) && gedruckt.length === 1 && gedruckt[0].titel.startsWith('Anlage 1: Krankenhausbericht'));
+                await fuegePdfZusammen();
+                pruefe('Ohne Stellungnahme wird nichts gespeichert', gespeichert, null);
+                // Mit Stellungnahme: speichern als eine PDF
+                zusammenStellungnahme = new File([stell], 'Stellungnahme.pdf', { type: 'application/pdf' });
+                await fuegePdfZusammen();
+                pruefeWahr('Gespeichert wird eine PDF', !!gespeichert && /\.pdf$/.test(gespeichert.name) && gespeichert.blob.type === 'application/pdf');
+                if (gespeichert) pruefe('Gespeicherte PDF: Stellungnahme + angehakte Anlage', (await PDFLib.PDFDocument.load(await gespeichert.blob.arrayBuffer())).getPageCount(), 5);
+                pruefeWahr('Knopf „PDF mit Anlagen zusammenfügen" im Reiter Auswertung',
+                    /zeigeZusammenfuegen\(\)/.test(await fetch('js/auswertung.js').then(r => r.text()).catch(() => '')));
+                pruefeWahr('Drucken bleibt ohne Anlagenbilder', !druckeStellungnahme.toString().includes('anhaenge'));
                 vorschlagOverlayZweck('Probe', 'closeVorschlaege()');
                 pruefe('Andere Fenster behalten ihre Beschriftung', document.querySelector('#vorschlag-overlay .review-header .btn-primary').textContent.trim(), '✓ Ausgewählte übernehmen');
-                // Ohne Unterlagen: direkt drucken, kein Fenster
-                anlagen = []; gedruckt = null;
-                printAppealText();
-                pruefeWahr('Ohne Unterlagen: direkt zur PDF, kein Auswahlfenster', Array.isArray(gedruckt) && gedruckt.length === 0);
 
-                // (d) Anträge: hochgeladene Arztberichte
+                // Anträge: hochgeladene Arztberichte
                 setzeModus('hoeherstufung');
                 antragBerichtDateien = [];
-                merkeAntragBericht(pdf30); merkeAntragBericht(pdf30);
+                merkeAntragBericht(bericht); merkeAntragBericht(bericht);
                 pruefe('Antrag: Arztbericht wird einmal gemerkt', anhangKandidaten().length, 1);
                 pruefeWahr('Antrag: Arztberichte werden beim Einlesen gemerkt', leseArztberichte.toString().includes('merkeAntragBericht(datei)'));
 
-                // (e) Fallwechsel: keine Unterlage der vorigen Person
-                anlagen = [{ id: 't30c', bezeichnung: 'x', dateiname: 'x.pdf', bestaetigt: [] }]; belegDateien['t30c'] = pdf30;
+                // Fallwechsel: keine Unterlage der vorigen Person
+                anlagen = [{ id: 't30c', bezeichnung: 'x', dateiname: 'x.pdf', bestaetigt: [] }]; belegDateien['t30c'] = bericht;
                 widerspruchStellungnahme = '<div class="crit" data-nr="4.4.2"></div>';
                 unterlagenZuruecksetzen(true);
                 pruefeWahr('Neuer Fall: Dateien, Anlagen und gemerkte Stellungnahme geleert',
-                    !antragBerichtDateien.length && !Object.keys(belegDateien).length && !anlagen.length && !widerspruchStellungnahme);
+                    !antragBerichtDateien.length && !Object.keys(belegDateien).length && !anlagen.length && !widerspruchStellungnahme && !zusammenStellungnahme);
                 pruefeWahr('Neuer Fall beim Einlesen eines Gutachtens leert die Unterlagen',
                     /unterlagenZuruecksetzen\(true\)/.test(await fetch('js/auslese.js').then(r => r.text()).catch(() => '')));
                 pruefeWahr('Fall laden leert die Dateien im Arbeitsspeicher', loadCase.toString().includes('unterlagenZuruecksetzen(false)'));
             } finally {
-                window.open = merk30.open; window.druckeStellungnahme = merk30.druck;
-                if (dokEl && merkDok !== null) dokEl.innerHTML = merkDok;
-                anlagen = merk30.anl; antragBerichtDateien = merk30.ab;
+                window.speichereDatei = merk30.speichern;
+                anlagen = merk30.anl; antragBerichtDateien = merk30.ab; zusammenStellungnahme = null;
                 Object.keys(belegDateien).forEach(k => delete belegDateien[k]); Object.assign(belegDateien, merk30.bd);
                 widerspruchStellungnahme = merk30.ws; widerspruchKerne = merk30.wk;
                 try { closeVorschlaege(); } catch (e) {}

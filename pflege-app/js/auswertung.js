@@ -194,6 +194,7 @@ function renderAuswertung() {
                         <button class="btn btn-yellow" onclick="exportAppealWord()">📄 Als Word-Dokument speichern</button>
                         <button class="btn btn-primary" onclick="copyAppealText()">Kopieren</button>
                         <button class="btn btn-secondary" onclick="printAppealText()">Drucken / PDF speichern</button>
+                        <button class="btn btn-secondary" id="btn-pdf-anlagen" title="Die gespeicherte PDF der Stellungnahme mit ausgewählten Arztberichten zu einer Datei zusammenfügen" onclick="zeigeZusammenfuegen()">📎 PDF mit Anlagen zusammenfügen</button>
                     </div>
                 </div>
             </div>
