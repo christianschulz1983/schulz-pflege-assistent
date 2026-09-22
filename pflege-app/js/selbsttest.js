@@ -5147,6 +5147,111 @@ async function selbsttest() {
             }
         }
 
+        /* 29. Ärztliche Unterlagen als Beleg in Widerspruch und Anhörung (js/belege.js).
+           Wunsch: Arztberichte hochladen und einbauen, wenn Diagnosen oder Annahmen des
+           Gutachtens falsch sind. Nichts vorausgewählt, keine Bewertung von der App. */
+        if (typeof belegAbgleich === 'function') {
+            const merk29 = { modus: appModus, anl: JSON.parse(JSON.stringify(anlagen)),
+                             orig: JSON.parse(JSON.stringify(stateOrig)), eigen: JSON.parse(JSON.stringify(stateEigene)),
+                             zweit: JSON.parse(JSON.stringify(stateZweit)), cgf: window.callGeminiWithFallback };
+            const set29 = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+            const txt29 = h => { const d = document.createElement('div'); d.innerHTML = h; return d.textContent.replace(/\s+/g, ' '); };
+            try {
+                const id29 = nr => ITEMS.find(i => i.nr === nr).id;
+                const leer29 = st => ITEMS.forEach(i => { st.values[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+                [stateOrig, stateEigene].forEach(leer29);
+                stateEigene.values[id29('4.4.2')] = 1;
+                setzeModus('widerspruch');
+                // Oberfläche: Karte in Widerspruch und Anhörung, nicht im Antrag
+                pruefeWahr('Unterlagen-Karte im Widerspruch sichtbar',
+                    document.getElementById('belege-bereich').style.display !== 'none' && !!document.getElementById('anlagen-liste'));
+                setzeModus('erstantrag');
+                pruefeWahr('Unterlagen-Karte im Erstantrag verborgen', document.getElementById('belege-bereich').style.display === 'none');
+                setzeModus('widerspruch');
+                pruefe('Nur eine Anlagenliste im Dokument (keine doppelte Kennung)', document.querySelectorAll('#anlagen-liste').length, 1);
+
+                // Gutachten-Diagnosen: G81.1 vorhanden
+                ensureDiagRows(2);
+                set29('diag-icd-1', 'G81.1 G'); set29('diag-txt-1', 'Hemiparese');
+                set29('diag-icd-2', ''); set29('diag-txt-2', '');
+                // Auslesen mit Attrappe statt Google
+                window.callGeminiWithFallback = async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({
+                    art: 'Krankenhausbericht', datum: '12.02.2026', aussteller: 'Klinik für Geriatrie',
+                    diagnosen: [{ icd: 'F05.1', text: 'Delir bei Demenz' }, { icd: 'G81.9', text: 'Hemiparese' }, { text: 'ohne Code' }],
+                    verordnungen: [{ bezeichnung: 'Physiotherapie', haeufigkeit: '2x pro Woche' },
+                                   { bezeichnung: 'Kompressionsstrümpfe Klasse II', haeufigkeit: 'täglich' }],
+                    befunde: [{ bereich: 'Kognition', zitat: 'zeitlich und örtlich nicht orientiert, wechselhaftes Delir' }],
+                    dauer: 'seit 2024' }) }] } }] });
+                anlagen = [];
+                const a29 = { id: 'test29', bezeichnung: 'Entlassbericht', art: '', datum: '', kriterium: '', bemerkung: '',
+                              dateiname: 'Entlassbericht.pdf', bestaetigt: [] };
+                anlagen.push(a29);
+                const ok29 = await belegAuslesen(a29, new File(['x'], 'Entlassbericht.pdf', { type: 'application/pdf' }));
+                pruefeWahr('Unterlage wird ausgelesen', ok29 && a29.status === 'gelesen');
+                pruefe('Art und Datum werden ergänzt', [a29.art, a29.datum], ['Krankenhausbericht', '2026-02-12']);
+                const f29 = belegAbgleich(a29);
+                pruefeWahr('Abgleich: fehlende Diagnose gefunden, mit Hinweis auf Modul 3',
+                    f29.some(f => f.typ === 'diagnose' && /F05\.1/.test(f.text) && /Modul 3/.test(f.text)));
+                pruefeWahr('Abgleich: vorhandene Diagnose (gleiche Kategorie) kein Fund', !f29.some(f => /G81/.test(f.text)));
+                pruefeWahr('Abgleich: Diagnose ohne Code kein Fund', !f29.some(f => /ohne Code/.test(f.text)));
+                pruefeWahr('Abgleich: Physiotherapie → 4.5.14 nicht gewertet', f29.some(f => f.nr === '4.5.14'));
+                pruefeWahr('Abgleich: Kompressionsstrümpfe → 4.5.7 nicht gewertet', f29.some(f => f.nr === '4.5.7'));
+                pruefe('Eigenübungen → 4.5.11, Heilmittel beim Therapeuten → 4.5.14',
+                    [belegKriteriumFuer('Eigenübungsprogramm Krankengymnastik'), belegKriteriumFuer('Ergotherapie')], ['4.5.11', '4.5.14']);
+                stateOrig.values[id29('4.5.14')] = { count: 2, period: 'W' };
+                pruefeWahr('Abgleich: im Gutachten gewertete Maßnahme kein Fund', !belegAbgleich(a29).some(f => f.nr === '4.5.14'));
+                stateOrig.values[id29('4.5.14')] = { count: 0, period: 'W' };
+                pruefe('Keine Bewertung von der App gesetzt', JSON.stringify(stateEigene.values[id29('4.5.14')]), JSON.stringify({ count: 0, period: 'W' }));
+
+                // Nichts vorausgewählt: ohne Häkchen nichts im Schriftstück
+                pruefe('Nichts vorausgewählt', bestaetigteBelegFunde().length, 0);
+                pruefeWahr('Ohne Häkchen kein Belege-Absatz', !buildStellungnahme('', {}, '').includes('stmt-belege'));
+                const dx = f29.find(f => f.typ === 'diagnose');
+                belegFundUmschalten(0, dx.key, true);
+                a29.kriterium = '4.4.2';
+                const w29 = buildStellungnahme('', {}, '');
+                const tw = txt29(w29);
+                pruefeWahr('Widerspruch: bestätigter Fund in den Allgemeinen Angaben mit Anlage',
+                    /Die beigefügten ärztlichen Unterlagen belegen/.test(tw) && tw.includes('F05.1') && tw.includes('(Anlage 1)'));
+                pruefeWahr('Schriftstück ohne Arbeitshinweis („bedeutsam für Modul 3")', !/bedeutsam für Modul 3/.test(tw));
+                pruefeWahr('Widerspruch: Verweis beim zugeordneten Kriterium',
+                    (w29.split('data-nr="4.4.2"')[1] || '').split('class="crit"')[0].includes('Beigefügt: Anlage 1'));
+                pruefeWahr('Widerspruch: Anlagenverzeichnis am Ende', w29.includes('id="stmt-anlagen"'));
+                // KI erhält Inhalt und Regel
+                const pr29 = anlagenFuerPrompt('4.4.2');
+                pruefeWahr('KI erhält den gelesenen Inhalt der Anlage', pr29.includes('Delir bei Demenz') && pr29.includes('wechselhaftes Delir'));
+                pruefeWahr('KI-Regel: Quelle nennen, Diagnose → Einschränkung', /Quelle/.test(pr29) && /Diagnose allein/.test(pr29));
+                pruefeWahr('Widerspruchs-Anweisung enthält die Anlagen', buildBegruendungPrompt(computeDiffs(), false).includes('Delir bei Demenz'));
+                // Zitatprüfung kennt die Anlage
+                pruefe('Zitat aus der Anlage gilt als belegt',
+                    unbelegteZitate('4.4.2', 'Laut Entlassbericht war sie „zeitlich und örtlich nicht orientiert, wechselhaftes Delir“ (Anlage 1).').length, 0);
+                // Zusammenführen: Häkchen weg -> Absatz verschwindet
+                belegFundUmschalten(0, dx.key, false);
+                const zus29 = mergeStellungnahme(w29, buildStellungnahme('', {}, ''));
+                pruefeWahr('Häkchen entfernt → Absatz verschwindet beim Aktualisieren', !zus29.includes('stmt-belege'));
+                // Anhörung: gleiche Karte, Abgleich gegen das Zweitgutachten
+                setzeModus('anhoerung');
+                pruefeWahr('Unterlagen-Karte in der Anhörung sichtbar', document.getElementById('belege-bereich').style.display !== 'none');
+                stateZweit = { special: 0, values: {}, kontinenz: { harn: null, stuhl: null } }; leer29(stateZweit);
+                stateZweit.values[id29('4.5.7')] = { count: 1, period: 'D' };
+                pruefeWahr('Anhörung: Abgleich gegen das Zweitgutachten', !belegAbgleich(a29).some(f => f.nr === '4.5.7')
+                    && belegAbgleich(a29).some(f => f.nr === '4.5.14'));
+                // Speichern und Laden: Auswertung und Häkchen bleiben
+                belegFundUmschalten(0, dx.key, true);
+                const ges29 = JSON.parse(JSON.stringify(anlagenSichern()));
+                anlagen = []; anlagenLaden(ges29);
+                pruefeWahr('Auswertung und Häkchen überstehen Speichern und Laden',
+                    !!anlagen[0].auswertung && anlagen[0].bestaetigt.includes(dx.key));
+                anlagenLaden([{ bezeichnung: 'alt', dateiname: 'alt.pdf' }]);
+                pruefeWahr('Ältere Falldatei: Kennung wird nachgetragen', !!anlagen[0].id && Array.isArray(anlagen[0].bestaetigt));
+            } finally {
+                window.callGeminiWithFallback = merk29.cgf;
+                anlagen = merk29.anl; stateOrig = merk29.orig; stateEigene = merk29.eigen; stateZweit = merk29.zweit;
+                setzeModus(merk29.modus);
+                if (typeof renderAnlagen === 'function') renderAnlagen();
+            }
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

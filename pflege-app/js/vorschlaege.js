@@ -407,6 +407,18 @@ function allgemeinAufgabe(vorgang) {
         + sperre;
 }
 
+/* Die bestätigten Funde aus den ärztlichen Unterlagen setzt die App selbst als eigenen
+   Absatz in die Allgemeinen Angaben (belegeAllgemeinHtml). Die KI soll sie deshalb nicht
+   ein zweites Mal aufzählen – darf sich aber darauf beziehen. */
+function belegeHinweisFuerAllgemein() {
+    const f = (typeof bestaetigteBelegFunde === 'function') ? bestaetigteBelegFunde() : [];
+    if (!f.length) return '';
+    return 'ÄRZTLICHE UNTERLAGEN: Die App setzt unter die Allgemeinen Angaben selbst einen Satz mit diesen von mir '
+         + 'bestätigten Abweichungen: ' + f.map(x => x.text + ' (Anlage ' + (x.anlage + 1) + ')').join('; ')
+         + '. Zähle sie im Abschnitt „allgemein" NICHT erneut auf; ein kurzer Bezug („wie die beigefügten '
+         + 'ärztlichen Unterlagen belegen") ist erlaubt.\n\n';
+}
+
 function buildBegruendungPrompt(diffs, mitAllgemein) {
     const cut = (s, n) => (s && s.length > n) ? s.slice(0, n) + ' …' : (s || '');
     let p = '';
@@ -485,8 +497,11 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
                 if (d.eIdx != null && lh.stufen[d.eIdx]) p += `Praxisbeschreibung meiner Bewertung: ${lh.stufen[d.eIdx]}\n`;
             }
         }
+        // Ärztliche Unterlagen, die diesem Kriterium zugeordnet sind (Widerspruch)
+        if (!istAntrag && typeof anlagenFuerPrompt === 'function') p += anlagenFuerPrompt(d.nr);
         p += '\n';
     });
+    if (!istAntrag && mitAllgemein) p += belegeHinweisFuerAllgemein();
     // Quervergleich: Kriterien, in denen der Gutachter selbst schon eine Einschränkung sah
     const diffNrs = new Set(diffs.map(d => d.nr));
     let quer = '';
@@ -877,6 +892,7 @@ ZWINGEND:
         prompt += '\n';
     });
 
+    if (mitAllgemein) prompt += belegeHinweisFuerAllgemein();
     if (mitAllgemein) {
         /* Aufbau und Tonfall folgen den Vorlagen des Verfassers (Vorlagen A und B).
            Dort steht KEINE Nummernliste, sondern Fließtext, in dem zwei bis drei

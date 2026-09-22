@@ -24,15 +24,29 @@ function anlagenHinzufuegen(event) {
     const dateien = Array.from(event.target.files || []);
     event.target.value = '';
     if (!dateien.length) return;
+    const neu = [];
     dateien.forEach(d => {
         if (typeof merkeImportDokument === 'function') merkeImportDokument(d, d.type);
-        anlagen.push({
-            bezeichnung: anlageBezeichnungAus(d.name), art: '', datum: '',
-            kriterium: '', bemerkung: '', dateiname: d.name
-        });
+        const a = {
+            id: anlageNeueId(), bezeichnung: anlageBezeichnungAus(d.name), art: '', datum: '',
+            kriterium: '', bemerkung: '', dateiname: d.name, bestaetigt: []
+        };
+        // Die Datei bleibt im Arbeitsspeicher – zum Auslesen (js/belege.js)
+        if (typeof belegDateien !== 'undefined') belegDateien[a.id] = d;
+        anlagen.push(a);
+        neu.push(a);
     });
     renderAnlagen();
-    showToast(dateien.length + ' Anlage(n) hinzugefügt. Bitte Art und Zuordnung ergänzen.', 'success');
+    // Widerspruch und Anhörung: jede Unterlage gleich auslesen und mit dem Gutachten abgleichen
+    if (typeof belegeAuslesen === 'function' && typeof istBelegModus === 'function' && istBelegModus()) {
+        belegeAuslesen(neu);
+    } else {
+        showToast(dateien.length + ' Anlage(n) hinzugefügt. Bitte Art und Zuordnung ergänzen.', 'success');
+    }
+}
+
+function anlageNeueId() {
+    return 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
 function anlageSetzen(i, feld, wert) {
@@ -46,8 +60,12 @@ function anlageEntfernen(i) {
     renderAnlagen();
 }
 
-// Die strittigen Kriterien, denen sich eine Anlage zuordnen lässt.
+// Die strittigen Kriterien, denen sich eine Anlage zuordnen lässt: in der Anhörung die
+// strittig gebliebenen, im Widerspruch die vom Gutachten abweichend bewerteten.
 function anlagenKriterien() {
+    if (typeof appModus !== 'undefined' && appModus === 'widerspruch' && typeof computeDiffs === 'function') {
+        return computeDiffs().map(d => ({ nr: d.nr, titel: d.title }));
+    }
     if (typeof strittigeLagen !== 'function' || !hatZweitgutachten()) return [];
     return strittigeLagen().map(l => ({ nr: l.nr, titel: l.titel }));
 }
@@ -84,6 +102,7 @@ function anlagenZeile(a, i) {
                        placeholder="was die Anlage belegt"
                        oninput="anlageSetzen(${i},'bemerkung',this.value)"></div>
         </div>
+        ${(typeof belegDetailHtml === 'function') ? belegDetailHtml(a, i) : ''}
     </div>`;
 }
 
@@ -139,15 +158,32 @@ function anlagenVerzeichnisHtml() {
     return `<hr><h2>Anlagen</h2><div id="stmt-anlagen">${zeilen}</div>`;
 }
 
-// Für die KI: welche Anlage belegt was?
+// Für die KI: welche Anlage belegt was – und, wenn ausgelesen, was darin steht.
 function anlagenFuerPrompt(nr) {
     const treffer = anlagenZuKriterium(nr);
-    if (!treffer.length) return '';
-    return 'BEIGEFÜGTE ANLAGEN zu diesem Kriterium (im Text als „Anlage N" benennen, '
-         + 'nichts über ihren Inhalt erfinden): '
-         + treffer.map(x => anlageText(x.a, x.i) + (x.a.bemerkung ? ' – ' + x.a.bemerkung : '')).join('; ') + '\n';
+    const funde = (typeof bestaetigteBelegFunde === 'function') ? bestaetigteBelegFunde().filter(f => f.nr === nr) : [];
+    if (!treffer.length && !funde.length) return '';
+    let t = '';
+    if (treffer.length) {
+        t += 'BEIGEFÜGTE ANLAGEN zu diesem Kriterium (im Text als „Anlage N" benennen, '
+           + 'nichts über ihren Inhalt erfinden): '
+           + treffer.map(x => anlageText(x.a, x.i) + (x.a.bemerkung ? ' – ' + x.a.bemerkung : '')).join('; ') + '\n';
+        treffer.forEach(x => { if (typeof belegInhaltFuerPrompt === 'function') t += belegInhaltFuerPrompt(x.a, x.i); });
+    }
+    if (funde.length) {
+        t += 'VON MIR BESTÄTIGTE ABWEICHUNG ZUM GUTACHTEN: '
+           + funde.map(f => f.text + ' (Anlage ' + (f.anlage + 1) + ')').join('; ') + '\n';
+    }
+    t += 'REGEL FÜR ANLAGEN: Nenne die Quelle („laut … vom … (Anlage N)"). Zitiere aus einer Anlage nur die oben '
+       + 'als wörtlich angegebenen Stellen. Eine Diagnose allein begründet keine Einschränkung – leite die Folge '
+       + 'für die Selbständigkeit ab (Erkrankung → Einschränkung → personelle Hilfe).\n';
+    return t;
 }
 
 // ------------------------------------------------------- Speichern und Laden
 function anlagenSichern() { return anlagen; }
-function anlagenLaden(d) { anlagen = Array.isArray(d) ? d : []; }
+function anlagenLaden(d) {
+    anlagen = Array.isArray(d) ? d : [];
+    // Ältere Falldateien: Kennung und Häkchenliste nachtragen
+    anlagen.forEach(a => { if (!a.id) a.id = anlageNeueId(); if (!Array.isArray(a.bestaetigt)) a.bestaetigt = []; });
+}

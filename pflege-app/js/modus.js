@@ -98,6 +98,8 @@ function setzeModus(key) {
         erf.style.display = mitBefund ? '' : 'none';
         if (mitBefund && typeof renderErfassung === 'function') renderErfassung();
     }
+    // Ärztliche Unterlagen als Beleg: Widerspruch und Anhörung (js/belege.js)
+    if (typeof renderBelegeBereich === 'function') renderBelegeBereich();
     // Bereich für das Anhörungsverfahren nur dort
     const anh = document.getElementById('anhoerung-bereich');
     if (anh) {

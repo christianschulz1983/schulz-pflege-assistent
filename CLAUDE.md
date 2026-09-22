@@ -31,6 +31,7 @@ pflege-app/
   js/grundlage.js     Anhoerung: Grundlage aus einer alten Stellungnahme (Ausweichweg)
   js/vergleich.js     Dreiervergleich und Schwellenwertrechnung
   js/anlagen.js       Anlagen: Zuordnung zum Kriterium, Verzeichnis im Dokument
+  js/belege.js        Ärztliche Unterlagen als Beleg (Widerspruch, Anhörung): Auslesen, Abgleich
   js/namenspruefung.js Abgleich der eingelesenen Namen gegen den Dokumenttext
   js/befund.js        Befunderhebung (Erstantrag, Höherstufung)
   js/erfassung.js     Pflegepersonen, Aufenthalte, Versorgung, Übernahme in Modul 5
@@ -552,6 +553,24 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Zeitüberschreitung kein weiteres Modell mit derselben Datei; bei 429 kein Warten.
    Knopf **„Abbrechen"** im Ladefenster (`kiAbbrechen`), Anzeige des laufenden Modells.
 
+40. **Ärztliche Unterlagen als Beleg in Widerspruch und Anhörung** (`js/belege.js`, Karte
+   `#belege-bereich` auf Reiter 1; die Anlagenliste aus `js/anlagen.js` steht nicht mehr in der
+   Anhörungskarte). Beim Hinzufügen wird jede Unterlage ausgelesen (eine KI-Anfrage je Datei:
+   Art, Datum, Diagnosen, Verordnungen, **wörtliche** Befunde, Dauer) und **gerechnet** mit dem
+   Gutachten abgeglichen (`belegAbgleich`): Diagnosen mit ICD, die im Gutachten fehlen
+   (gleiche 3-stellige Kategorie gilt als vorhanden; ohne Code kein Fund), und Verordnungen,
+   deren Kriterium im Gutachten nicht gewertet ist (`BELEG_M5_REGELN` nach BRi-Wortlaut:
+   Heilmittel beim Therapeuten 4.5.14, Eigenübungen 4.5.11, Orthesen/Kompression/Hörgerät 4.5.7).
+   Maßstab ist im Widerspruch das Erstgutachten, in der Anhörung das Zweitgutachten.
+   **Nichts vorausgewählt, keine Bewertung von der App:** Nur abgehakte Funde (`bestaetigt`)
+   erscheinen – als eigener Absatz `#stmt-belege` unter den Allgemeinen Angaben (Wortlaut
+   `dok`, ohne Arbeitshinweise) und für die KI. Zugeordnete Anlagen gehen mit ihrem Inhalt je
+   Kriterium an die KI (`anlagenFuerPrompt`: Quelle nennen, nur wörtlich zitieren, Diagnose →
+   Einschränkung → Hilfe); die Zitatprüfung lässt wörtliche Anlagenstellen gelten
+   (`anlagenZitatText`). Der Widerspruch hat jetzt ebenfalls Verweis und Anlagenverzeichnis.
+   `mergeStellungnahme` hält `#stmt-belege` und `#stmt-anlagen` aktuell. Gespeichert wird die
+   Auswertung, nicht die Datei (`belegDateien` nur im Arbeitsspeicher).
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -604,7 +623,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1314 Pruefungen.
+Der Selbsttest umfasst 1342 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

@@ -106,6 +106,8 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
             const m5 = (d.m === 5 && typeof m5WirkungSatz === 'function')
                 ? m5WirkungSatz(d.nr, 'orig', 'own') : '';
             if (m5) body += `<div class="m5-wirkung">${esc(nummernImText(m5, org))}</div>`;
+            // Zugeordnete ärztliche Unterlagen („Beigefügt: Anlage 1 …") – wie in der Anhörung
+            if (typeof anlagenVerweisHtml === 'function') body += anlagenVerweisHtml(d.nr);
             // data-ai: stammt der Text von der KI? Ersatzbloecke werden beim naechsten Mal nachgeholt.
             return `<div class="crit" data-nr="${esc(d.nr)}" data-vals="${esc(d.o)}|${esc(d.e)}" data-ai="${txt ? '1' : '0'}"><div class="ct">${esc(zeigeNr(d.nr, org))}: ${esc(d.title)}</div><div>Gutachterliche Bewertung: „${esc(d.o)}“</div>${body}</div>`;
         }).join('')
@@ -160,6 +162,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     <h2>Allgemeine Angaben</h2>
     <p>Im Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} erfolgte die Einstufung mit ${df('opts', origPts)} gewichteten Punkten, woraus sich ${istKeinPG(origPG) ? df('opgsatz', 'kein Pflegegrad') : 'ein ' + df('opgsatz', pgSatz(origPG))} ergeben hat. Die Verteilung der gewichteten Punkte auf die einzelnen Module ist der nachfolgenden Übersicht zu entnehmen.</p>
     <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${notesBullets}</div>
+    ${(typeof belegeAllgemeinHtml === 'function') ? belegeAllgemeinHtml() : ''}
     <p>Ich bin in mehreren dieser Module zu abweichenden Einschätzungen gekommen. Dies ergibt eine höhere Punktzahl in den Modulen und in der Folge eine höhere Gesamtpunktzahl. Die nachfolgende Übersicht stellt die Ergebnisse des Vorgutachtens und meiner Beurteilung einander gegenüber:</p>
 
     <h2>Gegenüberstellung des Gutachtens und der abweichenden Bepunktung</h2>
@@ -180,6 +183,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     <p id="stmt-fazit" data-art="${fazitArt}">Das vorliegende Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} ${istKeinPG(origPG) ? 'mit der Feststellung ' + df('opgfazit', 'keines Pflegegrades') : 'mit einem ' + df('opgfazit', pgSatz(origPG))} und ${df('opts', origPts)} Punkten berücksichtigt die tatsächlichen Einschränkungen von ${df('name', name)} ${fazitGleich ? '' : 'nicht '}hinreichend. ${fazitNiedriger
         ? `Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Punkten. Es besteht ein geringerer Pflegegrad und das reelle Risiko einer Rückstufung.`
         : `Unter Berücksichtigung der oben genannten Korrekturen ergibt sich ein Punktwert von ${df('etotal', f2(rE.total))} Gesamtpunkten, der gemäß den Richtlinien ${istKeinPG(rE.pg) ? 'weiterhin ' + df('epgfazit', 'keinen Pflegegrad') : (fazitGleich ? 'weiterhin ' : '') + 'den ' + df('epgfazit', pgSatz(rE.pg))} ab dem ${df('antrag', antrag)} (Antragsdatum) rechtfertigt.`}</p>
+    ${(typeof anlagenVerzeichnisHtml === 'function') ? anlagenVerzeichnisHtml() : ''}
   </div>`;
 }
 
@@ -326,6 +330,8 @@ function unbelegteZitate(nr, text) {
     let quelle = normZitat(b.definition + ' ' + Object.values(b.levels || {}).join(' '));
     const modul = (typeof BRI_MODULE !== 'undefined') ? BRI_MODULE[nr.split('.').slice(0, 2).join('.')] : null;
     if (modul) quelle += ' ' + normZitat(modul.text);   // Modul-Einleitung zählt als Beleg
+    // Wörtliche Stellen aus ausgelesenen ärztlichen Unterlagen sind ebenfalls belegt (js/belege.js)
+    if (typeof anlagenZitatText === 'function') quelle += ' ' + normZitat(anlagenZitatText());
     const offen = [];
     const re = /[„"]([^„“”"]{25,})[“”"]/g;              // nur längere Passagen prüfen
     let m;
@@ -415,6 +421,25 @@ function mergeStellungnahme(existingHtml, freshHtml) {
         const f = fresh.querySelector('#' + id), c = cur.querySelector('#' + id);
         if (f && c) c.innerHTML = f.innerHTML;
     });
+    /* Ärztliche Unterlagen (js/belege.js): der Absatz mit den bestätigten Funden und das
+       Anlagenverzeichnis folgen immer dem aktuellen Stand – neu, geändert oder entfallen. */
+    const fB = fresh.querySelector('#stmt-belege'), cB = cur.querySelector('#stmt-belege');
+    if (fB && cB) cB.outerHTML = fB.outerHTML;
+    else if (cB && !fB) cB.remove();
+    else if (fB && !cB) { const n = cur.querySelector('#stmt-notes'); if (n) n.insertAdjacentHTML('afterend', fB.outerHTML); }
+    const fA2 = fresh.querySelector('#stmt-anlagen'), cA2 = cur.querySelector('#stmt-anlagen');
+    const anlagenTitel = el => { const h = el && el.previousElementSibling; return (h && /^H2$/i.test(h.tagName)) ? h : null; };
+    if (fA2 && cA2) cA2.innerHTML = fA2.innerHTML;
+    else if (cA2 && !fA2) {
+        const h = anlagenTitel(cA2), hr = h && h.previousElementSibling;
+        if (hr && /^HR$/i.test(hr.tagName)) hr.remove();
+        if (h) h.remove();
+        cA2.remove();
+    } else if (fA2 && !cA2) {
+        const stmt = cur.querySelector('.stmt') || cur;
+        const h = anlagenTitel(fA2), hr = h && h.previousElementSibling;
+        stmt.insertAdjacentHTML('beforeend', ((hr && /^HR$/i.test(hr.tagName)) ? hr.outerHTML : '') + (h ? h.outerHTML : '') + fA2.outerHTML);
+    }
     // „Allgemeine Angaben": nur ersetzen, wenn sich Notizen oder Abweichungen geändert haben.
     // Sonst bleibt der vorhandene, ggf. überarbeitete Text unangetastet.
     const fN = fresh.querySelector('#stmt-notes'), cN = cur.querySelector('#stmt-notes');

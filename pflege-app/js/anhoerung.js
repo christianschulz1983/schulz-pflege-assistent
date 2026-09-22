@@ -100,21 +100,8 @@ function renderAnhoerungBereich() {
                               oninput="autoResize(this); if (typeof markiereStellungnahmeVeraltet === 'function') markiereStellungnahmeVeraltet('Befund des Zweitgutachtens')"></textarea>
                 </div>
 
-                <div class="field-group" style="margin-top:14px">
-                    <label class="field-label">Anlagen (Arztberichte, Verordnungen, Befundberichte)</label>
-                    <p style="font-size:11px;color:var(--text-muted);line-height:1.55;margin-bottom:10px">
-                        Ordnen Sie jede Anlage dem strittigen Kriterium zu, das sie belegt – etwa eine
-                        Verordnung Physiotherapie zu 4.5.14. Im Schriftstück erscheint dann ein Verweis
-                        und am Ende ein Anlagenverzeichnis. Die Dateien selbst legen Sie beim Versand bei;
-                        in ein Word-Dokument lassen sie sich nicht einbetten.
-                    </p>
-                    <button class="btn btn-secondary" onclick="document.getElementById('anlagenFiles').click()">
-                        + Anlagen hinzufügen</button>
-                    <input type="file" id="anlagenFiles" accept=".pdf,image/*" multiple
-                           onchange="anlagenHinzufuegen(event)" style="display:none">
-                    <span id="anlagen-hinweis" style="font-size:11px;color:var(--text-muted);margin-left:10px"></span>
-                    <div id="anlagen-liste" style="margin-top:12px"></div>
-                </div>
+                <!-- Anlagen (Arztberichte usw.) stehen seit v66.57 in einer eigenen Karte darunter
+                     (js/belege.js) – dieselbe für Widerspruch und Anhörung. -->
 
                 <div class="field-group" style="margin-top:14px">
                     <label class="field-label">Eigene Anmerkungen zum Anhörungsverfahren</label>
@@ -126,7 +113,7 @@ function renderAnhoerungBereich() {
             </div>
         </div>`;
     ziel.dataset.gebaut = '1';
-    if (typeof renderAnlagen === 'function') renderAnlagen();
+    if (typeof renderBelegeBereich === 'function') renderBelegeBereich();
     aktualisiereAnhoerungStatus();
 }
 
@@ -498,6 +485,7 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
 
     <h2>Allgemeine Angaben</h2>
     <div id="stmt-notes" data-sig="${esc(anhoerungSignatur(analyse, notizenAnh))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${allgemein}</div>
+    ${(typeof belegeAllgemeinHtml === 'function') ? belegeAllgemeinHtml() : ''}
     <p>Die nachfolgende Übersicht stellt die Ergebnisse des Erstgutachtens, des Zweitgutachtens und meiner Beurteilung einander gegenüber:</p>
 
     <h2>Gegenüberstellung des Gutachtens und der abweichenden Bepunktung</h2>
