@@ -94,7 +94,7 @@ function kiFehlerErklaerung(fehler) {
              + 'Gutachten kommt das vor, wenn Google ausgelastet ist – bitte in ein paar Minuten erneut versuchen.';
     if (/api key not valid|schlüssel ist ungültig|API_KEY_INVALID/i.test(t))
         return 'Der API-Schlüssel ist ungültig. Bitte auf aistudio.google.com/apikey neu kopieren und oben rechts '
-             + 'einfügen – ohne Leerzeichen, vollständig ab „AIza".';
+             + 'einfügen – über das Kopiersymbol, damit der ganze Schlüssel übernommen wird (er beginnt je nach Alter mit „AIza“ oder „AQ.“).';
     if (/api key expired|API_KEY_EXPIRED/i.test(t))
         return 'Der API-Schlüssel ist abgelaufen. Bitte auf aistudio.google.com/apikey einen neuen erstellen.';
     if (/location is not supported|FAILED_PRECONDITION/i.test(t))
