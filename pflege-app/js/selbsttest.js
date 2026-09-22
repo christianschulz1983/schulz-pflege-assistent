@@ -5104,6 +5104,36 @@ async function selbsttest() {
                 let f28 = null; try { await callGeminiWithFallback({ contents: [] }, 'Test'); } catch (e) { f28 = e; }
                 pruefeWahr('Ungültiger Schlüssel: Klartext', !!f28 && /ungültig/.test(kiFehlerErklaerung(f28)));
                 pruefe('Ungültiger Schlüssel: keine weiteren Anfragen', aufrufe.length, 1);
+                /* (d) „Lädt ewig": Antwortet Google nicht, greift die Zeitgrenze – und es wird kein
+                   weiteres Modell mit derselben großen Datei angefragt. Zeitgrenze hier verkürzt. */
+                const merkZeit = Object.assign({}, KI_ZEIT);
+                try {
+                    Object.keys(kiModellCache).forEach(k => delete kiModellCache[k]);
+                    aufrufe.length = 0;
+                    KI_ZEIT.anfrageMs = 300; KI_ZEIT.gesamtMs = 60000;
+                    window.fetch = (url, opt) => {
+                        aufrufe.push(url);
+                        if (/\/models\?/.test(url)) return antwort(200, { models: [
+                            { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+                            { name: 'models/gemini-2.5-flash-lite', supportedGenerationMethods: ['generateContent'] }] });
+                        return new Promise((ok, fehler) => {           // hängt, bis abgebrochen wird
+                            if (opt && opt.signal) opt.signal.addEventListener('abort', () => fehler(new Error('aborted')));
+                        });
+                    };
+                    const t0 = Date.now();
+                    let fz = null; try { await callGeminiWithFallback({ contents: [] }, 'Test'); } catch (e) { fz = e; }
+                    pruefeWahr('Hängende Anfrage: Zeitgrenze greift', !!fz && /Zeitgrenze/.test(kiFehlerErklaerung(fz)) && Date.now() - t0 < 5000);
+                    pruefe('Nach Zeitüberschreitung kein weiteres Modell', aufrufe.filter(u => /:generate/.test(u)).length, 1);
+                    // Abbrechen durch den Berater
+                    aufrufe.length = 0; KI_ZEIT.anfrageMs = 20000;
+                    setTimeout(() => kiAbbrechen(), 100);
+                    fz = null; try { await callGeminiWithFallback({ contents: [] }, 'Test'); } catch (e) { fz = e; }
+                    pruefeWahr('„Abbrechen" beendet die Anfrage', !!fz && /abgebrochen/.test(kiFehlerErklaerung(fz)));
+                    pruefeWahr('Knopf „Abbrechen" im Ladefenster', !!document.getElementById('ai-abbrechen'));
+                    pruefe('Höchstens drei Modelle je Aufruf', KI_ZEIT.maxModelle, 3);
+                } finally {
+                    Object.assign(KI_ZEIT, merkZeit); kiAbgebrochen = false;
+                }
                 // (c) Modellliste nicht erreichbar: feste Vorzugsliste
                 Object.keys(kiModellCache).forEach(k => delete kiModellCache[k]);
                 window.fetch = () => Promise.reject(new Error('Failed to fetch'));

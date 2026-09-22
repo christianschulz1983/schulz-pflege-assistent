@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pflegegradassistent für Berater v66.55</title>
+    <title>Pflegegradassistent für Berater v66.56</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
@@ -194,6 +194,9 @@
     <div class="ai-overlay-title">KI liest Gutachten aus...</div>
     <div class="ai-overlay-sub" id="ai-overlay-step">Datei wird vorbereitet</div>
     <div class="ai-progress-bar"><div class="ai-progress-fill" id="ai-progress-fill"></div></div>
+    <div class="ai-overlay-sub" id="ai-overlay-ki" style="margin-top:10px"></div>
+    <button type="button" class="btn btn-secondary" id="ai-abbrechen" style="margin-top:14px"
+            onclick="kiAbbrechen()">Abbrechen</button>
 </div>
 
 <div id="review-overlay" class="review-overlay">

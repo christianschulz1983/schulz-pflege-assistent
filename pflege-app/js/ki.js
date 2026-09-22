@@ -1,14 +1,43 @@
 // Teil des Pflegegradassistenten für Berater. Diese Datei wurde aus der frueheren
 // Einzeldatei index.html herausgeloest; der Inhalt ist unveraendert.
-async function callGeminiWithRetry(url, payload) {
-    let delay = 1000;
-    for (let i = 0; i < 5; i++) {
+/* ZEITGRENZEN. Gemeldet: „nun lädt es bei mir ewig" – nach dem Umbau auf mehrere Modelle
+   wurde ein gescanntes Gutachten (ganzes PDF) nacheinander an mehrere Modelle geschickt,
+   und eine einzelne Anfrage hatte keine Zeitgrenze. Jetzt: jede Anfrage höchstens
+   KI_ZEIT.anfrageMs, alle Versuche zusammen höchstens KI_ZEIT.gesamtMs, höchstens
+   KI_ZEIT.maxModelle Modelle – und der Berater kann jederzeit abbrechen. */
+const KI_ZEIT = { anfrageMs: 150000, gesamtMs: 240000, maxModelle: 3 };
+let kiAbbruch = null;          // AbortController des laufenden Aufrufs
+let kiAbgebrochen = false;     // vom Berater abgebrochen
+
+function kiAbbrechen() {
+    kiAbgebrochen = true;
+    if (kiAbbruch) { try { kiAbbruch.abort(); } catch (e) {} }
+}
+
+async function callGeminiWithRetry(url, payload, restMs) {
+    let delay = 2000;
+    for (let i = 0; i < 3; i++) {
+        if (kiAbgebrochen) throw new Error("KI_ABGEBROCHEN");
+        const zeit = Math.min(KI_ZEIT.anfrageMs, restMs || KI_ZEIT.anfrageMs);
+        kiAbbruch = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        let uhr = null, abgelaufen = false;
+        if (kiAbbruch) uhr = setTimeout(() => { abgelaufen = true; kiAbbruch.abort(); }, zeit);
         try {
-            const response = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
+            let response;
+            try {
+                response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                    signal: kiAbbruch ? kiAbbruch.signal : undefined
+                });
+            } catch (netz) {
+                if (kiAbgebrochen) throw new Error("KI_ABGEBROCHEN");
+                if (abgelaufen) throw new Error("KI_ZEITUEBERSCHREITUNG nach " + Math.round(zeit / 1000) + " s");
+                throw netz;
+            } finally {
+                if (uhr) clearTimeout(uhr);
+            }
             if (response.ok) {
                 return await response.json();
             }
@@ -22,26 +51,20 @@ async function callGeminiWithRetry(url, payload) {
                 throw new Error("API Fehler: 400 – Der API-Schlüssel ist ungültig. Bitte prüfen Sie den oben rechts eingetragenen Google Gemini API-Schlüssel (aistudio.google.com).");
             }
             if (response.status === 429) {
-                /* Tageslimit oder ein Kontingent von 0 (Modell im kostenlosen Zugang gesperrt):
-                   Warten hilft nicht – sofort weiter zum nächsten Modell. Nur ein kurzes
-                   Minutenlimit wird EINMAL abgewartet. Vorher: fünf Versuche mit wachsender
-                   Pause, danach Abbruch ohne anderes Modell. */
-                const warte = kiWartezeit(apiMsg);
-                if (i >= 1 || warte === null || warte > 20) {
-                    throw new Error("API Fehler: 429 " + (apiMsg || "Anfragenlimit überschritten"));
-                }
-                await new Promise(r => setTimeout(r, warte * 1000));
-                continue;
+                /* Limit: NICHT warten, sondern sofort zum nächsten Modell (eigenes Kontingent).
+                   Das Warten vervielfachte bei großen Scans die Dauer. */
+                throw new Error("API Fehler: 429 " + (apiMsg || "Anfragenlimit überschritten"));
             } else if (response.status >= 500 && response.status < 600) {
-                if (i === 4) throw new Error(`API Fehler: ${response.status} ${apiMsg || response.statusText}`);
+                if (i === 2) throw new Error(`API Fehler: ${response.status} ${apiMsg || response.statusText}`);
             } else {
                 throw new Error(`API Fehler: ${response.status} ${apiMsg || response.statusText}`);
             }
         } catch (e) {
-            if (e.message && (e.message.includes("400") || e.message.includes("403") || e.message.includes("404") || e.message.includes("429"))) {
+            if (e.message && (/KI_ABGEBROCHEN|KI_ZEITUEBERSCHREITUNG/.test(e.message)
+                || e.message.includes("400") || e.message.includes("403") || e.message.includes("404") || e.message.includes("429"))) {
                 throw e;
             }
-            if (i === 4) throw e;
+            if (i === 2) throw e;
         }
         await new Promise(resolve => setTimeout(resolve, delay));
         delay *= 2;
@@ -65,6 +88,10 @@ function kiFehlerErklaerung(fehler) {
     const t = String((fehler && fehler.message) || fehler || '');
     if (!t) return '';
     if (/zuerst oben rechts/i.test(t)) return 'Es ist kein API-Schlüssel eingetragen (oben rechts).';
+    if (/KI_ABGEBROCHEN/.test(t)) return 'Die Anfrage an Google wurde abgebrochen.';
+    if (/KI_ZEITUEBERSCHREITUNG/.test(t))
+        return 'Google hat nicht rechtzeitig geantwortet (Zeitgrenze überschritten). Bei großen, gescannten '
+             + 'Gutachten kommt das vor, wenn Google ausgelastet ist – bitte in ein paar Minuten erneut versuchen.';
     if (/api key not valid|schlüssel ist ungültig|API_KEY_INVALID/i.test(t))
         return 'Der API-Schlüssel ist ungültig. Bitte auf aistudio.google.com/apikey neu kopieren und oben rechts '
              + 'einfügen – ohne Leerzeichen, vollständig ab „AIza".';
@@ -158,15 +185,26 @@ async function callGeminiWithFallback(payload, systemPrompt) {
         }
     } catch (e) {}
 
-    let lastError = null, limitFehler = null;
-    for (const model of models) {
+    // Höchstens KI_ZEIT.maxModelle Modelle und KI_ZEIT.gesamtMs insgesamt – sonst „ewig"
+    const kandidaten = models.slice(0, KI_ZEIT.maxModelle);
+    const start = Date.now();
+    kiAbgebrochen = false;
+    const kiZeile = document.getElementById('ai-overlay-ki');
+    let lastError = null, limitFehler = null, nr = 0;
+    for (const model of kandidaten) {
+        nr++;
+        const rest = KI_ZEIT.gesamtMs - (Date.now() - start);
+        if (rest < 5000) { lastError = lastError || new Error("KI_ZEITUEBERSCHREITUNG (Gesamtzeit)"); break; }
+        if (kiZeile) kiZeile.innerText = 'Google-KI: ' + model.name + (kandidaten.length > 1 ? ' (Versuch ' + nr + ' von ' + kandidaten.length + ')' : '');
         const url = `https://generativelanguage.googleapis.com/${model.version}/models/${model.name}:generateContent?key=${cleanApiKey}`;
         const fullPayload = { ...payload, systemInstruction: { parts: [{ text: systemPrompt }] } };
         try {
-            const response = await callGeminiWithRetry(url, fullPayload);
+            const response = await callGeminiWithRetry(url, fullPayload, rest);
             if (response) { try { localStorage.setItem('pflege_pref_model', model.name); } catch (e) {} return response; }
         } catch (e) {
             lastError = e;
+            // Abgebrochen oder Zeit überschritten: nicht noch ein Modell mit derselben großen Datei
+            if (e.message && /KI_ABGEBROCHEN|KI_ZEITUEBERSCHREITUNG/.test(e.message)) throw e;
             // Jedes Modell hat ein eigenes Kontingent: bei einem Limit das nächste versuchen.
             if (e.message && e.message.includes("429")) { limitFehler = limitFehler || e; continue; }
             // Ungültiger Schlüssel, Standort, gesperrter Zugang: gilt für alle Modelle – abbrechen.
@@ -181,10 +219,11 @@ async function callGeminiWithFallback(payload, systemPrompt) {
                         delete stripped.generationConfig.responseSchema;
                         if (Object.keys(stripped.generationConfig).length === 0) delete stripped.generationConfig;
                     }
-                    const resp2 = await callGeminiWithRetry(url, stripped);
+                    const resp2 = await callGeminiWithRetry(url, stripped, KI_ZEIT.gesamtMs - (Date.now() - start));
                     if (resp2) { try { localStorage.setItem('pflege_pref_model', model.name); } catch (e) {} return resp2; }
                 } catch (e2) {
                     lastError = e2;
+                    if (e2.message && /KI_ABGEBROCHEN|KI_ZEITUEBERSCHREITUNG/.test(e2.message)) throw e2;
                     if (e2.message && e2.message.includes("429")) { limitFehler = limitFehler || e2; continue; }
                 }
             }
@@ -239,6 +278,8 @@ function updateOverlay(step, pct) {
 }
 function hideOverlay() {
     document.getElementById('ai-overlay').classList.remove('active');
+    const kiZeile = document.getElementById('ai-overlay-ki');
+    if (kiZeile) kiZeile.innerText = '';
     document.getElementById('system-status-badge').className = "status-badge ready";
     document.getElementById('system-status-text').innerText = "Bereit";
 }

@@ -546,6 +546,11 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Kontingent), ein Tageslimit nie abgewartet, ein kurzes Minutenlimit einmal. Knopf
    **„✓ Prüfen"** am Schlüsselfeld (`pruefeApiSchluessel`). Der Schlüssel wird nie in
    Meldungen, Protokolle oder den Modell-Zwischenspeicher geschrieben.
+   **Zeitgrenzen** (`KI_ZEIT`): Gemeldet „lädt ewig" – ein gescanntes Gutachten ging an
+   mehrere Modelle, eine Anfrage hatte keine Zeitgrenze. Jetzt je Anfrage höchstens
+   `anfrageMs`, zusammen `gesamtMs`, höchstens `maxModelle` Modelle; nach einer
+   Zeitüberschreitung kein weiteres Modell mit derselben Datei; bei 429 kein Warten.
+   Knopf **„Abbrechen"** im Ladefenster (`kiAbbrechen`), Anzeige des laufenden Modells.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -599,7 +604,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1309 Pruefungen.
+Der Selbsttest umfasst 1314 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
