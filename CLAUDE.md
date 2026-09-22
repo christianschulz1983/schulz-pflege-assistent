@@ -536,6 +536,17 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Vorhandenes zu überschreiben. `mergeStellungnahme` führt **nie** Widerspruch und Anhörung
    zusammen – sonst wanderten Einleitung, Tabellenkopf und Allgemeine Angaben mit.
 
+39. **KI-Fehler im Klartext, Modelle vom Schlüssel** (`js/ki.js`). Gemeldet: Der neue Schlüssel
+   einer Kollegin „funktionierte nicht", die App sagte bei JEDEM Fehler „Google-Limit
+   erreicht". Jetzt übersetzt `kiFehlerErklaerung()` Googles Antwort (ungültiger Schlüssel,
+   Standort/VPN, Zugriff verweigert, Kontingent 0 → Abrechnung, Tages- oder Minutenlimit,
+   keine Verbindung); alle KI-Meldungen nutzen sie. Die Modelle fragt `kiModelleFuer()` bei
+   Google ab (models.list, kein Kontingent), statt abgeschaltete (1.5, 2.0) zu raten;
+   Vorzugsreihenfolge `KI_MODELL_VORZUG`. Bei 429 wird das **nächste Modell** versucht (eigenes
+   Kontingent), ein Tageslimit nie abgewartet, ein kurzes Minutenlimit einmal. Knopf
+   **„✓ Prüfen"** am Schlüsselfeld (`pruefeApiSchluessel`). Der Schlüssel wird nie in
+   Meldungen, Protokolle oder den Modell-Zwischenspeicher geschrieben.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -588,7 +599,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1293 Pruefungen.
+Der Selbsttest umfasst 1309 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

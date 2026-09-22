@@ -154,7 +154,7 @@ async function leseAlteStellungnahme(event) {
     } catch (e) {
         hideOverlay();
         console.error('Stellungnahme konnte nicht gelesen werden', e);
-        showToast('Die Stellungnahme konnte nicht gelesen werden: ' + (e && e.message ? e.message : e), 'error');
+        showToast('Die Stellungnahme konnte nicht gelesen werden: ' + ((typeof kiFehlerErklaerung === 'function') ? kiFehlerErklaerung(e) : (e && e.message ? e.message : e)), 'error');
     }
 }
 

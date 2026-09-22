@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pflegegradassistent für Berater v66.54</title>
+    <title>Pflegegradassistent für Berater v66.55</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
@@ -33,6 +33,7 @@
                 <input type="password" id="user-api-key" class="field-input" style="width: 150px; font-family: var(--font-mono); font-size: 10px; height: 34px; border-color: var(--border-bright);" placeholder="🔑 API-Schlüssel" oninput="userApiKey = this.value; saveApiKey()" onpaste="setTimeout(function(){ var e=document.getElementById('user-api-key'); userApiKey=e.value; saveApiKey(); }, 0)">
                 <button type="button" class="btn btn-ghost" id="api-key-toggle" title="Schlüssel anzeigen/verbergen" style="height:34px; padding:8px 10px;" onclick="toggleApiKeyVisible()">👁</button>
                 <button type="button" class="btn btn-ghost" title="Aus Zwischenablage einfügen" style="height:34px; padding:8px 10px;" onclick="pasteApiKey()">📋 Einfügen</button>
+                <button type="button" class="btn btn-ghost" id="api-key-pruefen" title="Prüfen, ob der Schlüssel funktioniert – und wenn nicht, warum" style="height:34px; padding:8px 10px;" onclick="pruefeApiSchluessel()">✓ Prüfen</button>
             </div>
 
             <button class="btn btn-primary" onclick="saveCase()">Speichern</button>

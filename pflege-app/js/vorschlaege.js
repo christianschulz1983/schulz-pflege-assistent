@@ -157,7 +157,7 @@ Zwingende Regeln:
     } catch (e) {
         hideOverlay();
         console.warn('Vorschläge fehlgeschlagen:', e);
-        showToast('Die Prüfung ist fehlgeschlagen: ' + e.message, 'error');
+        showToast('Die Prüfung ist fehlgeschlagen: ' + ((typeof kiFehlerErklaerung === 'function') ? kiFehlerErklaerung(e) : e.message), 'error');
     }
 }
 

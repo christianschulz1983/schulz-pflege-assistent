@@ -401,7 +401,8 @@ function showToast(msg, type) {
         'font-size:11px;font-weight:700;z-index:9999;max-width:520px;text-align:center;' +
         'box-shadow:0 4px 24px rgba(15,23,42,0.1);letter-spacing:0.03em;';
     document.body.appendChild(t);
-    setTimeout(function(){ t.remove(); }, 4500);
+    // Lange Fehlermeldungen (etwa der Grund, warum Google nicht antwortet) länger zeigen
+    setTimeout(function(){ t.remove(); }, (type === 'error' && String(msg).length > 120) ? 10000 : 4500);
 }
 
 window.onload = function() {

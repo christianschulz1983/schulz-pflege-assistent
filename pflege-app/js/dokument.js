@@ -540,7 +540,7 @@ async function generateAppealText() {
                 }
             } catch (e) {
                 console.warn("Korrektur übersprungen:", e);
-                showToast("Rechtschreibprüfung übersprungen (" + e.message + "). Stellungnahme wurde mit Originaltext erstellt.", "error");
+                showToast("Rechtschreibprüfung übersprungen – " + ((typeof kiFehlerErklaerung === 'function') ? kiFehlerErklaerung(e) : e.message) + " Stellungnahme wurde mit Originaltext erstellt.", "error");
             } finally {
                 hideOverlay();
             }
@@ -620,7 +620,7 @@ async function generateAppealText() {
                 }
             } catch (e) {
                 console.warn("Texterstellung übersprungen:", e);
-                showToast("Texte konnten nicht erzeugt werden (" + e.message + "). Es werden die Standardtexte verwendet.", "error");
+                showToast("Texte konnten nicht erzeugt werden – " + ((typeof kiFehlerErklaerung === 'function') ? kiFehlerErklaerung(e) : e.message) + " Es werden die Standardtexte verwendet.", "error");
             } finally {
                 hideOverlay();
             }

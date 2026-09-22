@@ -5054,6 +5054,69 @@ async function selbsttest() {
             }
         }
 
+        /* 28. API-Schlüssel: echter Grund statt „Google-Limit erreicht", Modelle vom Schlüssel.
+           Gemeldet: Bei einer Kollegin „funktionierte der Schlüssel nicht" – die App nannte bei
+           jedem Fehler das Limit, fragte abgeschaltete Modelle an und brach beim ersten Limit ab.
+           Google wird hier NICHT angefragt: fetch ist durch eine Attrappe ersetzt. */
+        if (typeof kiFehlerErklaerung === 'function' && typeof kiModelleFuer === 'function') {
+            const e28 = m => kiFehlerErklaerung(new Error(m));
+            pruefeWahr('Klartext: ungültiger Schlüssel', /ungültig/.test(e28('API Fehler: 400 – API key not valid. Please pass a valid API key.')));
+            pruefeWahr('Klartext: Standort nicht unterstützt', /Standort/.test(e28('API Fehler: 400 User location is not supported for the API use.')));
+            pruefeWahr('Klartext: Tageslimit', /Tageskontingent/.test(e28('API Fehler: 429 Quota exceeded for metric: generate_content_free_tier_requests, limit: 20, GenerateRequestsPerDayPerProjectPerModel')));
+            pruefeWahr('Klartext: Kontingent 0 → Abrechnung', /Abrechnung/.test(e28('API Fehler: 429 Quota exceeded, limit: 0, model: gemini-2.5-pro')));
+            pruefeWahr('Klartext: Zugriff verweigert', /verweigert/.test(e28('API Fehler: 403 Generative Language API has not been used in project 1 before or it is disabled.')));
+            pruefeWahr('Klartext: keine Verbindung', /nicht erreichbar/.test(e28('Failed to fetch')));
+            pruefe('Wartezeit: Minutenlimit', kiWartezeit('Please retry in 12.4s.'), 13);
+            pruefe('Wartezeit: Tageslimit wird nicht abgewartet', kiWartezeit('limit: 20, PerDay. Please retry in 12s.'), null);
+            pruefeWahr('Einlesen nennt den echten Grund statt pauschal das Limit',
+                !/Google-Limit erreicht – Felder/.test(aiReadGutachten.toString()) && /kiFehlerErklaerung\(aiError\)/.test(aiReadGutachten.toString()));
+            pruefeWahr('Knopf „Prüfen" am Schlüsselfeld', !!document.getElementById('api-key-pruefen') && typeof pruefeApiSchluessel === 'function');
+
+            const merkFetch = window.fetch;
+            const keyEl = document.getElementById('user-api-key');
+            const merkKey = keyEl ? keyEl.value : '', merkUser = userApiKey;
+            let merkPref = null; try { merkPref = localStorage.getItem('pflege_pref_model'); } catch (e) {}
+            const aufrufe = [];
+            const antwort = (status, body) => Promise.resolve({ ok: status === 200, status, statusText: '', json: async () => body });
+            try {
+                if (keyEl) keyEl.value = 'AIzaTEST000000000000000000000000000abc1';
+                Object.keys(kiModellCache).forEach(k => delete kiModellCache[k]);
+                try { localStorage.removeItem('pflege_pref_model'); } catch (e) {}
+                // (a) Tageslimit beim ersten Modell -> nächstes Modell, ohne Wiederholungsschleife
+                window.fetch = (url) => {
+                    aufrufe.push(url.replace(/key=[^&]+/, 'key=…'));
+                    if (/\/models\?/.test(url)) return antwort(200, { models: [
+                        { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+                        { name: 'models/gemini-2.5-flash-lite', supportedGenerationMethods: ['generateContent'] },
+                        { name: 'models/gemini-1.5-flash', supportedGenerationMethods: ['generateContent'] },
+                        { name: 'models/text-embedding-004', supportedGenerationMethods: ['embedContent'] }] });
+                    if (/gemini-2\.5-flash:generate/.test(url)) return antwort(429, { error: { message: 'Quota exceeded, limit: 20, PerDay' } });
+                    return antwort(200, { candidates: [{ content: { parts: [{ text: 'OK' }] } }] });
+                };
+                let r28 = null; try { r28 = await callGeminiWithFallback({ contents: [] }, 'Test'); } catch (e) { r28 = null; }
+                pruefeWahr('Limit beim ersten Modell: zweites Modell antwortet', !!(r28 && r28.candidates));
+                pruefe('Tageslimit: erstes Modell nur einmal angefragt', aufrufe.filter(u => /gemini-2\.5-flash:generate/.test(u)).length, 1);
+                pruefeWahr('Abgeschaltetes Modell 1.5 wird nicht mehr angefragt', !aufrufe.some(u => /gemini-1\.5/.test(u)));
+                // (b) Ungültiger Schlüssel: sofort Klartext, keine Modellanfrage
+                aufrufe.length = 0;
+                Object.keys(kiModellCache).forEach(k => delete kiModellCache[k]);
+                window.fetch = (url) => { aufrufe.push(url); return antwort(400, { error: { message: 'API key not valid. Please pass a valid API key.' } }); };
+                let f28 = null; try { await callGeminiWithFallback({ contents: [] }, 'Test'); } catch (e) { f28 = e; }
+                pruefeWahr('Ungültiger Schlüssel: Klartext', !!f28 && /ungültig/.test(kiFehlerErklaerung(f28)));
+                pruefe('Ungültiger Schlüssel: keine weiteren Anfragen', aufrufe.length, 1);
+                // (c) Modellliste nicht erreichbar: feste Vorzugsliste
+                Object.keys(kiModellCache).forEach(k => delete kiModellCache[k]);
+                window.fetch = () => Promise.reject(new Error('Failed to fetch'));
+                pruefe('Ohne Modellliste gilt die Vorzugsliste', await kiModelleFuer('AIzaTEST000000000000000000000000000abc1'), KI_MODELL_VORZUG);
+            } finally {
+                window.fetch = merkFetch;
+                if (keyEl) keyEl.value = merkKey;
+                userApiKey = merkUser;
+                Object.keys(kiModellCache).forEach(k => delete kiModellCache[k]);
+                try { if (merkPref === null) localStorage.removeItem('pflege_pref_model'); else localStorage.setItem('pflege_pref_model', merkPref); } catch (e) {}
+            }
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

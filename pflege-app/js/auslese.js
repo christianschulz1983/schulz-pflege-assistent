@@ -429,12 +429,16 @@ async function aiReadGutachten(event, ziel) {
                 if (!keyPresent) {
                     msg = "Zum Einlesen bitte oben rechts einen kostenlosen Google-API-Schlüssel eintragen (aistudio.google.com)."
                         + (online ? " Das Einlesen läuft online über Google." : " Alternativ den lokalen Server über 'Pflege-Server starten.bat' nutzen.");
-                } else if (online) {
-                    msg = "Google nicht verfügbar (evtl. Limit erreicht oder Schlüssel ungültig). Tipp: ein neuer, kostenloser API-Schlüssel löst ein Limit sofort. Felder bitte anhand der PDF prüfen/ergänzen.";
-                } else if (!lastServerReachable) {
-                    msg = "Lokaler Server nicht erreicht und Google nicht verfügbar. Bitte 'Pflege-Server starten.bat' starten und die App über http://127.0.0.1:8765 öffnen – oder oben rechts einen Google-API-Schlüssel eintragen.";
                 } else {
-                    msg = "Google-Limit erreicht – Felder wurden lokal vorab gefüllt (ggf. unvollständig). Bitte anhand der PDF prüfen/ergänzen. Tipp: ein neuer, kostenloser API-Schlüssel löst das Limit sofort.";
+                    /* Der ECHTE Grund statt pauschal „Google-Limit erreicht" (kiFehlerErklaerung).
+                       Gemeldet: Der Schlüssel einer Kollegin „funktionierte nicht" – die App nannte
+                       bei jedem Fehler das Limit, auch wenn Google etwas ganz anderes meldete. */
+                    const grund = (typeof kiFehlerErklaerung === 'function' && aiError)
+                        ? kiFehlerErklaerung(aiError) : 'Google war nicht verfügbar.';
+                    const rest = (!online && !lastServerReachable)
+                        ? " Der lokale Server ist ebenfalls nicht erreichbar – bitte 'Pflege-Server starten.bat' starten."
+                        : " Die Felder wurden lokal vorab gefüllt (ggf. unvollständig) – bitte anhand der PDF prüfen.";
+                    msg = "Google-KI nicht verfügbar: " + grund + rest;
                 }
                 showToast(msg, "error");
             }
