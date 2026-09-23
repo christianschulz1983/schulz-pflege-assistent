@@ -770,3 +770,9 @@
         .rev-crit-title { font-size: 12px; }
         .rev-crit-ctrl { display: flex; gap: 6px; align-items: center; }
         @media (max-width: 900px) { .review-body { grid-template-columns: 1fr; grid-template-rows: 40% 60%; } .review-pdf { border-right: none; border-bottom: 1px solid var(--border); } }
+
+
+/* Prüfansicht: Herkunft je Kriterium (zwei Quellen) */
+.rev-bilanz{font-size:12px;line-height:1.7;padding:10px 12px;margin-bottom:10px;
+            background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;}
+.rev-quelle{font-size:10px;line-height:1.5;color:var(--text-muted);margin-top:2px;}

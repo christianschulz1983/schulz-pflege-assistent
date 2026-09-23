@@ -50,7 +50,7 @@ werkzeuge/bri_abgleich.py  Prüft bri_texte.js wörtlich gegen Richtlinien/*.pdf
   laien_hinweise.js   Praxishinweise, 58 Kriterien (Hilfsmittel-Regeln, Fallstricke)
   pdf-lib.min.js      pdf-lib 1.17.1 (MIT, pdf-lib.LICENSE.md), aus dem npm-Paket, Prüfsumme geprüft
   pflege_server.py    Lokaler Server: PDF-Text, OCR, liefert die App aus
-  test_pflege_server.py  Selbsttest für den Server (python test_pflege_server.py)
+  test_pflege_server.py  Selbsttest für den Server, 24 Pruefungen (python test_pflege_server.py)
 ```
 Alle Skripte sind klassische Skripte im gemeinsamen Namensraum – **keine ES-Module**,
 weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
@@ -623,6 +623,27 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Vergleichsreiter zeigt zusätzlich `lagenUebersichtHtml()`: gefolgt, teilweise, nicht,
    verschlechtert – je mit Sprung zum Kriterium.
 
+45. **Übertragung der Modulbewertungen: ZWEI QUELLEN.** Gemeldet als Kernproblem des
+   Einlesens. Früher lieferte die KI die Kriterien nicht mehr, sobald der lokale Server sie
+   gelesen hatte – ein Lesefehler fiel nur auf, wenn zufällig die Modulsumme nicht passte,
+   und **nicht gefundene Kriterien wurden still zu 0 („selbständig")**. Jetzt liest die KI
+   immer mit; `werteVergleich(lokal, ki)` (js/auslese.js) vergleicht je Kriterium:
+   `beide` (gesichert), `konflikt`, `lokal`, `ki`, `fehlt`. Bei Streit gilt die
+   koordinatengenaue Lesung, **wenn sie sicher war**, sonst die KI. Ein fehlendes Kriterium
+   kommt **nicht** in `values_orig`. Die Prüfansicht zeigt `quellenBilanz` („x von 64 gelesen,
+   y bestätigt, z abweichend …"), je Zeile Herkunft, Grund und Fundstelle
+   (`quelleHinweisHtml`) und den Filter **„nur zu prüfende zeigen"** (`rvNurZuPruefen`);
+   eine Handeingabe setzt die Zeile auf `korrigiert` (`rvQuelleKorrigiert`).
+46. **Markierungserkennung ohne feste Koordinaten** (`pflege_server.py`). Die Kreuze sitzen je
+   nach Gutachten (Medizinischer Dienst, Medicproof, Vorlage, Druckqualität) an
+   unterschiedlichen Stellen. Deshalb: `_spalten_aus_marken()` bildet die Spalten **je Seite
+   und je Modul aus allen Kriteriumszeilen**; der Stufenindex ist die nächstgelegene Spalte,
+   nicht die Position in der Zeile. Fehlt in einer Zeile ein leeres Kästchen, verschiebt sich
+   nichts mehr (vorher wurde aus Stufe 2 still Stufe 1 – Gegenprobe im Servertest).
+   `_widget_marken()` liest zusätzlich echte AcroForm-Checkboxen ausfüllbarer Gutachten.
+   Zeilentoleranz aus der Zeilenhöhe statt fester 6 pt. Je Wert kommen `sicher`, `grund`
+   (mehrere, keine, unvollstaendig, abstand, heuristik, zahl), `seite` und `y` zurück.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -675,7 +696,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1431 Pruefungen.
+Der Selbsttest umfasst 1455 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

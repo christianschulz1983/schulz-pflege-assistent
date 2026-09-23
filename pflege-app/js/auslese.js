@@ -82,6 +82,121 @@ function localMetaToData(local) {
 
 // Stufe 3: koordinatengenau lokal ausgelesene Werte (vom Server) in das values_orig-Format
 // der App umwandeln. Diese haben Vorrang vor der KI-Schätzung der Einzelkriterien.
+/* ZWEI QUELLEN JE KRITERIUM: koordinatengenaue Lesung des lokalen Servers und Lesung der KI.
+   Gemeldet war das Kernproblem der Übertragung: Ein Lesefehler sah in der Prüfansicht aus wie
+   ein sicher gelesener Wert. Jetzt wird verglichen:
+     beide      – beide Quellen sagen dasselbe (gesichert)
+     konflikt   – die Quellen widersprechen sich (muss geprüft werden)
+     lokal / ki – nur eine Quelle hat einen Wert
+     fehlt      – keine Quelle hat das Kriterium gefunden (früher still eine 0)
+   Rückgabe: { werte: [values_orig-Einträge], quellen: { "4.1.1": {...} } } */
+function werteVergleich(lokal, kiListe) {
+    const kiMap = {};
+    (kiListe || []).forEach(v => { if (v && v.id != null) kiMap[v.id] = v; });
+    const quellen = {};
+    const werte = [];
+    ITEMS.forEach(i => {
+        if (!i.m || !i.nr) return;
+        const m5 = (i.m === 5 && i.group !== 'D');
+        const l = lokal ? lokal[i.nr] : null;
+        const k = kiMap[i.id];
+        const grenze = v => Math.max(0, Math.min((i.opts ? i.opts.length : 1) - 1, Number(v)));
+        const lWert = !l ? null : (m5
+            ? ((l.count == null && l.period == null) ? null : { count: Number(l.count) || 0, period: l.period || 'W' })
+            : (l.idx == null ? null : grenze(l.idx)));
+        const kWert = !k ? null : (m5
+            ? ((k.val_obj_count === undefined && k.val_obj_period === undefined) ? null
+               : { count: Number(k.val_obj_count) || 0, period: k.val_obj_period || 'W' })
+            : (k.val_num === undefined || k.val_num === null ? null : grenze(k.val_num)));
+        const gleich = (a, b) => (a == null || b == null) ? false
+            : (m5 ? (a.count === b.count && a.period === b.period) : a === b);
+        const sicher = l ? (l.sicher !== false) : false;
+        let status, wert;
+        if (lWert !== null && kWert !== null) {
+            if (gleich(lWert, kWert)) { status = 'beide'; wert = lWert; }
+            else { status = 'konflikt'; wert = sicher ? lWert : kWert; }
+        } else if (lWert !== null) { status = 'lokal'; wert = lWert; }
+        else if (kWert !== null) { status = 'ki'; wert = kWert; }
+        else { status = 'fehlt'; wert = null; }
+        quellen[i.nr] = { id: i.id, status: status, sicher: sicher, grund: l ? (l.grund || '') : '',
+                          seite: l ? l.seite : null, y: l ? l.y : null, lokal: lWert, ki: kWert };
+        if (wert === null) return;
+        if (m5) werte.push({ id: i.id, val_obj_count: wert.count, val_obj_period: wert.period });
+        else werte.push({ id: i.id, val_num: wert });
+    });
+    return { werte: werte, quellen: quellen };
+}
+
+// Lesbare Fassung eines Wertes für die Prüfansicht
+function wertText(item, wert) {
+    if (wert === null || wert === undefined) return '–';
+    if (item.m === 5 && item.group !== 'D') {
+        const p = { D: 'pro Tag', W: 'pro Woche', M: 'pro Monat' }[wert.period] || '';
+        return (wert.count || 0) + ' ' + p;
+    }
+    const o = item.opts ? item.opts[wert] : null;
+    return o ? ((typeof expandLabel === 'function') ? expandLabel(o) : o) : String(wert);
+}
+
+// Zählt, was zu prüfen ist – Grundlage der Kopfzeile und des Filters
+function quellenBilanz(quellen) {
+    const b = { gesamt: 0, beide: 0, konflikt: 0, lokal: 0, ki: 0, fehlt: 0, unsicher: 0, korrigiert: 0 };
+    Object.keys(quellen || {}).forEach(nr => {
+        const q = quellen[nr];
+        b.gesamt++;
+        b[q.status] = (b[q.status] || 0) + 1;
+        // Unsicher ist alles, was nur EINE Quelle hat oder beim Lesen Zweifel hinterließ
+        if (q.status !== 'fehlt' && q.status !== 'korrigiert' && q.status !== 'beide' && !q.sicher) b.unsicher++;
+        if (q.status === 'lokal' || q.status === 'ki') b.nurEine = (b.nurEine || 0) + 1;
+    });
+    b.gelesen = b.gesamt - b.fehlt;
+    b.zuPruefen = b.konflikt + b.fehlt + b.unsicher;
+    return b;
+}
+
+// Muss dieses Kriterium geprüft werden?
+function quelleZuPruefen(q) {
+    if (!q) return false;
+    if (q.status === 'konflikt' || q.status === 'fehlt') return true;
+    if (q.status === 'beide' || q.status === 'korrigiert') return false;
+    return !q.sicher;
+}
+
+const QUELLE_TEXT = {
+    beide: { kurz: '✓ beide Quellen', farbe: 'var(--green)' },
+    konflikt: { kurz: '⚠ Quellen widersprechen sich', farbe: 'var(--red)' },
+    lokal: { kurz: 'aus der Tabelle gelesen', farbe: 'var(--text-muted)' },
+    ki: { kurz: 'von der KI gelesen', farbe: 'var(--text-muted)' },
+    fehlt: { kurz: '⚠ nicht gefunden', farbe: 'var(--red)' },
+    korrigiert: { kurz: '✎ von Ihnen gesetzt', farbe: 'var(--accent)' }
+};
+const QUELLE_GRUND = {
+    mehrere: 'mehrere Kreuze in der Zeile',
+    keine: 'kein Kreuz erkannt',
+    unvollstaendig: 'in der Zeile fehlt ein Kästchen',
+    abstand: 'Kreuz passt zu keiner Spalte',
+    heuristik: 'nur über eine Notlösung erkannt',
+    zahl: 'Häufigkeit nicht lesbar',
+    spalte: 'Spalte unklar'
+};
+
+// Die Zeile in der Prüfansicht: Herkunft, Sicherheit, beide Vorschläge bei Streit
+function quelleHinweisHtml(item, q) {
+    if (!q) return '';
+    const t = QUELLE_TEXT[q.status] || QUELLE_TEXT.lokal;
+    const teile = [`<span style="color:${t.farbe}">${escapeHtml(t.kurz)}</span>`];
+    if (q.status === 'konflikt') {
+        teile.push('Tabelle: „' + escapeHtml(wertText(item, q.lokal)) + '“, KI: „' + escapeHtml(wertText(item, q.ki)) + '“');
+    }
+    if (q.status !== 'fehlt' && q.status !== 'korrigiert' && !q.sicher && q.grund && QUELLE_GRUND[q.grund]) {
+        // Bestätigt die KI eine unsichere Tabellenlesung, gehört beides in den Hinweis
+        teile.push(escapeHtml(q.status === 'beide' ? 'Tabelle unsicher (' + QUELLE_GRUND[q.grund] + '), von der KI bestätigt'
+                                         : QUELLE_GRUND[q.grund]));
+    }
+    if (q.seite) teile.push('Seite ' + q.seite);
+    return `<div class="rev-quelle">${teile.join(' · ')}</div>`;
+}
+
 function serverValuesToValuesOrig(sv) {
     const arr = [];
     ITEMS.forEach(i => {
@@ -374,8 +489,10 @@ async function aiReadGutachten(event, ziel) {
                 ];
                 updateOverlay("KI analysiert das Dokument...", 60);
             }
-            // Liegen die Kriterien lokal präzise vor, muss Google sie nicht liefern (kleinere Antwort).
-            if (haveLocalValues) { delete responseSchema.properties.values_orig; responseSchema.required = ["diagnoses"]; }
+            /* ZWEI QUELLEN. Früher lieferte die KI die Kriterien NICHT mehr, sobald der lokale
+               Server sie gelesen hatte – ein Lesefehler fiel dann nur auf, wenn zufällig die
+               Modulsumme nicht passte. Jetzt liest die KI immer mit; die App vergleicht beide
+               Quellen und legt nur die Abweichungen zur Prüfung vor (werteVergleich). */
 
             const payload = {
                 contents: [{ role: "user", parts: userParts }],
@@ -408,8 +525,13 @@ async function aiReadGutachten(event, ziel) {
                 : null;
 
             if (data) {
-                // Google erfolgreich -> präzise lokale Kriterien (Text-PDFs) haben Vorrang
-                if (haveLocalValues) { data.values_orig = serverValuesToValuesOrig(local.values); data._localValues = true; }
+                /* Beide Quellen gegeneinander: gleich = gesichert, verschieden = vorlegen.
+                   Bei Streit gilt die koordinatengenaue Lesung, sofern sie sicher war;
+                   war sie unsicher, gilt die Lesung der KI. */
+                const verglichen = werteVergleich(haveLocalValues ? local.values : null, data.values_orig);
+                data._quellen = verglichen.quellen;
+                if (haveLocalValues) data._localValues = true;
+                if (verglichen.werte.length) data.values_orig = verglichen.werte;
                 // Den ausgelesenen Text mitgeben: daran wird die Schreibweise des Namens geprüft.
                 if (haveLocalText) data._text = local.text;
                 if (scanInfo) data._scan = scanInfo;
@@ -418,7 +540,11 @@ async function aiReadGutachten(event, ziel) {
             } else {
                 // Google nicht verfügbar (z.B. 429) -> lokale Reserve, damit nichts blockiert
                 const fb = (local && local.ok) ? localMetaToData(local) : {};
-                if (haveLocalValues) { fb.values_orig = serverValuesToValuesOrig(local.values); }
+                if (haveLocalValues) {
+                    const nurLokal = werteVergleich(local.values, null);
+                    fb.values_orig = nurLokal.werte;
+                    fb._quellen = nurLokal.quellen;
+                }
                 if (haveLocalText) fb._text = local.text;
                 if (scanInfo) fb._scan = scanInfo;
                 fb._localValues = true;
@@ -514,6 +640,8 @@ function normalizeImport(data) {
         // gezeigt und geprüft, nicht Stammdaten, Diagnosen und Modulsummen.
         nurKriterien: !!data._nurKriterien,
         rekonstruiert: data._rekonstruiert || null,
+        // Herkunft und Sicherheit je Kriterium (werteVergleich)
+        quellen: data._quellen || null,
         nichtZuordenbar: data._nichtZuordenbar || null,
         eigeneSummen: data._eigeneSummen || null,
         // Höherstufungsantrag: Angaben für die Erfassungsmaske, geprüft und an-/abwählbar
@@ -726,9 +854,51 @@ function rvMarkEdited(id) {
     if (typeof rvZeigeModulGegenprobe === 'function') rvZeigeModulGegenprobe();
     if (typeof rvZeigeStellungnahmePruefung === 'function') rvZeigeStellungnahmePruefung();
 }
-function rvValNum(id, v) { reviewData.valuesMap[id] = parseInt(v); rvMarkEdited(id); }
-function rvM5Count(id, v) { if (typeof reviewData.valuesMap[id] !== 'object') reviewData.valuesMap[id] = { count: 0, period: 'W' }; reviewData.valuesMap[id].count = Number(v); rvMarkEdited(id); }
-function rvM5Period(id, v) { if (typeof reviewData.valuesMap[id] !== 'object') reviewData.valuesMap[id] = { count: 0, period: 'W' }; reviewData.valuesMap[id].period = v; rvMarkEdited(id); }
+function rvValNum(id, v) { reviewData.valuesMap[id] = parseInt(v); rvMarkEdited(id); rvQuelleKorrigiert(id); }
+
+/* Ein von Hand gesetzter Wert ist geprüft – die Zeile verliert ihre Warnung. */
+function rvQuelleKorrigiert(id) {
+    const item = ITEMS.find(i => i.id === id);
+    if (!item || !reviewData || !reviewData.quellen || !reviewData.quellen[item.nr]) return;
+    const q = reviewData.quellen[item.nr];
+    q.status = 'korrigiert'; q.sicher = true;
+    const zeile = document.getElementById('rev-row-' + id);
+    if (zeile) {
+        zeile.classList.remove('rev-pruefen', 'rev-missing');
+        zeile.classList.add('rev-ok');
+        const hinweis = zeile.querySelector('.rev-quelle');
+        if (hinweis) hinweis.outerHTML = quelleHinweisHtml(item, q);
+    }
+    rvBilanzAktualisieren();
+}
+
+// Zeigt nur noch die Kriterien, die zu prüfen sind
+function rvNurZuPruefen(an) {
+    document.querySelectorAll('#review-form .rev-crit').forEach(el => {
+        el.style.display = (an && !el.classList.contains('rev-pruefen')) ? 'none' : '';
+    });
+    document.querySelectorAll('#review-form .rev-mod-label').forEach(el => {
+        if (!an) { el.style.display = ''; return; }
+        let sichtbar = false;
+        let n = el.nextElementSibling;
+        while (n && n.classList && n.classList.contains('rev-crit')) {
+            if (n.style.display !== 'none') { sichtbar = true; break; }
+            n = n.nextElementSibling;
+        }
+        el.style.display = sichtbar ? '' : 'none';
+    });
+}
+
+// Kopfzeile nachziehen, wenn von Hand korrigiert wurde
+function rvBilanzAktualisieren() {
+    const box = document.querySelector('#review-form .rev-bilanz');
+    if (!box || !reviewData || !reviewData.quellen) return;
+    const b = quellenBilanz(reviewData.quellen);
+    const k = box.querySelector('label');
+    if (k) k.lastChild.textContent = ' nur zu prüfende zeigen (' + b.zuPruefen + ')';
+}
+function rvM5Count(id, v) { if (typeof reviewData.valuesMap[id] !== 'object') reviewData.valuesMap[id] = { count: 0, period: 'W' }; reviewData.valuesMap[id].count = Number(v); rvMarkEdited(id); rvQuelleKorrigiert(id); }
+function rvM5Period(id, v) { if (typeof reviewData.valuesMap[id] !== 'object') reviewData.valuesMap[id] = { count: 0, period: 'W' }; reviewData.valuesMap[id].period = v; rvMarkEdited(id); rvQuelleKorrigiert(id); }
 
 // Zeichnet die hochgeladene PDF zuverlässig mit PDF.js in die linke Vorschau.
 // Fällt auf ein <iframe> zurück, falls die Bibliothek fehlt oder das Rendern scheitert.
@@ -1014,6 +1184,23 @@ function buildReviewKriterien(rev) {
         ? `Einzelkriterien (NBA) — <span style="color:var(--green)">grün = aus der Stellungnahme gelesen</span> · <span style="color:var(--yellow)">gelb = unverändert aus dem Erstgutachten</span>`
         : `Einzelkriterien (NBA) — <span style="color:var(--green)">grün = erkannt</span> · <span style="color:var(--yellow)">gelb = nicht erkannt</span>`;
     let html = `<div class="rev-section"><div class="rev-sec-title">${kopf}</div>`;
+    /* ZWEI QUELLEN: Bilanz und Filter. Nicht gefundene Kriterien werden nicht mehr still
+       als „selbständig" (0) übernommen, sondern hier ausgewiesen. */
+    if (rev.quellen) {
+        const b = quellenBilanz(rev.quellen);
+        html += `<div class="rev-bilanz">
+            <b>${b.gelesen} von ${b.gesamt} Kriterien gelesen</b> (ohne die besondere Bedarfskonstellation) ·
+            <span style="color:var(--green)">${b.beide} von beiden Quellen bestätigt</span> ·
+            <span style="color:${b.konflikt ? 'var(--red)' : 'var(--text-muted)'}">${b.konflikt} abweichend</span> ·
+            <span style="color:${b.fehlt ? 'var(--red)' : 'var(--text-muted)'}">${b.fehlt} nicht gefunden</span> ·
+            <span style="color:${b.unsicher ? 'var(--yellow)' : 'var(--text-muted)'}">${b.unsicher} unsicher oder nur aus einer Quelle</span>
+            <label style="margin-left:12px;font-weight:600"><input type="checkbox" id="rev-nur-pruefen"
+                onchange="rvNurZuPruefen(this.checked)"> nur zu prüfende zeigen (${b.zuPruefen})</label>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;font-weight:400">
+                Gelesen wird doppelt: koordinatengenau aus der Tabelle und durch die KI. Stimmen beide
+                überein, gilt der Wert als gesichert. Bitte nur die übrigen prüfen.</div>
+        </div>`;
+    }
     for (let m = 1; m <= 6; m++) {
         html += `<div class="rev-mod-label">Modul ${m}: ${modNames[m - 1]}</div>`;
         ITEMS.filter(i => i.m === m).forEach(i => {
@@ -1029,7 +1216,12 @@ function buildReviewKriterien(rev) {
                 const cur = (typeof v === 'number') ? v : 0;
                 control = `<select onchange="rvValNum(${i.id},this.value)">${i.opts.map((o, oi) => `<option value="${oi}" ${cur === oi ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
             }
-            html += `<div class="rev-crit ${ok ? 'rev-ok' : 'rev-missing'}" id="rev-row-${i.id}"><span class="rev-crit-nr">${i.nr}</span><span class="rev-crit-title">${esc(i.title)}</span><span class="rev-crit-ctrl">${control}</span></div>`;
+            const q = rev.quellen ? rev.quellen[i.nr] : null;
+            const pruefen = quelleZuPruefen(q);
+            const klasse = q ? (q.status === 'beide' ? 'rev-ok' : (pruefen ? 'rev-missing' : 'rev-ok')) : (ok ? 'rev-ok' : 'rev-missing');
+            html += `<div class="rev-crit ${klasse}${pruefen ? ' rev-pruefen' : ''}" id="rev-row-${i.id}"` +
+                `><span class="rev-crit-nr">${i.nr}</span><span class="rev-crit-title">${esc(i.title)}` +
+                `${q ? quelleHinweisHtml(i, q) : ''}</span><span class="rev-crit-ctrl">${control}</span></div>`;
         });
     }
     html += `</div>`;

@@ -5565,6 +5565,83 @@ async function selbsttest() {
             }
         }
 
+        /* 34. Übertragung der Modulbewertungen: ZWEI QUELLEN vergleichen (js/auslese.js).
+           Gemeldet als Kernproblem: Ein Lesefehler sah in der Prüfansicht aus wie ein sicher
+           gelesener Wert, und nicht gefundene Kriterien wurden still zu „selbständig".
+           Jetzt liest die KI immer mit, beide Quellen werden verglichen, und die Prüfansicht
+           zeigt Herkunft, Sicherheit und Fundstelle. */
+        if (typeof werteVergleich === 'function') {
+            const kid = nr => ITEMS.find(i => i.nr === nr).id;
+            const lokal34 = {
+                '4.1.1': { idx: 1, sicher: true, grund: '', seite: 2, y: 120 },
+                '4.1.2': { idx: 2, sicher: true, grund: '', seite: 2, y: 140 },
+                '4.1.3': { idx: 1, sicher: false, grund: 'unvollstaendig', seite: 2, y: 160 },
+                '4.1.4': { idx: 2, sicher: false, grund: 'mehrere', seite: 2, y: 180 },
+                '4.5.1': { count: 3, period: 'D', sicher: true, grund: '', seite: 5, y: 90 }
+            };
+            const ki34 = [
+                { id: kid('4.1.1'), val_num: 1 },                       // gleich -> gesichert
+                { id: kid('4.1.2'), val_num: 3 },                       // Streit, lokal sicher
+                { id: kid('4.1.3'), val_num: 1 },                       // lokal unsicher, KI bestätigt
+                { id: kid('4.1.4'), val_num: 3 },                       // Streit, lokal unsicher -> KI
+                { id: kid('4.4.2'), val_num: 2 },                       // nur die KI
+                { id: kid('4.5.1'), val_obj_count: 3, val_obj_period: 'D' }
+            ];
+            const v34 = werteVergleich(lokal34, ki34);
+            const q34 = v34.quellen;
+            const wert = nr => v34.werte.find(x => x.id === kid(nr));
+            pruefe('Beide Quellen gleich → gesichert', q34['4.1.1'].status, 'beide');
+            pruefe('Quellen verschieden → Konflikt', q34['4.1.2'].status, 'konflikt');
+            pruefe('Bei Streit gilt die sichere Tabellenlesung', wert('4.1.2').val_num, 2);
+            pruefe('Unsicher gelesen, aber von der KI bestätigt → gesichert', q34['4.1.3'].status, 'beide');
+            pruefe('Bei Streit und unsicherer Tabelle gilt die KI', wert('4.1.4').val_num, 3);
+            pruefe('Nur die KI hat einen Wert', q34['4.4.2'].status, 'ki');
+            pruefe('Modul 5 wird mit Häufigkeit und Zeitraum verglichen', q34['4.5.1'].status, 'beide');
+            pruefe('Nicht gefundenes Kriterium wird als fehlend geführt', q34['4.6.6'].status, 'fehlt');
+            pruefeWahr('Fehlendes Kriterium wird NICHT still als 0 übernommen', !wert('4.6.6'));
+            pruefe('Fundstelle wird durchgereicht', [q34['4.1.1'].seite, q34['4.1.1'].y], [2, 120]);
+
+            const b34 = quellenBilanz(q34);
+            pruefe('Bilanz: gelesen von insgesamt', [b34.gelesen, b34.gesamt], [6, 64]);
+            pruefe('Bilanz: bestätigt, abweichend, fehlend', [b34.beide, b34.konflikt, b34.fehlt], [3, 2, 58]);
+            pruefeWahr('Bilanz: zu prüfen sind Konflikte, Fehlende und Unsichere',
+                b34.zuPruefen === b34.konflikt + b34.fehlt + b34.unsicher && b34.zuPruefen > 0);
+            pruefeWahr('Zu prüfen: Konflikt ja, gesichert nein',
+                quelleZuPruefen(q34['4.1.2']) && !quelleZuPruefen(q34['4.1.1']));
+
+            // Anzeige in der Prüfansicht
+            const hin = quelleHinweisHtml(ITEMS.find(i => i.nr === '4.1.2'), q34['4.1.2']);
+            pruefeWahr('Hinweis nennt beide Vorschläge',
+                hin.includes('Tabelle:') && hin.includes('KI:') && hin.includes('Seite 2'));
+            pruefeWahr('Grund der Unsicherheit wird genannt',
+                quelleHinweisHtml(ITEMS.find(i => i.nr === '4.1.4'), q34['4.1.4']).includes('mehrere Kreuze'));
+            pruefe('Werte werden lesbar gezeigt (Modul 5)',
+                wertText(ITEMS.find(i => i.nr === '4.5.1'), { count: 3, period: 'D' }), '3 pro Tag');
+
+            // Der Kriterienteil der Prüfansicht zeigt Bilanz und Filter
+            const revProbe = { valuesMap: {}, provided: new Set(), quellen: q34, nurKriterien: false };
+            ITEMS.forEach(i => { revProbe.valuesMap[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+            const html34 = buildReviewKriterien(revProbe);
+            pruefeWahr('Prüfansicht nennt die Bilanz', html34.includes('von 64 Kriterien gelesen'));
+            pruefeWahr('Prüfansicht bietet den Filter „nur zu prüfende"', html34.includes('rvNurZuPruefen'));
+            pruefeWahr('Zu prüfende Zeilen sind markiert', html34.includes('rev-pruefen'));
+            pruefeWahr('Die Herkunft steht an der Zeile', html34.includes('rev-quelle'));
+
+            // Handeingabe macht aus einer Warnung eine geprüfte Angabe
+            const merkRev = reviewData;
+            try {
+                reviewData = { valuesMap: revProbe.valuesMap, quellen: JSON.parse(JSON.stringify(q34)) };
+                rvQuelleKorrigiert(kid('4.1.2'));
+                pruefe('Von Hand gesetzt → geprüft', reviewData.quellen['4.1.2'].status, 'korrigiert');
+                pruefeWahr('Geprüfte Zeile muss nicht mehr geprüft werden', !quelleZuPruefen(reviewData.quellen['4.1.2']));
+            } finally { reviewData = merkRev; }
+
+            // Die KI liefert die Kriterien wieder mit (zweite Quelle)
+            pruefeWahr('KI liest die Kriterien immer mit',
+                !/delete responseSchema\.properties\.values_orig/.test(aiReadGutachten.toString())
+                && aiReadGutachten.toString().includes('werteVergleich('));
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

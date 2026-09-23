@@ -83,7 +83,12 @@ def seite_medizinischer_dienst():
 fehler = []
 
 
+geprueft = 0
+
+
 def pruefe(name, ist, soll):
+    global geprueft
+    geprueft += 1
     if ist != soll:
         fehler.append("%s: erwartet %r, gelesen %r" % (name, soll, ist))
 
@@ -104,9 +109,86 @@ pruefe("Med. Dienst 4.5.1 Zeitraum", md.get("4.5.1", {}).get("period"), "D")
 pruefe("Med. Dienst 4.5.13 Haeufigkeit", md.get("4.5.13", {}).get("count"), 2)
 pruefe("Med. Dienst 4.5.13 Zeitraum", md.get("4.5.13", {}).get("period"), "W")
 
+def seite_modul4(verrutscht=False, fehlendes_kaestchen=False, doppelkreuz=False):
+    """Vier Stufen wie in Modul 1/4. Optionen:
+    verrutscht          – die Kreuze sitzen je Zeile leicht anders (andere Vorlage, Druck)
+    fehlendes_kaestchen – in einer Zeile fehlt ein leeres Kaestchen (Erkennungsluecke)
+    doppelkreuz         – eine Zeile traegt zwei Kreuze
+    """
+    d = fitz.open()
+    p = d.new_page(width=620, height=320)
+    f = 9
+    spalten_x = [300, 360, 420, 480]
+    p.insert_text((60, 60), "Kriterium", fontsize=f)
+    zeilen = [(100, "4.4.1", 0), (130, "4.4.2", 1), (160, "4.4.3", 2), (190, "4.4.4", 3)]
+    for k, (y, nr, markiert) in enumerate(zeilen):
+        p.insert_text((60, y), nr, fontsize=f)
+        p.insert_text((100, y), "Kriterium " + nr, fontsize=f)
+        for i, x in enumerate(spalten_x):
+            # dieselbe Spalte, aber leicht andere Position je Zeile
+            xx = x + ((k % 3) - 1) * 4 if verrutscht else x
+            if fehlendes_kaestchen and nr == "4.4.3" and i == 0:
+                continue                      # erstes Kaestchen fehlt in dieser Zeile
+            voll = (i == markiert) or (doppelkreuz and nr == "4.4.2" and i == 3)
+            p.insert_text((xx, y), VOLL if voll else LEER, fontsize=f)
+    b = d.tobytes()
+    d.close()
+    return b
+
+
+def seite_formularfelder():
+    """Gutachten als ausfuellbares Formular: das Kreuz steht in einer Checkbox,
+    nicht im Text."""
+    d = fitz.open()
+    p = d.new_page(width=620, height=300)
+    f = 9
+    p.insert_text((60, 100), "4.1.1", fontsize=f)
+    p.insert_text((100, 100), "Positionswechsel im Bett", fontsize=f)
+    for i, x in enumerate([300, 360, 420, 480]):
+        w = fitz.Widget()
+        w.field_name = "k411_%d" % i
+        w.field_type = fitz.PDF_WIDGET_TYPE_CHECKBOX
+        w.rect = fitz.Rect(x, 92, x + 10, 102)
+        w.field_value = (i == 2)
+        p.add_widget(w)
+    b = d.tobytes()
+    d.close()
+    return b
+
+
+# --- Robustheit der Markierungserkennung -------------------------------------
+sauber = srv.extract_values(seite_modul4(), "application/pdf")
+pruefe("Modul 4: erste Stufe", sauber.get("4.4.1", {}).get("idx"), 0)
+pruefe("Modul 4: zweite Stufe", sauber.get("4.4.2", {}).get("idx"), 1)
+pruefe("Modul 4: vierte Stufe", sauber.get("4.4.4", {}).get("idx"), 3)
+pruefe("Sauber gelesener Wert gilt als sicher", sauber.get("4.4.1", {}).get("sicher"), True)
+pruefe("Fundstelle wird mitgeliefert", sauber.get("4.4.1", {}).get("seite"), 1)
+
+# Kreuze sitzen nicht exakt an derselben Stelle (andere Vorlage, anderer Druck)
+verrutscht = srv.extract_values(seite_modul4(verrutscht=True), "application/pdf")
+pruefe("Verrutschte Kreuze: Stufe bleibt richtig (4.4.2)", verrutscht.get("4.4.2", {}).get("idx"), 1)
+pruefe("Verrutschte Kreuze: Stufe bleibt richtig (4.4.4)", verrutscht.get("4.4.4", {}).get("idx"), 3)
+
+# Ein leeres Kaestchen wird nicht erkannt: frueher verschob sich der Index um eins
+luecke = srv.extract_values(seite_modul4(fehlendes_kaestchen=True), "application/pdf")
+pruefe("Fehlendes Kaestchen verschiebt die Stufe nicht", luecke.get("4.4.3", {}).get("idx"), 2)
+pruefe("Unvollstaendige Zeile gilt als unsicher", luecke.get("4.4.3", {}).get("sicher"), False)
+pruefe("Grund wird genannt", luecke.get("4.4.3", {}).get("grund"), "unvollstaendig")
+
+# Zwei Kreuze in einer Zeile
+doppelt = srv.extract_values(seite_modul4(doppelkreuz=True), "application/pdf")
+pruefe("Doppelkreuz gilt als unsicher", doppelt.get("4.4.2", {}).get("sicher"), False)
+pruefe("Doppelkreuz nennt den Grund", doppelt.get("4.4.2", {}).get("grund"), "mehrere")
+
+# Ausfuellbares Formular: Checkbox statt Symbol im Text
+formular = srv.extract_values(seite_formularfelder(), "application/pdf")
+pruefe("Formular-Checkbox wird gelesen", formular.get("4.1.1", {}).get("idx"), 2)
+pruefe("Formular-Checkbox gilt als sicher", formular.get("4.1.1", {}).get("sicher"), True)
+
+
 if fehler:
     print("FEHLGESCHLAGEN:")
     for f_ in fehler:
         print("  -", f_)
     sys.exit(1)
-print("Alle 10 Serverpruefungen bestanden.")
+print("Alle %d Serverpruefungen bestanden." % geprueft)

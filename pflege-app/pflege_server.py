@@ -200,11 +200,80 @@ def _row_filled_index(roww):
     return None
 
 
+def _widget_marken(page):
+    """Echte Formularfelder (AcroForm-Checkboxen/Radios) als Markierungen.
+    Viele Gutachten sind ausfuellbare Formulare - dort steht das Kreuz nicht im Text."""
+    marken = []
+    try:
+        felder = page.widgets() or []
+    except Exception:
+        return marken
+    check = getattr(fitz, "PDF_WIDGET_TYPE_CHECKBOX", 2)
+    radio = getattr(fitz, "PDF_WIDGET_TYPE_RADIOBUTTON", 5)
+    for w in felder:
+        try:
+            if w.field_type not in (check, radio):
+                continue
+            r = w.rect
+            wert = str(w.field_value if w.field_value is not None else "").strip().lower()
+            gefuellt = wert not in ("", "off", "none", "aus", "0", "false")
+            marken.append(((r.x0 + r.x1) / 2.0, (r.y0 + r.y1) / 2.0, gefuellt))
+        except Exception:
+            continue
+    return marken
+
+
+def _text_marken(words):
+    """Markierungsfelder aus dem Text: bekannte Symbole, gefuellt oder leer."""
+    marken = []
+    for x0, y0, x1, y1, wd, *_ in words:
+        s = wd.strip()
+        if len(s) == 1 and (s in KNOWN_FILLED or s in KNOWN_EMPTY):
+            marken.append(((x0 + x1) / 2.0, (y0 + y1) / 2.0, s in KNOWN_FILLED))
+    return marken
+
+
+def _spalten_aus_marken(marken, toleranz=16.0):
+    """Die Spaltenmitten einer Tabelle aus den tatsaechlichen Markierungen.
+
+    DER KERN DER ROBUSTHEIT: Die Kreuze sitzen je nach Gutachten (Medizinischer Dienst,
+    MEDICPROOF, unterschiedliche Vorlagen und Druckqualitaet) nicht an denselben
+    Koordinaten. Feste Positionen scheiden deshalb aus. Auch die blosse Reihenfolge in der
+    Zeile traegt nicht: Wird ein leeres Kaestchen nicht erkannt, verschiebt sich der Index
+    um eins - aus 'selbstaendig' wird still 'ueberwiegend selbstaendig'.
+    Deshalb werden die Spalten aus ALLEN Kriteriumszeilen desselben Moduls auf der Seite
+    gebildet; eine einzelne Zeile mit fehlendem Kaestchen aendert daran nichts."""
+    xs = sorted(m[0] for m in marken)
+    if not xs:
+        return []
+    gruppen = [[xs[0]]]
+    for x in xs[1:]:
+        if x - gruppen[-1][-1] <= toleranz:
+            gruppen[-1].append(x)
+        else:
+            gruppen.append([x])
+    return [(sum(g) / len(g), len(g)) for g in gruppen]
+
+
+def _naechste_spalte(x, spalten):
+    """(Index, Abstand) der naechstgelegenen Spaltenmitte."""
+    best, bestd = None, 1e9
+    for i, (mitte, _n) in enumerate(spalten):
+        d = abs(x - mitte)
+        if d < bestd:
+            bestd, best = d, i
+    return best, bestd
+
+
 def extract_values(file_bytes, mime):
-    """Liest die angekreuzten Werte koordinatengenau aus den Tabellen (Med. Dienst & MEDICPROOF):
-    - Module 1/2/3/4/6 + .16: Position des angekreuzten Feldes -> idx (0..3)
+    """Liest die angekreuzten Werte aus den Tabellen (Med. Dienst & MEDICPROOF):
+    - Module 1/2/3/4/6 + .16: Spalte des angekreuzten Feldes -> idx (0..3)
     - Modul 5 (Haeufigkeiten): Zahl + Spalte (Tag/Woche/Monat)
-    Rueckgabe: dict  {"4.1.1": {"idx":0,"count":null,"period":null}, ...}"""
+    Rueckgabe je Kriterium:
+      {"idx":0, "count":null, "period":null, "sicher":True, "grund":"", "seite":1, "y":100.0}
+    'sicher' sagt, ob der Wert zweifelsfrei gelesen wurde; 'grund' nennt sonst das Problem
+    (mehrere Kreuze, kein Kreuz, unvollstaendige Zeile, Notloesung). Die App legt unsichere
+    Werte in der Pruefansicht nach oben."""
     res = {}
     if not HAVE_FITZ or (mime and mime.startswith("image/")):
         return res
@@ -212,7 +281,7 @@ def extract_values(file_bytes, mime):
         doc = fitz.open(stream=file_bytes, filetype="pdf")
     except Exception:
         return res
-    for page in doc:
+    for seite_nr, page in enumerate(doc, start=1):
         try:
             words = page.get_text("words")
         except Exception:
@@ -227,43 +296,71 @@ def extract_values(file_bytes, mime):
             # "pro Tag/Woche/Monat" enthalten dort nur die Markierung, nicht die Zahl.
             if s.rstrip(":") in ("Häufigkeit", "Haeufigkeit") and haeufigkeit_x is None:
                 haeufigkeit_x = (x0 + x1) / 2.0
+
+        marken = _text_marken(words) + _widget_marken(page)
+
+        # Kriteriumszeilen der Seite: Nummer, Hoehe und Modul
         crit_tokens = []
         for x0, y0, x1, y1, wd, b, l, n in words:
             m = CRIT_RE.match(wd.strip())
             if m:
                 nr = "4.%s.%s" % (m.group(2), m.group(3))  # 5.x.y -> 4.x.y normalisieren
-                crit_tokens.append((y0, nr))
-        for cy, cnr in crit_tokens:
-            roww = sorted([w for w in words if abs(w[1] - cy) < 6], key=lambda w: w[0])
+                crit_tokens.append({"y0": y0, "y1": y1, "nr": nr, "modul": m.group(2)})
+
+        # Zeilenmarken je Kriterium (Toleranz aus der Zeilenhoehe, nicht fest)
+        for c in crit_tokens:
+            tol = max(6.0, (c["y1"] - c["y0"]) * 1.1)
+            mitte = (c["y0"] + c["y1"]) / 2.0
+            c["tol"] = tol
+            c["marken"] = sorted([m for m in marken if abs(m[1] - mitte) <= tol], key=lambda m: m[0])
+            c["woerter"] = sorted([w for w in words if abs(w[1] - c["y0"]) < tol], key=lambda w: w[0])
+
+        # Spalten JE MODUL auf dieser Seite: Modul 5 hat andere Spalten als Modul 1
+        spalten_je_modul = {}
+        for modul in set(c["modul"] for c in crit_tokens):
+            zeilen = [c for c in crit_tokens if c["modul"] == modul]
+            alle = [m for c in zeilen for m in c["marken"]]
+            spalten = _spalten_aus_marken(alle)
+            # Nur Spalten, die in mindestens 40 % der Zeilen vorkommen (mindestens zwei):
+            # Streuung einzelner Zeilen faellt so nicht ins Gewicht.
+            mindest = max(2, int(len(zeilen) * 0.4)) if len(zeilen) >= 3 else 1
+            spalten_je_modul[modul] = [s for s in spalten if s[1] >= mindest] or spalten
+
+        for c in crit_tokens:
+            cnr, roww = c["nr"], c["woerter"]
+            spalten = spalten_je_modul.get(c["modul"], [])
             count = None
             period = None
+            sicher = True
+            grund = ""
+
             if cols and haeufigkeit_x is not None:
                 # MEDICPROOF: Markierung sagt den Zeitraum, die Zahl steht in "Haeufigkeit".
-                pos = _row_filled_index(roww)
-                if pos is not None:
-                    marks = sorted([w for w in roww
-                                    if len(w[4].strip()) == 1
-                                    and (w[4].strip() in KNOWN_FILLED or w[4].strip() in KNOWN_EMPTY)],
-                                   key=lambda w: w[0])
-                    if pos < len(marks):
-                        mx = (marks[pos][0] + marks[pos][2]) / 2.0
-                        best, bestd = None, 1e9
-                        for name, hx in cols.items():
-                            dd = abs(mx - hx)
-                            if dd < bestd:
-                                bestd, best = dd, name
-                        if best and bestd < 30:
-                            period = {"Tag": "D", "Woche": "W", "Monat": "M"}[best]
-                            for x0, y0, x1, y1, wd, b, l, n in roww:
-                                s = wd.strip()
-                                if s.isdigit() and abs((x0 + x1) / 2.0 - haeufigkeit_x) < 40:
-                                    count = int(s)
-                                    break
-                            if count is None:
-                                count = 0
-                        else:
-                            # Markierung bei "entfaellt" oder "selbstaendig"
-                            period, count = "W", 0
+                gefuellt = [m for m in c["marken"] if m[2]]
+                if gefuellt:
+                    mx = gefuellt[0][0]
+                    best, bestd = None, 1e9
+                    for name, hx in cols.items():
+                        dd = abs(mx - hx)
+                        if dd < bestd:
+                            bestd, best = dd, name
+                    if best and bestd < 30:
+                        period = {"Tag": "D", "Woche": "W", "Monat": "M"}[best]
+                        for x0, y0, x1, y1, wd, b, l, n in roww:
+                            s = wd.strip()
+                            if s.isdigit() and abs((x0 + x1) / 2.0 - haeufigkeit_x) < 40:
+                                count = int(s)
+                                break
+                        if count is None:
+                            count = 0
+                            sicher = False
+                            grund = "zahl"
+                    else:
+                        # Markierung bei "entfaellt" oder "selbstaendig"
+                        period, count = "W", 0
+                    if len(gefuellt) > 1:
+                        sicher = False
+                        grund = "mehrere"
             elif cols:
                 # Medizinischer Dienst: die Zahl steht unmittelbar in der Zeitraumspalte.
                 for x0, y0, x1, y1, wd, b, l, n in roww:
@@ -281,16 +378,46 @@ def extract_values(file_bytes, mime):
                             period = {"Tag": "D", "Woche": "W", "Monat": "M"}[best]
                             count = int(s)
                             break
-            idx = _row_filled_index(roww)
+
+            # Stufenindex: ueber die Spalten der Seite, nicht ueber die Reihenfolge in der Zeile
+            idx = None
+            gefuellt = [m for m in c["marken"] if m[2]]
+            if spalten and gefuellt:
+                if len(gefuellt) > 1:
+                    sicher = False
+                    grund = grund or "mehrere"
+                pos, abstand = _naechste_spalte(gefuellt[0][0], spalten)
+                if abstand <= 20:
+                    idx = pos
+                    if len(c["marken"]) != len(spalten):
+                        sicher = False
+                        grund = grund or "unvollstaendig"
+                else:
+                    sicher = False
+                    grund = grund or "abstand"
+            if idx is None and not gefuellt and not c["marken"]:
+                # Notloesung: Abweichler unter gleichen Symbolen (aeltere, unsaubere Vorlagen)
+                alt = _row_filled_index(roww)
+                if alt is not None:
+                    idx = alt
+                    sicher = False
+                    grund = grund or "heuristik"
+            if idx is None and c["marken"] and not gefuellt and count is None:
+                sicher = False
+                grund = grund or "keine"
+
             # Bei MEDICPROOF-Modul-5-Zeilen ist die Markierungsposition kein Stufenindex.
             if haeufigkeit_x is not None and count is not None:
                 idx = None
-            if idx is None and count is None:
+            if idx is None and count is None and not c["marken"]:
                 continue  # keine erkennbare Markierung -> keine echte Tabellenzeile
             # nicht ueberschreiben, falls eine bessere Zeile schon erkannt wurde
-            if cnr in res and res[cnr].get("idx") is not None and idx is None and count is None:
+            alt_eintrag = res.get(cnr)
+            if alt_eintrag and alt_eintrag.get("idx") is not None and idx is None and count is None:
                 continue
-            res[cnr] = {"idx": idx, "count": count, "period": period}
+            res[cnr] = {"idx": idx, "count": count, "period": period,
+                        "sicher": bool(sicher and (idx is not None or count is not None)),
+                        "grund": grund, "seite": seite_nr, "y": round(c["y0"], 1)}
     doc.close()
     return res
 
