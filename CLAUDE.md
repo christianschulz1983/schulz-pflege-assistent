@@ -33,6 +33,9 @@ pflege-app/
   js/anlagen.js       Anlagen: Zuordnung zum Kriterium, Verzeichnis im Dokument
   js/belege.js        Ärztliche Unterlagen als Beleg (Widerspruch, Anhörung): Auslesen, Abgleich
   js/anhang.js        Stellungnahme + Arztberichte zu einer PDF (pdf-lib), Fallwechsel leert Unterlagen
+  js/prognose.js      Prognose, Schwellen/Kipp-Analyse, Rueckstufungsrisiko, Quervergleich, Tragfaehigkeit
+  js/verfahren.js     Verfahrensfehler-Checkliste (Widerspruch, Anhoerung)
+  js/chronik.js       Zeitachse der Verschlechterung (Hoeherstufungsantrag)
   js/namenspruefung.js Abgleich der eingelesenen Namen gegen den Dokumenttext
   js/befund.js        Befunderhebung (Erstantrag, Höherstufung)
   js/erfassung.js     Pflegepersonen, Aufenthalte, Versorgung, Übernahme in Modul 5
@@ -590,6 +593,36 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    `vorschlagOverlayZweck(titel, aufruf, knopfText)` setzt auch die Beschriftung zurück.
    Selbsttest im **vorderen** Tab laufen lassen – im Hintergrund bremst der Browser pdf.js aus.
 
+42. **Prognose, Schwellen, Risiko, Quervergleich, Tragfähigkeit** (`js/prognose.js`, Karten in
+   `#analyse-bereich` auf Reiter „Einschätzung", gezogen von `calculate('own')` und `setzeModus`).
+   Alles **gerechnet**, keine KI, und die App setzt **keine** Bewertung.
+   `naechsteSchwelle()` – 12,5 → PG 1, 27 → 2, 47,5 → 3, 70 → 4, 90 → 5 (die Zuordnung war beim
+   Bauen erst falsch). `kippAnalyse(basis, ziel)` – dieselbe Rechnung wie `schwellenAnalyse()`
+   der Anhörung, jetzt auch für den Widerspruch: Welches abweichende Kriterium kippt allein?
+   `rueckstufungsAnalyse()` – wo liegt die eigene Einschätzung UNTER dem Gutachten; der
+   schlimmste Fall wird gerechnet und beantwortet „lohnt sich der Vorgang?" (Höherstufung und
+   Widerspruch, vor dem Schreiben statt erst im Fazit). `quervergleichHtml()` macht die vom
+   Gutachter anerkannten Einschränkungen sichtbar (die KI nutzte sie längst).
+   `tragfaehigkeitFunde()` warnt: Modul 3 gewertet ohne psychiatrische Diagnose oder Demenz
+   (ICD F.., G30/G31 oder Klartext), Modul 5 gewertet ohne Nachweis in Erfassungstabellen oder
+   ausgelesenen Unterlagen. `zeigeKriterium(nr)` springt aus jeder Liste zur Bewertung.
+43. **Verfahrensfehler-Checkliste** (`js/verfahren.js`, Karte `#verfahren-bereich` auf Reiter 1,
+   Widerspruch und Anhörung). `VERFAHREN_KATALOG` mit fertigen Sätzen; zwei Punkte nur in der
+   Anhörung (wortgleicher Befundtext, „keine neuen Gesichtspunkte"). **Nichts vorausgewählt**;
+   `verfahrenEmpfehlungen()` markiert „empfohlen" nur, was belegt ist (Aktenlage oder
+   Telefoninterview laut Durchführungsart, vorhandene Anlagen, gemessene Textgleichheit ≥ 40 %).
+   Abgehakte Punkte: Absatz `#stmt-verfahren` unter den Allgemeinen Angaben und
+   `verfahrenFuerPrompt()` für die KI (ohne Wiederholung). Gespeichert als `verfahrensfehler`,
+   geleert beim neuen Fall.
+44. **Zeitachse und Textvergleich.** `js/chronik.js` (Höherstufungsantrag): datierte Ereignisse
+   aus Krankenhaus- und Hilfsmittelzeilen, Erstdiagnosen und ausgelesenen Unterlagen; nur was
+   NACH dem Begutachtungsdatum liegt, geht als `#stmt-chronik` in den Antrag und an die KI.
+   `textUebernahme()` in `js/vergleich.js` misst über Achtwortfolgen, wie viel des
+   Zweitgutachten-Befundes wörtlich im Erstgutachten steht (plus längste Passage – nur zur
+   Anzeige, **nicht als Zitat**); daraus die Empfehlung „wortgleich übernommen". Der
+   Vergleichsreiter zeigt zusätzlich `lagenUebersichtHtml()`: gefolgt, teilweise, nicht,
+   verschlechtert – je mit Sprung zum Kriterium.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -642,7 +675,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1368 Pruefungen.
+Der Selbsttest umfasst 1431 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

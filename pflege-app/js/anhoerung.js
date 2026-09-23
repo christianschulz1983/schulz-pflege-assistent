@@ -485,6 +485,7 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
 
     <h2>Allgemeine Angaben</h2>
     <div id="stmt-notes" data-sig="${esc(anhoerungSignatur(analyse, notizenAnh))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${allgemein}</div>
+    ${(typeof verfahrenAbsatzHtml === 'function') ? verfahrenAbsatzHtml() : ''}
     ${(typeof belegeAllgemeinHtml === 'function') ? belegeAllgemeinHtml() : ''}
     <p>Die nachfolgende Übersicht stellt die Ergebnisse des Erstgutachtens, des Zweitgutachtens und meiner Beurteilung einander gegenüber:</p>
 

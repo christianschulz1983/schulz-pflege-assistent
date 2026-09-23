@@ -100,6 +100,10 @@ function setzeModus(key) {
     }
     // Ärztliche Unterlagen als Beleg: Widerspruch und Anhörung (js/belege.js)
     if (typeof renderBelegeBereich === 'function') renderBelegeBereich();
+    // Die Analysekarten hängen am Vorgang (js/prognose.js)
+    if (typeof renderAnalyseBereich === 'function') renderAnalyseBereich();
+    // Verfahrensfehler-Checkliste: Widerspruch und Anhörung (js/verfahren.js)
+    if (typeof renderVerfahrenBereich === 'function') renderVerfahrenBereich();
     // Bereich für das Anhörungsverfahren nur dort
     const anh = document.getElementById('anhoerung-bereich');
     if (anh) {

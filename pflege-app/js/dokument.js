@@ -162,6 +162,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
     <h2>Allgemeine Angaben</h2>
     <p>Im Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} erfolgte die Einstufung mit ${df('opts', origPts)} gewichteten Punkten, woraus sich ${istKeinPG(origPG) ? df('opgsatz', 'kein Pflegegrad') : 'ein ' + df('opgsatz', pgSatz(origPG))} ergeben hat. Die Verteilung der gewichteten Punkte auf die einzelnen Module ist der nachfolgenden Übersicht zu entnehmen.</p>
     <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${notesBullets}</div>
+    ${(typeof verfahrenAbsatzHtml === 'function') ? verfahrenAbsatzHtml() : ''}
     ${(typeof belegeAllgemeinHtml === 'function') ? belegeAllgemeinHtml() : ''}
     <p>Ich bin in mehreren dieser Module zu abweichenden Einschätzungen gekommen. Dies ergibt eine höhere Punktzahl in den Modulen und in der Folge eine höhere Gesamtpunktzahl. Die nachfolgende Übersicht stellt die Ergebnisse des Vorgutachtens und meiner Beurteilung einander gegenüber:</p>
 
@@ -423,6 +424,16 @@ function mergeStellungnahme(existingHtml, freshHtml) {
     });
     /* Ärztliche Unterlagen (js/belege.js): der Absatz mit den bestätigten Funden und das
        Anlagenverzeichnis folgen immer dem aktuellen Stand – neu, geändert oder entfallen. */
+    ['stmt-verfahren', 'stmt-chronik'].forEach(id => {
+        const f = fresh.querySelector('#' + id), c = cur.querySelector('#' + id);
+        if (f && c) c.outerHTML = f.outerHTML;
+        else if (c && !f) { const h = c.previousElementSibling; if (h && /^H3$/i.test(h.tagName)) h.remove(); c.remove(); }
+        else if (f && !c) {
+            const anker = cur.querySelector('#stmt-notes');
+            const h = f.previousElementSibling;
+            if (anker) anker.insertAdjacentHTML('afterend', ((h && /^H3$/i.test(h.tagName)) ? h.outerHTML : '') + f.outerHTML);
+        }
+    });
     const fB = fresh.querySelector('#stmt-belege'), cB = cur.querySelector('#stmt-belege');
     if (fB && cB) cB.outerHTML = fB.outerHTML;
     else if (cB && !fB) cB.remove();

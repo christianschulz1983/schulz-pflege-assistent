@@ -380,6 +380,7 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
     <div id="stmt-anamnese" data-ai="1">${anamneseBlock}</div>` : ''}
     <h3>Aktuelle Situation</h3>
     <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${notesBlock}</div>
+    ${(istHoeher && typeof chronikAbschnittHtml === 'function') ? chronikAbschnittHtml() : ''}
 
     ${/* Einfache Aufzählung: welche Hilfsmittel liegen vor, werden sie genutzt, und was
           tut die Pflegeperson damit. Die Häufigkeit steht dort, wo sie hingehört – in der

@@ -188,6 +188,9 @@ function renderVergleich() {
             </div>
         </div>`;
 
+    if (typeof textvergleichHtml === 'function') html += textvergleichHtml();
+    html += lagenUebersichtHtml(a);
+
     // Weicht die Angabe im Gutachten von der Summe seiner Kriterien ab, ist die
     // Schwellenwertrechnung nur so verlässlich wie die erfassten Kriterien.
     if (a.abweichung) {
@@ -271,4 +274,117 @@ function tabelleLagen(liste, mitMuster, analyse) {
     }).join('');
     return `<div style="overflow-x:auto"><table class="result-table" style="font-size:12px">
         <thead>${kopf}</thead><tbody>${zeilen}</tbody></table></div>`;
+}
+
+/* ===================================================================================
+   TEXTVERGLEICH ERSTGUTACHTEN ./. ZWEITGUTACHTEN.
+   In fast jedem Anhörungsschreiben steht die Rüge, das Zweitgutachten übernehme den
+   Befundtext des Erstgutachtens nahezu wortgleich. Bisher aus dem Gedächtnis – jetzt
+   gemessen: Anteil der wörtlich übereinstimmenden Achtwortfolgen und die längste
+   übereinstimmende Passage. Gerechnet, keine KI.
+   =================================================================================== */
+const TEXT_FENSTER = 8;          // Länge der verglichenen Wortfolgen
+
+function textWoerter(t) {
+    return String(t || '').toLowerCase()
+        .replace(/[^a-zäöüß0-9]+/g, ' ')
+        .split(/\s+/).filter(Boolean);
+}
+
+function textFolgen(woerter, n) {
+    const s = new Set();
+    for (let i = 0; i + n <= woerter.length; i++) s.add(woerter.slice(i, i + n).join(' '));
+    return s;
+}
+
+/* Wie viel des ZWEITEN Textes steht wörtlich schon im ERSTEN?
+   Rückgabe: { anteil (0..1), treffer, gesamt, passage } oder null, wenn ein Text fehlt
+   oder zu kurz ist (unter TEXT_FENSTER Wörtern ist keine Aussage möglich). */
+function textUebernahme(erst, zweit) {
+    const a = textWoerter(erst), b = textWoerter(zweit);
+    if (a.length < TEXT_FENSTER || b.length < TEXT_FENSTER) return null;
+    const folgenA = textFolgen(a, TEXT_FENSTER);
+    const folgenB = textFolgen(b, TEXT_FENSTER);
+    let treffer = 0;
+    folgenB.forEach(f => { if (folgenA.has(f)) treffer++; });
+    // Längste zusammenhängende Übereinstimmung: benachbarte Fenster, die beide vorkommen
+    let lauf = 0, besterStart = -1, besteLaenge = 0;
+    for (let i = 0; i + TEXT_FENSTER <= b.length; i++) {
+        if (folgenA.has(b.slice(i, i + TEXT_FENSTER).join(' '))) {
+            lauf++;
+            if (lauf > besteLaenge) { besteLaenge = lauf; besterStart = i - lauf + 1; }
+        } else lauf = 0;
+    }
+    return {
+        anteil: folgenB.size ? treffer / folgenB.size : 0,
+        treffer: treffer, gesamt: folgenB.size,
+        passage: besteLaenge ? b.slice(besterStart, besterStart + besteLaenge + TEXT_FENSTER - 1).join(' ') : '',
+        passageWoerter: besteLaenge ? besteLaenge + TEXT_FENSTER - 1 : 0
+    };
+}
+
+// Der Vergleich der beiden Befundtexte des Falls (Erstgutachten gegen Zweitgutachten)
+function befundAehnlichkeit() {
+    const erst = (document.getElementById('stam-befund')?.value || '').trim();
+    const zweit = (document.getElementById('anh-zweit-befund')?.value || '').trim();
+    return textUebernahme(erst, zweit);
+}
+
+function textvergleichHtml() {
+    const a = befundAehnlichkeit();
+    if (!a) {
+        return `<div class="card"><div class="card-header"><div class="dot"></div>Textvergleich der Befunde</div>
+            <div style="padding:16px 20px"><p style="font-size:12px;color:var(--text-muted);line-height:1.6">
+                Für den Vergleich werden beide Befundtexte gebraucht: der des Erstgutachtens (Reiter 1, Stammdaten)
+                und der des Zweitgutachtens (Reiter 1, „Befund und Begründungen des Zweitgutachtens").
+            </p></div></div>`;
+    }
+    const prozent = Math.round(a.anteil * 100);
+    const stark = prozent >= 40;
+    return `<div class="card"><div class="card-header"><div class="dot" style="background:${stark ? 'var(--red)' : 'var(--accent)'}"></div>
+            Textvergleich der Befunde</div>
+        <div style="padding:16px 20px">
+            <p style="font-size:13px;color:var(--text-secondary);line-height:1.7">
+                <b>${prozent} %</b> des Befundtextes im Zweitgutachten stehen wörtlich schon im Erstgutachten
+                (${a.treffer} von ${a.gesamt} verglichenen Wortfolgen).
+                ${a.passageWoerter ? 'Die längste wörtlich übereinstimmende Passage umfasst <b>' + a.passageWoerter + ' Wörter</b>.' : ''}
+            </p>
+            ${stark ? `<div class="hinweis-warnung" style="margin-top:12px">
+                Das trägt die Rüge, das Zweitgutachten habe den Befund übernommen, statt eigenständig zu erheben.
+                Sie steht als Punkt „Befundtext wortgleich übernommen" in der Verfahrensfehler-Liste bereit.</div>`
+              : `<p style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-top:8px">
+                Für die Rüge der wortgleichen Übernahme reicht das nicht; der Befundtext weicht deutlich ab.</p>`}
+            ${a.passage ? `<p style="font-size:11px;color:var(--text-muted);line-height:1.6;margin-top:10px">
+                Längste Übereinstimmung (klein geschrieben, ohne Satzzeichen – zum Wiederfinden im Gutachten, nicht zum Zitieren):<br>
+                <span style="font-family:var(--font-mono)">${escapeHtml(a.passage.slice(0, 300))}${a.passage.length > 300 ? ' …' : ''}</span></p>` : ''}
+        </div></div>`;
+}
+
+/* Lagenübersicht: gefolgt, teilweise, nicht, verschlechtert – mit Sprung zum Kriterium.
+   Die Lagen werden ohnehin gerechnet; hier werden sie zum Arbeitsmittel. */
+function lagenUebersichtHtml(a) {
+    const gruppen = [
+        ['gefolgt', 'Gefolgt', 'var(--green)', a.lagen.filter(l => l.lage === 'gefolgt')],
+        ['teilweise', 'Teilweise gefolgt', '#b45309', a.lagen.filter(l => l.lage === 'teilweise')],
+        ['nicht', 'Nicht gefolgt', 'var(--red)', a.lagen.filter(l => l.lage === 'nicht')],
+        ['verschlechtert', 'Verschlechtert', 'var(--red)', a.lagen.filter(l => l.lage === 'verschlechtert')]
+    ];
+    const sprung = l => (typeof zeigeKriterium === 'function')
+        ? `<a href="#" onclick="zeigeKriterium('${escapeHtml(l.nr)}');return false;" style="font-family:var(--font-mono);font-size:11px">${escapeHtml(l.nr)}</a>`
+        : `<span style="font-family:var(--font-mono);font-size:11px">${escapeHtml(l.nr)}</span>`;
+    const block = ([key, titel, farbe, liste]) => `<div style="margin-bottom:12px">
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;
+                    color:${farbe};font-weight:700;margin-bottom:6px">${escapeHtml(titel)} (${liste.length})</div>
+        ${liste.length ? liste.map(l => `<div style="font-size:12px;margin-bottom:3px">${sprung(l)} ${escapeHtml(l.titel)}
+            <span style="color:var(--text-muted)">– Zweitgutachten „${escapeHtml(l.zText)}“, meine Beurteilung „${escapeHtml(l.bText)}“</span>
+            ${l.kipptAllein ? ' <span style="color:var(--red);font-weight:700">⚑ kippt allein</span>' : ''}</div>`).join('')
+          : '<div style="font-size:12px;color:var(--text-muted)">–</div>'}
+    </div>`;
+    return `<div class="card"><div class="card-header"><div class="dot" style="background:var(--accent2)"></div>
+            Was hat das Zweitgutachten übernommen?</div>
+        <div style="padding:16px 20px">
+            <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+                Ein Klick auf die Nummer springt zum Kriterium in der Bewertung.</p>
+            ${gruppen.map(block).join('')}
+        </div></div>`;
 }

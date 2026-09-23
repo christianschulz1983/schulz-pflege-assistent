@@ -62,7 +62,8 @@ async function selbsttest() {
         vorschlagGruende: (typeof vorschlagGruende !== 'undefined') ? JSON.parse(JSON.stringify(vorschlagGruende)) : {},
         // Anhörung: die gemerkte Stellungnahme des Widerspruchs (Quelle je Kriterium)
         wsQuelle: (typeof widerspruchStellungnahme !== 'undefined') ? widerspruchStellungnahme : '',
-        wsKerne: (typeof widerspruchKerne !== 'undefined') ? JSON.parse(JSON.stringify(widerspruchKerne)) : {}
+        wsKerne: (typeof widerspruchKerne !== 'undefined') ? JSON.parse(JSON.stringify(widerspruchKerne)) : {},
+        verfahren: (typeof verfahrensfehler !== 'undefined') ? JSON.parse(JSON.stringify(verfahrensfehler)) : {}
     };
 
     try {
@@ -5352,6 +5353,218 @@ async function selbsttest() {
             }
         }
 
+        /* 31. Prognose, Rückstufungsrisiko, Schwellen, Quervergleich, Tragfähigkeit
+           (js/prognose.js) – je Vorgang das, was dort trägt. Alles gerechnet, keine KI,
+           und die App setzt dabei KEINE Bewertung. */
+        if (typeof kippAnalyse === 'function') {
+            const merk31 = { modus: appModus, orig: JSON.parse(JSON.stringify(stateOrig)),
+                             eigen: JSON.parse(JSON.stringify(stateEigene)), erf: JSON.parse(JSON.stringify(erfassung || {})),
+                             anl: JSON.parse(JSON.stringify(anlagen)) };
+            const set31 = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+            try {
+                pruefe('Schwelle 12,50 gehört zu Pflegegrad 1',
+                    [naechsteSchwelle(0).pg, naechsteSchwelle(0).schwelle], [1, 12.5]);
+                pruefe('Schwelle 27 gehört zu Pflegegrad 2 (nicht 3)',
+                    [naechsteSchwelle(20).pg, naechsteSchwelle(20).schwelle, naechsteSchwelle(20).fehlend], [2, 27, 7]);
+                pruefe('Über 90 Punkten keine weitere Schwelle', naechsteSchwelle(95), null);
+
+                const id31 = nr => ITEMS.find(i => i.nr === nr).id;
+                const leer31 = st => ITEMS.forEach(i => { st.values[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+                [stateOrig, stateEigene].forEach(leer31);
+                erfassung = {};
+                anlagen = [];
+                ensureDiagRows(2); set31('diag-icd-1', ''); set31('diag-txt-1', ''); set31('diag-icd-2', ''); set31('diag-txt-2', '');
+
+                // Kipp-Analyse: Gutachten gegen eigene Einschätzung
+                stateEigene.values[id31('4.4.2')] = 3; stateEigene.values[id31('4.4.5')] = 3;
+                stateEigene.values[id31('4.4.6')] = 3; stateEigene.values[id31('4.4.7')] = 3;
+                const k31 = kippAnalyse(stateOrig, stateEigene);
+                pruefe('Kipp-Analyse findet die Abweichungen', k31.abweichend.length, 4);
+                pruefeWahr('Kipp-Analyse: Gutachten ohne Punkte, eigene Einschätzung darüber',
+                    k31.basis.total === 0 && k31.gesamt.total > 0);
+                pruefe('Kipp-Analyse nennt die nächste Schwelle', k31.naechsteSchwelle, 12.5);
+                pruefeWahr('Kipp-Analyse: ohne Punktsprung kein Kipper', !k31.kipper.length);
+                /* Ein Kipper entsteht erst, wenn EIN Kriterium die Schwelle überschreitet:
+                   Gutachten 10,00 Punkte (Modul 4), dazu 4.1.4 – das ergibt 12,50 und Pflegegrad 1. */
+                [stateOrig, stateEigene].forEach(leer31);
+                stateOrig.values[id31('4.4.2')] = 1; stateOrig.values[id31('4.4.5')] = 2;
+                stateEigene.values[id31('4.4.2')] = 1; stateEigene.values[id31('4.4.5')] = 2;
+                stateEigene.values[id31('4.1.4')] = 2;
+                const k31b = kippAnalyse(stateOrig, stateEigene);
+                pruefe('Kipp-Analyse: das eine Kriterium kippt den Pflegegrad', k31b.kipper.map(x => x.nr), ['4.1.4']);
+                pruefeWahr('Kipp-Analyse nennt den Pflegegrad mit diesem Kriterium',
+                    k31b.kipper[0].pgMit === 1 && k31b.basis.pg === 0);
+
+                // Rückstufungsrisiko: eigene Einschätzung unter dem Gutachten
+                stateOrig.values[id31('4.1.4')] = 2; stateEigene.values[id31('4.1.4')] = 0;
+                const r31 = rueckstufungsAnalyse();
+                pruefe('Risiko: Kriterium unter dem Gutachten wird gefunden', r31.schlechter.length, 1);
+                pruefeWahr('Risiko: schlimmster Fall wird gerechnet', r31.risiko.total < r31.gutachten.total);
+                stateOrig.values[id31('4.1.4')] = 0; stateEigene.values[id31('4.1.4')] = 0;
+                pruefe('Ohne Unterschreitung kein Risiko', rueckstufungsAnalyse().schlechter.length, 0);
+
+                // Tragfähigkeit: Modul 3 ohne Diagnose, Modul 5 ohne Nachweis
+                stateEigene.values[id31('4.3.10')] = 2;
+                stateEigene.values[id31('4.5.7')] = { count: 2, period: 'D' };
+                let f31 = tragfaehigkeitFunde();
+                pruefeWahr('Tragfähigkeit: Modul 3 ohne fachärztliche Diagnose wird gemeldet',
+                    f31.some(x => x.art === 'modul3' && /4\.3\.10/.test(x.text)));
+                pruefeWahr('Tragfähigkeit: Modul 5 ohne Nachweis wird gemeldet',
+                    f31.some(x => x.art === 'modul5' && /4\.5\.7/.test(x.text)));
+                set31('diag-icd-1', 'F32.1'); set31('diag-txt-1', 'Depressive Episode');
+                pruefeWahr('Mit psychiatrischer Diagnose keine Modul-3-Warnung',
+                    !tragfaehigkeitFunde().some(x => x.art === 'modul3'));
+                set31('diag-icd-1', ''); set31('diag-txt-1', 'Demenz vom Alzheimer-Typ');
+                pruefeWahr('Diagnose auch ohne ICD erkannt (Text)', psychDiagnoseVorhanden());
+                anlagen = [{ id: 'p31', bezeichnung: 'x', dateiname: 'x.pdf', bestaetigt: [],
+                             auswertung: { diagnosen: [], befunde: [], verordnungen: [{ bezeichnung: 'Kompressionsstrümpfe', haeufigkeit: 'täglich' }] } }];
+                pruefeWahr('Mit belegter Verordnung keine Modul-5-Warnung zu 4.5.7',
+                    !tragfaehigkeitFunde().some(x => x.art === 'modul5' && /4\.5\.7/.test(x.text)));
+                anlagen = [];
+                erfassung = { hilfsmittel: [{ bezeichnung: 'Kompressionsstrümpfe', nutzung: 'genutzt' }] };
+                pruefeWahr('Auch die Erfassungstabelle gilt als Nachweis',
+                    !tragfaehigkeitFunde().some(x => x.art === 'modul5' && /4\.5\.7/.test(x.text)));
+                erfassung = {};
+
+                // Die Karten je Vorgang
+                const karten = m => { setzeModus(m); fillTable('own'); calculate('own'); renderAnalyseBereich();
+                                      return document.getElementById('analyse-bereich').innerText; };
+                const wEigenVorher = JSON.stringify(stateEigene.values);
+                const tE = karten('erstantrag');
+                pruefeWahr('Erstantrag: Prognose mit Punkten und Abstand zur Schwelle',
+                    /PROGNOSE/i.test(tE) && /Ihre Angaben ergeben/.test(tE) && /fehlen/.test(tE));
+                pruefeWahr('Erstantrag: kein Rückstufungsrisiko und keine Schwellenanalyse',
+                    !/RÜCKSTUFUNGSRISIKO/i.test(tE) && !/SCHWELLENANALYSE/i.test(tE));
+                const tH = karten('hoeherstufung');
+                pruefeWahr('Höherstufung: Prognose, Zeitachse und Rückstufungsrisiko',
+                    /PROGNOSE/i.test(tH) && /ZEITACHSE/i.test(tH) && /RÜCKSTUFUNGSRISIKO/i.test(tH));
+                const tW = karten('widerspruch');
+                pruefeWahr('Widerspruch: Schwellenanalyse, Quervergleich und Risiko',
+                    /SCHWELLENANALYSE/i.test(tW) && /ANERKANNTE EINSCHRÄNKUNGEN/i.test(tW) && /RÜCKSTUFUNGSRISIKO/i.test(tW));
+                pruefeWahr('Tragfähigkeitswarnung erscheint in der Karte', /OHNE NACHWEIS/i.test(tW));
+                pruefe('Die Analyse ändert keine Bewertung', JSON.stringify(stateEigene.values), wEigenVorher);
+                pruefeWahr('Sprung zum Kriterium ist verlinkt',
+                    /zeigeKriterium\(/.test(quervergleichHtml()) && quervergleichHtml().includes('4.4.2'));
+            } finally {
+                stateOrig = merk31.orig; stateEigene = merk31.eigen; erfassung = merk31.erf; anlagen = merk31.anl;
+                setzeModus(merk31.modus);
+            }
+        }
+
+        /* 32. Verfahrensfehler-Checkliste (js/verfahren.js) – Widerspruch und Anhörung. */
+        if (typeof verfahrenGewaehlt === 'function') {
+            const merk32 = { modus: appModus, vf: JSON.parse(JSON.stringify(verfahrensfehler)),
+                             anl: JSON.parse(JSON.stringify(anlagen)), felder: {} };
+            ['stam-art', 'anh-art', 'stam-befund', 'anh-zweit-befund'].forEach(id => {
+                const el = document.getElementById(id); if (el) merk32.felder[id] = el.value; });
+            const set32 = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+            try {
+                setzeModus('widerspruch');
+                verfahrenLaden({});
+                pruefe('Checkliste: nichts vorausgewählt', verfahrenGewaehlt().length, 0);
+                pruefe('Ohne Haken kein Absatz im Schriftstück', verfahrenAbsatzHtml(), '');
+                pruefeWahr('Widerspruch: Punkte des Anhörungsverfahrens fehlen zu Recht',
+                    !verfahrenKatalog().some(v => v.key === 'wortgleich'));
+                verfahrenSetzen('dauer', true); verfahrenDetail('dauer', '25');
+                const g32 = verfahrenGewaehlt();
+                pruefe('Ein Haken ergibt einen Satz', g32.length, 1);
+                pruefeWahr('Der Satz nennt die eingetragene Dauer', g32[0].satz.includes('25 Minuten'));
+                pruefeWahr('Absatz im Schriftstück trägt eine Kennung', verfahrenAbsatzHtml().includes('id="stmt-verfahren"'));
+                pruefeWahr('Widerspruchs-Stellungnahme enthält den Absatz',
+                    buildStellungnahme('', {}, '').includes('id="stmt-verfahren"'));
+                pruefeWahr('KI erhält die Rügen, ohne sie zu wiederholen',
+                    /25 Minuten/.test(verfahrenFuerPrompt()) && /NICHT erneut aufzählen/.test(verfahrenFuerPrompt()));
+                pruefeWahr('Widerspruchs-Anweisung enthält die Rügen',
+                    buildBegruendungPrompt(computeDiffs(), false).includes('25 Minuten'));
+                // Empfehlungen nur aus erfassten Daten
+                set32('stam-art', DURCHFUEHRUNGSARTEN.find(x => /aktenlage/i.test(x)));
+                pruefeWahr('Aktenlage wird empfohlen', !!verfahrenEmpfehlungen().aktenlage);
+                set32('stam-art', DURCHFUEHRUNGSARTEN[0]);
+                pruefeWahr('Ohne Aktenlage keine Empfehlung', !verfahrenEmpfehlungen().aktenlage);
+                anlagen = [{ id: 'v32', bezeichnung: 'Entlassbericht', art: 'Krankenhausbericht', datum: '', kriterium: '', bemerkung: '', dateiname: 'e.pdf', bestaetigt: [] }];
+                pruefeWahr('Vorhandene Anlagen empfehlen die Rüge „Unterlagen nicht berücksichtigt"', !!verfahrenEmpfehlungen().unterlagen);
+                pruefeWahr('Vorschlag nennt die Anlage', verfahrenDetailVorschlag('unterlagen').includes('Entlassbericht'));
+                // Anhörung: eigene Punkte, Empfehlung aus dem gemessenen Textvergleich
+                setzeModus('anhoerung');
+                pruefeWahr('Anhörung: Punkt „wortgleich" steht zur Verfügung',
+                    verfahrenKatalog().some(v => v.key === 'wortgleich'));
+                const text32 = 'Der Nackengriff ist beidseits unvollständig durchführbar, die Armhebung endet in Kinnhöhe, '
+                             + 'das Gangbild ist unsicher und kleinschrittig, Transfers gelingen nur mit Festhalten.';
+                set32('stam-befund', text32);
+                set32('anh-zweit-befund', text32 + ' Neue Erkenntnisse ergeben sich nicht.');
+                pruefeWahr('Wortgleicher Befund wird empfohlen', !!verfahrenEmpfehlungen().wortgleich);
+                verfahrenSetzen('wortgleich', true);
+                pruefeWahr('Der Satz nennt den gemessenen Anteil', /\d+ %/.test(verfahrenGewaehlt().find(x => x.key === 'wortgleich').satz));
+                pruefeWahr('Anhörungs-Stellungnahme enthält den Absatz',
+                    buildAnhoerung('', {}, '').includes('id="stmt-verfahren"'));
+                // Speichern, Laden, Fallwechsel
+                const fd32 = fallDaten();
+                pruefeWahr('Falldatei enthält die Checkliste', !!(fd32.verfahrensfehler && fd32.verfahrensfehler.dauer));
+                verfahrenLaden({});
+                pruefe('Nach dem Leeren keine Rügen', verfahrenGewaehlt().length, 0);
+                verfahrenLaden(fd32.verfahrensfehler);
+                pruefeWahr('Geladene Checkliste wirkt wieder', verfahrenGewaehlt().length >= 1);
+                unterlagenZuruecksetzen(true);
+                pruefe('Neuer Fall leert die Checkliste', verfahrenGewaehlt().length, 0);
+            } finally {
+                verfahrenLaden(merk32.vf); anlagen = merk32.anl;
+                Object.keys(merk32.felder).forEach(id => { const el = document.getElementById(id); if (el) el.value = merk32.felder[id]; });
+                setzeModus(merk32.modus);
+            }
+        }
+
+        /* 33. Zeitachse (js/chronik.js) und Textvergleich der Befunde (js/vergleich.js). */
+        if (typeof chronikEreignisse === 'function') {
+            const merk33 = { modus: appModus, erf: JSON.parse(JSON.stringify(erfassung || {})),
+                             anl: JSON.parse(JSON.stringify(anlagen)), felder: {} };
+            ['stam-begutachtung', 'diag-icd-1', 'diag-txt-1', 'stam-befund', 'anh-zweit-befund'].forEach(id => {
+                const el = document.getElementById(id); if (el) merk33.felder[id] = el.value; });
+            const set33 = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+            try {
+                setzeModus('hoeherstufung');
+                erfassung = { krankenhaus: [{ von: '2026-03-02', bis: '2026-03-20', grund: 'Schenkelhalsfraktur' }],
+                              hilfsmittel: [{ bezeichnung: 'Rollator', nutzung: 'genutzt', taetigkeit: 'vorhanden seit 15.04.2026' }] };
+                ensureDiagRows(1); set33('diag-icd-1', 'G20'); set33('diag-txt-1', 'Parkinson (Erstdiagnose 10.05.2026)');
+                anlagen = [];
+                set33('stam-begutachtung', '2026-01-10');
+                const ev = chronikEreignisse();
+                pruefe('Zeitachse: alle datierten Ereignisse', ev.length, 3);
+                pruefeWahr('Zeitachse ist nach Datum sortiert', ev[0].datum <= ev[1].datum && ev[1].datum <= ev[2].datum);
+                pruefe('Alle liegen nach dem Vorgutachten', chronikSeitVorgutachten().length, 3);
+                set33('stam-begutachtung', '2026-04-01');
+                pruefe('Frühere Ereignisse zählen nicht als Verschlechterung', chronikSeitVorgutachten().length, 2);
+                pruefeWahr('Abschnitt für den Antrag trägt eine Kennung', chronikAbschnittHtml().includes('id="stmt-chronik"'));
+                pruefeWahr('Abschnitt nennt Datum und Ereignis',
+                    chronikAbschnittHtml().includes('15.04.2026') && chronikAbschnittHtml().includes('Rollator'));
+                pruefeWahr('Höherstufungsantrag enthält die Zeitachse', buildHoeherstufung('', {}, '').includes('id="stmt-chronik"'));
+                pruefeWahr('KI erhält die Zeitachse als Tatsachen', /VERÄNDERUNGEN SEIT DEM VORGUTACHTEN/.test(chronikFuerPrompt()));
+                pruefeWahr('Antrags-Anweisung enthält die Zeitachse', buildAntragPrompt([], false).includes('Rollator'));
+                set33('stam-begutachtung', '2026-12-31');
+                pruefe('Ohne Ereignisse danach kein Abschnitt', chronikAbschnittHtml(), '');
+
+                // Textvergleich
+                const a33 = textUebernahme('Der Nackengriff ist beidseits unvollständig durchführbar und die Armhebung endet in Kinnhöhe',
+                                           'Der Nackengriff ist beidseits unvollständig durchführbar und die Armhebung endet in Kinnhöhe');
+                pruefe('Gleicher Text: 100 Prozent', Math.round(a33.anteil * 100), 100);
+                pruefe('Längste Passage wird in Wörtern gemessen', a33.passageWoerter, 12);
+                const b33 = textUebernahme('Die Versicherte geht sicher und benötigt keine Hilfe beim Ankleiden des Oberkörpers',
+                                           'Der Nackengriff ist beidseits unvollständig durchführbar und die Armhebung endet in Kinnhöhe');
+                pruefe('Anderer Text: keine Übereinstimmung', Math.round(b33.anteil * 100), 0);
+                pruefe('Zu kurzer Text ergibt keine Aussage', textUebernahme('zu kurz', 'auch zu kurz'), null);
+                setzeModus('anhoerung');
+                set33('stam-befund', 'Der Nackengriff ist beidseits unvollständig durchführbar und die Armhebung endet in Kinnhöhe');
+                set33('anh-zweit-befund', 'Der Nackengriff ist beidseits unvollständig durchführbar und die Armhebung endet in Kinnhöhe');
+                pruefe('Befundvergleich des Falls', Math.round(befundAehnlichkeit().anteil * 100), 100);
+                pruefeWahr('Vergleichsreiter zeigt den Textvergleich', textvergleichHtml().includes('100 %'));
+                pruefeWahr('Die Passage wird nicht als Zitat ausgegeben',
+                    textvergleichHtml().includes('nicht zum Zitieren'));
+            } finally {
+                erfassung = merk33.erf; anlagen = merk33.anl;
+                Object.keys(merk33.felder).forEach(id => { const el = document.getElementById(id); if (el) el.value = merk33.felder[id]; });
+                setzeModus(merk33.modus);
+            }
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {
@@ -5398,6 +5611,7 @@ async function selbsttest() {
             if (typeof widerspruchStellungnahme !== 'undefined') {
                 widerspruchStellungnahme = sicherung.wsQuelle; widerspruchKerne = sicherung.wsKerne;
             }
+            if (typeof verfahrenLaden === 'function') verfahrenLaden(sicherung.verfahren);
             if (typeof stellungnahmeVeraltet !== 'undefined') {
                 stellungnahmeVeraltet = sicherung.veraltet;
                 veraltetGruende = sicherung.veraltetGruende;

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pflegegradassistent für Berater v66.60</title>
+    <title>Pflegegradassistent für Berater v66.61</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
@@ -159,6 +159,8 @@
         <div id="anhoerung-bereich" class="space-y-6" style="display:none"></div>
         <!-- Ärztliche Unterlagen als Beleg: Widerspruch und Anhörung (js/belege.js) -->
         <div id="belege-bereich" class="space-y-6" style="display:none"></div>
+        <!-- Verfahrensfehler-Checkliste: Widerspruch und Anhörung (js/verfahren.js) -->
+        <div id="verfahren-bereich" class="space-y-6" style="display:none"></div>
     </section>
 
 
@@ -293,6 +295,9 @@ if (typeof pdfjsLib !== 'undefined') { try { pdfjsLib.GlobalWorkerOptions.worker
 <script src="js/vorlage.js"></script>
 <script src="js/laenge.js"></script>
 <script src="js/vorschlaege.js"></script>
+<script src="js/prognose.js"></script>
+<script src="js/verfahren.js"></script>
+<script src="js/chronik.js"></script>
 <script src="js/dokument.js"></script>
 <script src="js/oberflaeche.js"></script>
 <script src="js/bewertung.js"></script>

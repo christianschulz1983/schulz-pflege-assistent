@@ -506,6 +506,8 @@ function buildBegruendungPrompt(diffs, mitAllgemein) {
         p += '\n';
     });
     if (!istAntrag && mitAllgemein) p += belegeHinweisFuerAllgemein();
+    if (!istAntrag && typeof verfahrenFuerPrompt === 'function') p += verfahrenFuerPrompt();
+    if (istAntrag && typeof chronikFuerPrompt === 'function') p += chronikFuerPrompt();
     // Quervergleich: Kriterien, in denen der Gutachter selbst schon eine Einschränkung sah
     const diffNrs = new Set(diffs.map(d => d.nr));
     let quer = '';
@@ -897,6 +899,7 @@ ZWINGEND:
     });
 
     if (mitAllgemein) prompt += belegeHinweisFuerAllgemein();
+    if (typeof verfahrenFuerPrompt === 'function') prompt += verfahrenFuerPrompt();
     if (mitAllgemein) {
         /* Aufbau und Tonfall folgen den Vorlagen des Verfassers (Vorlagen A und B).
            Dort steht KEINE Nummernliste, sondern Fließtext, in dem zwei bis drei

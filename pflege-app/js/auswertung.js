@@ -289,6 +289,8 @@ function fallDaten() {
                 // Anhörung: die ursprüngliche Stellungnahme des Widerspruchs (Quelle je Kriterium)
                 stellungnahmeWiderspruch: (typeof widerspruchStellungnahme !== 'undefined') ? widerspruchStellungnahme : '',
                 stellungnahmeKerne: (typeof widerspruchKerne !== 'undefined') ? widerspruchKerne : {},
+                // Verfahrensfehler-Checkliste (js/verfahren.js)
+                verfahrensfehler: (typeof verfahrensfehler !== 'undefined') ? verfahrensfehler : {},
                 // Wer hat was geändert (Regler, Vorschlag, Befund, Modul 5, Korrektur)
                 bewertungsProtokoll: (typeof bewertungsProtokoll !== 'undefined') ? bewertungsProtokoll : [],
                 // Passt die gespeicherte Stellungnahme noch zu den Werten?
@@ -363,6 +365,7 @@ function loadCase(e) {
             if (typeof befundLaden === 'function') befundLaden(data.befund);
             if (typeof erfassungLaden === 'function') erfassungLaden(data.erfassung);
             if (typeof anlagenLaden === 'function') anlagenLaden(data.anlagen);
+            if (typeof verfahrenLaden === 'function') verfahrenLaden(data.verfahrensfehler);
             if (typeof vorschlagGruende !== 'undefined') vorschlagGruende = (data.vorschlagGruende && typeof data.vorschlagGruende === 'object') ? data.vorschlagGruende : {};
             // War die Stellungnahme beim Speichern veraltet, bleibt der Hinweis erhalten.
             if (data.stellungnahmeVeraltet && typeof stellungnahmeVeraltet !== 'undefined') {

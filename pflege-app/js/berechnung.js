@@ -367,6 +367,8 @@ function calculate(pref) {
             footEl.innerText='✓ Maximaler Pflegegrad erreicht';
         }
     }
+    // Prognose und Analysen mitziehen (js/prognose.js) – sie rechnen mit denselben Werten
+    if (pref === 'own' && typeof renderAnalyseBereich === 'function') renderAnalyseBereich();
 }
 
 /* Sagt an Ort und Stelle, was die Kontinenzangabe gerade bewirkt. Ohne diesen Satz

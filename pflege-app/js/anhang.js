@@ -170,6 +170,7 @@ function unterlagenZuruecksetzen(neuerFall) {
     if (typeof belegDateien !== 'undefined') Object.keys(belegDateien).forEach(k => delete belegDateien[k]);
     if (neuerFall) {
         if (typeof anlagenLaden === 'function') anlagenLaden([]);
+        if (typeof verfahrenLaden === 'function') verfahrenLaden({});
         if (typeof widerspruchStellungnahme !== 'undefined') { widerspruchStellungnahme = ''; widerspruchKerne = {}; }
         if (typeof renderAnlagen === 'function') renderAnlagen();
     }

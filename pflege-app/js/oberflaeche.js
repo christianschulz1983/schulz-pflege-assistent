@@ -49,7 +49,9 @@ function renderNBASection(prefix) {
                     </p>
                     <button class="btn btn-primary" onclick="schlageWiderspruchspunkteVor()">🔎 Weitere Widerspruchspunkte vorschlagen</button>
                 </div>
-            </div>` : ''}
+            </div>
+            <!-- Prognose, Rückstufungsrisiko, Schwellen, Quervergleich, Tragfähigkeit (js/prognose.js) -->
+            <div id="analyse-bereich" class="space-y-6"></div>` : ''}
 
             <div class="card">
                 <table class="nba-table">
