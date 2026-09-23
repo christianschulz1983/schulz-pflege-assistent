@@ -606,8 +606,9 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    `tragfaehigkeitFunde()` warnt: Modul 3 gewertet ohne psychiatrische Diagnose oder Demenz
    (ICD F.., G30/G31 oder Klartext), Modul 5 gewertet ohne Nachweis in Erfassungstabellen oder
    ausgelesenen Unterlagen. `zeigeKriterium(nr)` springt aus jeder Liste zur Bewertung.
-43. **Verfahrensfehler-Checkliste** (`js/verfahren.js`, Karte `#verfahren-bereich` auf Reiter 1,
-   Widerspruch und Anhörung). `VERFAHREN_KATALOG` mit fertigen Sätzen; zwei Punkte nur in der
+43. **Verfahrensfehler-Checkliste** (`js/verfahren.js`, Karte `#verfahren-bereich` auf Reiter
+   „Einschätzung" **unmittelbar unter der Mitschrift** – sie wird IM GESPRÄCH ausgefüllt, nicht
+   vorab bei den Stammdaten; Widerspruch und Anhörung). `VERFAHREN_KATALOG` mit fertigen Sätzen; zwei Punkte nur in der
    Anhörung (wortgleicher Befundtext, „keine neuen Gesichtspunkte"). **Nichts vorausgewählt**;
    `verfahrenEmpfehlungen()` markiert „empfohlen" nur, was belegt ist (Aktenlage oder
    Telefoninterview laut Durchführungsart, vorhandene Anlagen, gemessene Textgleichheit ≥ 40 %).
@@ -696,7 +697,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1455 Pruefungen.
+Der Selbsttest umfasst 1458 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

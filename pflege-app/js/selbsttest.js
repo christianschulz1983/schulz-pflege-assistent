@@ -5465,6 +5465,14 @@ async function selbsttest() {
                 pruefe('Ohne Haken kein Absatz im Schriftstück', verfahrenAbsatzHtml(), '');
                 pruefeWahr('Widerspruch: Punkte des Anhörungsverfahrens fehlen zu Recht',
                     !verfahrenKatalog().some(v => v.key === 'wortgleich'));
+                /* Die Checkliste wird IM GESPRÄCH ausgefüllt und gehört deshalb auf den Reiter
+                   „Einschätzung" unmittelbar unter die Mitschrift – nicht zu den Stammdaten. */
+                const vb = document.getElementById('verfahren-bereich');
+                pruefeWahr('Checkliste steht auf Reiter „Einschätzung"', !!vb && !!vb.closest('#tab-3'));
+                pruefeWahr('Checkliste steht NICHT bei den Stammdaten', !vb.closest('#tab-1'));
+                pruefeWahr('Checkliste steht unter der Mitschrift',
+                    !!document.getElementById('erstgespraech-notes')
+                    && vb.compareDocumentPosition(document.getElementById('erstgespraech-notes')) === Node.DOCUMENT_POSITION_PRECEDING);
                 verfahrenSetzen('dauer', true); verfahrenDetail('dauer', '25');
                 const g32 = verfahrenGewaehlt();
                 pruefe('Ein Haken ergibt einen Satz', g32.length, 1);

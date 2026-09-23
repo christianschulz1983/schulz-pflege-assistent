@@ -28,7 +28,10 @@ function renderNBASection(prefix) {
                                onchange="leseUnterlagen(event)" style="display:none">
                     </div>
                 </div>
-            </div>` : ''}
+            </div>
+            <!-- Verfahrensfehler-Checkliste (js/verfahren.js) – unmittelbar UNTER der Mitschrift:
+                 Sie wird im Gespräch ausgefüllt, nicht vorab bei den Stammdaten. -->
+            <div id="verfahren-bereich" class="space-y-6" style="display:none"></div>` : ''}
 
             <div class="special-card" onclick="selectItem(0,'${prefix}')">
                 <div class="special-header">⚠ Besondere Bedarfskonstellation (§ 15 Abs. 4 SGB XI)</div>
@@ -181,6 +184,9 @@ function init() {
     // Reiter "Laut Vorgutachten" entfällt – die Vorgutachten-Werte kommen aus dem Import
     // (Prüfansicht) und werden in Reiter "Einschätzung & Vergleich" je Kriterium angezeigt.
     document.getElementById('tab-3').innerHTML = renderNBASection('own');
+    // Die Karten in Reiter 3 hängen am Vorgang und müssen nach dem Aufbau gefüllt werden
+    if (typeof renderVerfahrenBereich === 'function') renderVerfahrenBereich();
+    if (typeof renderAnalyseBereich === 'function') renderAnalyseBereich();
     // Das Notizfeld steht jetzt in diesem Reiter und wird hier neu aufgebaut –
     // beim Laden eines Falls muss der gespeicherte Text zurückgeschrieben werden.
     const notizen = document.getElementById('erstgespraech-notes');
