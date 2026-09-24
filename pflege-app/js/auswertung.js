@@ -185,6 +185,22 @@ function renderAuswertung() {
                     <button class="btn btn-secondary" style="margin-top:10px" onclick="resetStilBeispiele()">Auf Ausgangsbeispiel zurücksetzen</button>
                 </details>
 
+                <details style="margin-top:12px; border:1px solid var(--border); border-radius:8px; padding:10px 14px;">
+                    <summary style="cursor:pointer; font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-secondary);">
+                        Gelernte Formulierungen (aus Ihren Überarbeitungen) — <span id="stil-lernen-kopf">–</span></summary>
+                    <p style="font-size:12px; color:var(--text-secondary); margin:10px 0; line-height:1.6">
+                        Überarbeiten Sie einen erzeugten Absatz, merkt sich die App Vorher und Nachher und gibt
+                        beides als Stilhinweis an die KI weiter – zusätzlich zur Stilvorlage oben. Aus den Paaren
+                        wird <b>nur die Sprache</b> übernommen, nie ein Sachverhalt. Name, Anrede, Daten,
+                        Versicherungsnummern und Kasse werden vor dem Speichern ersetzt. Die Paare liegen nur in
+                        diesem Browser, nicht in der Falldatei.
+                    </p>
+                    <label style="font-size:12px;display:inline-flex;align-items:center;gap:6px">
+                        <input type="checkbox" id="stil-lernen-an" onchange="stilLernenUmschalten(this.checked)"> beim Erstellen berücksichtigen</label>
+                    <button class="btn btn-secondary" style="margin-left:12px" onclick="stilLernenLeeren()">Alle löschen</button>
+                    <div id="stil-lernen-liste" style="margin-top:12px"></div>
+                </details>
+
                 <div id="appeal-result-container" style="display:none; margin-top:20px;">
                     <div id="appeal-veraltet">${typeof veraltetHinweisHtml === 'function' ? veraltetHinweisHtml() : ''}</div>
                     <label class="field-label">Generierte Stellungnahme (Vorschau – frei editierbar)</label>
@@ -204,6 +220,7 @@ function renderAuswertung() {
     // Eingaben nach dem Neu-Rendern wiederherstellen (Tab-Wechsel baut den Inhalt neu auf).
     // Das Notizfeld liegt jetzt im Reiter "Einschätzung" und wird davon nicht berührt.
     injectStellungnahmeCss();
+    if (typeof renderStilLernen === 'function') renderStilLernen();
     const stilEl = document.getElementById('stil-beispiele');
     if (stilEl) {
         let s = null;
@@ -272,6 +289,8 @@ function fallDateiname(betreffend, modus) {
 /* Alles, was zu einem Fall gehört, in einem Objekt. Eigene Funktion, damit der Selbsttest
    prüfen kann, was tatsächlich gespeichert wird – saveCase selbst öffnet einen Dialog. */
 function fallDaten() {
+    // Überarbeitungen am erzeugten Text lernen, bevor der Stand weggeschrieben wird
+    if (typeof stilLernenPruefen === 'function') stilLernenPruefen(true);
     const stammdaten={};
     // Auch die Felder des Anhoerungsverfahrens ("anh-") gehoeren in die Falldatei.
     document.querySelectorAll('[id^="stam-"], [id^="diag-"], [id^="anh-"]').forEach(el=>stammdaten[el.id]=el.value);

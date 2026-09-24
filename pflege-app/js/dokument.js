@@ -550,6 +550,8 @@ function setzeStellungnahme(html) {
 // Erzeugt die Stellungnahme im Familiara-Format (gefüllt aus den App-Daten, mit Rechtschreibkorrektur der Notizen).
 async function generateAppealText() {
     try {
+        // Was der Berater am bisherigen Text geändert hat, wird zuerst gelernt (js/stillernen.js)
+        if (typeof stilLernenPruefen === 'function') stilLernenPruefen(true);
         if (typeof appModus !== 'undefined' && appModus === 'anhoerung' && !hatZweitgutachten()) {
             showToast('Für die Anhörung fehlt noch das Anhörungsgutachten. Bitte zuerst auf Reiter 1 '
                 + 'den Widerspruchsfall laden und das Gutachten einlesen.', 'error');
@@ -688,6 +690,7 @@ async function generateAppealText() {
             finalHtml = fresh;
         }
         appealDraft = finalHtml;
+        if (typeof stilStandMerken === 'function') stilStandMerken(finalHtml);
         if (docEl) docEl.innerHTML = finalHtml;
         if (cont) cont.style.display = 'block';
         // Die Stellungnahme gibt jetzt wieder den aktuellen Stand der Bewertungen wieder.
@@ -754,6 +757,7 @@ function copyAppealText() {
 /* Word-Dokument erzeugen: bearbeitbar in Word und in Google Docs (dort hochladen und öffnen).
    Enthält Seitenzahlen in der Fußzeile und weder Erstellungsdatum noch Adresszeile des Browsers. */
 function exportAppealWord() {
+    if (typeof stilLernenPruefen === 'function') stilLernenPruefen(false);
     const docEl = document.getElementById('appeal-document');
     if (!docEl || !docEl.innerHTML.trim()) { showToast("Bitte zuerst die Stellungnahme erstellen.", "error"); return; }
     // Arbeitshinweise zu ungeprüften Zitaten gehören nicht ins fertige Dokument
@@ -885,6 +889,7 @@ function printAppealText() {
 function druckeStellungnahme() {
     const docEl = document.getElementById('appeal-document');
     if (!docEl || !docEl.innerHTML.trim()) { showToast("Bitte zuerst die Stellungnahme erstellen.", "error"); return; }
+    if (typeof stilLernenPruefen === 'function') stilLernenPruefen(false);
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
         showToast("Druckfenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.", "error");

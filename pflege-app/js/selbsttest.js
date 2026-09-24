@@ -5650,6 +5650,115 @@ async function selbsttest() {
                 && aiReadGutachten.toString().includes('werteVergleich('));
         }
 
+        /* 35. Aus den eigenen Überarbeitungen lernen (js/stillernen.js).
+           Wunsch: Überarbeitet der Verfasser einen erzeugten Absatz, merkt sich die App das
+           Vorher und Nachher und schreibt mit der Zeit näher an seinem Ton.
+           DATENSCHUTZ: Die Paare liegen nur im Browser, und Name, Anrede, Daten,
+           Versicherungsnummern und Kasse werden vor dem Speichern ersetzt. */
+        if (typeof stilLernenErfassen === 'function') {
+            const merk35 = {
+                liste: (() => { try { return localStorage.getItem(STIL_LERNEN_STORAGE); } catch (e) { return null; } })(),
+                aus: (() => { try { return localStorage.getItem(STIL_LERNEN_AUS); } catch (e) { return null; } })(),
+                stand: stilErzeugterStand, modus: appModus,
+                name: document.getElementById('stam-betreffend')?.value,
+                kasse: document.getElementById('stam-kasse')?.value,
+                dok: (() => { const el = document.getElementById('appeal-document'); return el ? el.innerHTML : null; })()
+            };
+            const setz35 = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+            try {
+                stilLernenSpeichern([]);
+                try { localStorage.removeItem(STIL_LERNEN_AUS); } catch (e) {}
+                setzeModus('widerspruch');
+                setz35('stam-betreffend', 'Frau Erika Musterfrau');
+                setz35('stam-kasse', 'Musterkasse');
+
+                const kiFassung = 'Die gutachterliche Einstufung als selbständig ignoriert die eingeschränkte Armhebung '
+                    + 'von Frau Erika Musterfrau seit dem 12.02.2026 und die Angaben der Musterkasse vollständig.';
+                const meineFassung = 'Die Wertung als selbständig verkennt die dokumentierte Einschränkung der Armhebung '
+                    + 'bei Frau Erika Musterfrau und hält einer Prüfung anhand der Richtlinien nicht stand.';
+                const bau = (text, notes) => '<div class="stmt"><div id="stmt-notes">' + notes + '</div>'
+                    + '<div id="stmt-crit"><div class="crit" data-nr="4.4.2"><div class="ct">4.4.2: Körperpflege</div>'
+                    + '<div>Gutachterliche Bewertung: „selbständig“</div><div>' + text + '</div></div></div></div>';
+
+                stilStandMerken(bau(kiFassung, 'Die von der KI verfassten Allgemeinen Angaben, erster Satz und zweiter Satz.'));
+                let feld = document.getElementById('appeal-document');
+                const selbstGebaut = !feld;
+                if (selbstGebaut) { feld = document.createElement('div'); feld.id = 'appeal-document'; document.body.appendChild(feld); }
+                feld.innerHTML = bau(meineFassung, 'Die von der KI verfassten Allgemeinen Angaben, erster Satz und zweiter Satz.');
+
+                pruefe('Eine Überarbeitung wird gelernt', stilLernenErfassen(), 1);
+                const liste35 = stilLernenListe();
+                pruefe('Das Paar gehört zum Kriterium', liste35[0].nr, '4.4.2');
+                pruefeWahr('Name ist ersetzt', !/Musterfrau/.test(liste35[0].vorher + liste35[0].nachher));
+                pruefeWahr('Datum ist ersetzt', !/12\.02\.2026/.test(liste35[0].vorher) && liste35[0].vorher.includes('<Datum>'));
+                pruefeWahr('Kasse ist ersetzt', !/Musterkasse/.test(liste35[0].vorher) && liste35[0].vorher.includes('<Kasse>'));
+                pruefeWahr('Platzhalter werden nicht gehäuft', !/<Name>\s*<Name>/.test(liste35[0].nachher));
+                pruefeWahr('Beide Fassungen sind gespeichert',
+                    liste35[0].vorher.includes('ignoriert') && liste35[0].nachher.includes('verkennt'));
+
+                pruefe('Ohne Änderung wird nichts gelernt', stilLernenErfassen(), 0);
+                feld.innerHTML = bau(meineFassung + ' ', 'Die von der KI verfassten Allgemeinen Angaben, erster Satz und zweiter Satz.');
+                pruefe('Leerzeichen sind keine Überarbeitung', stilLernenErfassen(), 0);
+                feld.innerHTML = bau(meineFassung, 'Kurz.');
+                pruefe('Ein Stichwort statt eines Absatzes wird nicht gelernt', stilLernenErfassen(), 0);
+
+                // In der KI-Anweisung: Sprache ja, Sachverhalt nein
+                const p35 = stilLernenFuerPrompt(['4.4.2']);
+                pruefeWahr('Anweisung enthält das Paar', p35.includes('verkennt') && p35.includes('ignoriert'));
+                pruefeWahr('Anweisung verbietet die Übernahme von Sachverhalten',
+                    /AUSSCHLIESSLICH Sprache/.test(p35) && /STRENG VERBOTEN/.test(p35));
+                pruefeWahr('Keine Personendaten in der Anweisung', !/Musterfrau|Musterkasse|12\.02\.2026/.test(p35));
+                pruefeWahr('Widerspruchs-Anweisung nutzt die gelernten Formulierungen',
+                    buildBegruendungPrompt(computeDiffs(), false).includes('ÜBERARBEITUNGEN'));
+
+                // Abschaltbar
+                stilLernenUmschalten(false);
+                pruefe('Abgeschaltet: nichts in der Anweisung', stilLernenFuerPrompt(['4.4.2']), '');
+                feld.innerHTML = bau('Eine dritte, deutlich andere Fassung dieses Absatzes, die sich klar von den vorigen unterscheidet und lang genug ist.', 'Die von der KI verfassten Allgemeinen Angaben, erster Satz und zweiter Satz.');
+                pruefe('Abgeschaltet: es wird nichts gelernt', stilLernenErfassen(), 0);
+                stilLernenUmschalten(true);
+
+                // Auswahl: höchstens sechs, passende zuerst
+                const viele = [];
+                for (let k = 0; k < 12; k++) {
+                    viele.push({ id: 'x' + k, nr: (k % 2 ? '4.4.2' : '4.1.1'), vorgang: 'widerspruch',
+                                 zeit: '2026-01-01', vorher: 'alt ' + k, nachher: 'neu ' + k });
+                }
+                stilLernenSpeichern(viele);
+                const aus35 = stilLernenAuswahl(['4.4.2']);
+                pruefe('Höchstens sechs Paare je Aufruf', aus35.length, STIL_LERNEN_PROMPT_MAX);
+                pruefeWahr('Paare zum gesuchten Kriterium zuerst', aus35.every(p => p.nr === '4.4.2'));
+
+                // Speichergrenze und Löschen
+                const zuviele = [];
+                for (let k = 0; k < STIL_LERNEN_MAX + 20; k++) zuviele.push({ id: 'z' + k, nr: '4.1.1', vorgang: 'widerspruch', zeit: '2026-01-01', vorher: 'a', nachher: 'b' });
+                stilLernenSpeichern(zuviele);
+                pruefe('Die Sammlung wächst nicht unbegrenzt', stilLernenListe().length, STIL_LERNEN_MAX);
+                const ersteId = stilLernenListe()[0].id;
+                stilLernenEntfernen(ersteId);
+                pruefeWahr('Einzelnes Paar lässt sich löschen', !stilLernenListe().some(p => p.id === ersteId));
+                stilLernenSpeichern([]);
+                pruefe('Ohne Paare keine Anweisung', stilLernenFuerPrompt([]), '');
+
+                // Die Falldatei enthält die Paare NICHT (sie gehören nicht zu einem Fall)
+                pruefeWahr('Gelernte Formulierungen stehen nicht in der Falldatei',
+                    !JSON.stringify(fallDaten()).includes('stilLernen'));
+                if (selbstGebaut) feld.remove();
+            } finally {
+                try {
+                    if (merk35.liste === null) localStorage.removeItem(STIL_LERNEN_STORAGE);
+                    else localStorage.setItem(STIL_LERNEN_STORAGE, merk35.liste);
+                    if (merk35.aus === null) localStorage.removeItem(STIL_LERNEN_AUS);
+                    else localStorage.setItem(STIL_LERNEN_AUS, merk35.aus);
+                } catch (e) {}
+                stilErzeugterStand = merk35.stand;
+                const el = document.getElementById('appeal-document');
+                if (el && merk35.dok !== null) el.innerHTML = merk35.dok;
+                setz35('stam-betreffend', merk35.name); setz35('stam-kasse', merk35.kasse);
+                setzeModus(merk35.modus);
+            }
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

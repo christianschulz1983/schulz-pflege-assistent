@@ -36,6 +36,7 @@ pflege-app/
   js/prognose.js      Prognose, Schwellen/Kipp-Analyse, Rueckstufungsrisiko, Quervergleich, Tragfaehigkeit
   js/verfahren.js     Verfahrensfehler-Checkliste (Widerspruch, Anhoerung)
   js/chronik.js       Zeitachse der Verschlechterung (Hoeherstufungsantrag)
+  js/stillernen.js    Lernt aus den eigenen Ueberarbeitungen (Stilpaare, nur im Browser)
   js/namenspruefung.js Abgleich der eingelesenen Namen gegen den Dokumenttext
   js/befund.js        Befunderhebung (Erstantrag, Höherstufung)
   js/erfassung.js     Pflegepersonen, Aufenthalte, Versorgung, Übernahme in Modul 5
@@ -645,6 +646,21 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Zeilentoleranz aus der Zeilenhöhe statt fester 6 pt. Je Wert kommen `sicher`, `grund`
    (mehrere, keine, unvollstaendig, abstand, heuristik, zahl), `seite` und `y` zurück.
 
+47. **Aus den eigenen Überarbeitungen lernen** (`js/stillernen.js`). Überarbeitet der Verfasser
+   einen erzeugten Absatz, merkt sich die App Vorher und Nachher und gibt beides als
+   Stilhinweis an die KI – zusätzlich zur handgepflegten Stilvorlage.
+   Ablauf: `stilStandMerken(html)` nach dem Erzeugen (das „Vorher"), `stilLernenPruefen()` beim
+   nächsten Erzeugen, beim Speichern, Drucken und Word-Export vergleicht den angezeigten Text
+   und legt die Paare ab. `stilEchteAenderung()` filtert Tippfehler und Stichworte heraus.
+   `stilLernenFuerPrompt(nrn)` wählt höchstens `STIL_LERNEN_PROMPT_MAX` Paare (gleiches
+   Kriterium, dann gleicher Vorgang, dann die jüngsten) und weist die KI an, **nur die Sprache**
+   zu übernehmen – niemals einen Sachverhalt aus einem anderen Fall.
+   **Datenschutz:** `stilAnonym()` ersetzt vor dem Speichern Name, Anrede mit Nachname, Kasse,
+   Daten, Versicherungs- und lange Nummern durch Platzhalter (`<Name>`, `<Kasse>`, `<Datum>` …;
+   keine Umschreibung, sonst lernt die KI schlechtes Deutsch). Die Paare liegen **nur im
+   Browser** (`localStorage`, höchstens `STIL_LERNEN_MAX`), **nicht in der Falldatei** und nicht
+   im Repository. In der Auswertung sind sie einzeln sichtbar, löschbar und ganz abschaltbar.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -697,7 +713,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1458 Pruefungen.
+Der Selbsttest umfasst 1480 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
