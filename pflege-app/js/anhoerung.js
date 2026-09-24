@@ -5,6 +5,11 @@
 // Damit stehen das Erstgutachten (stateOrig) und seine eigene Bewertung (stateEigene)
 // bereits fest. Neu hinzu kommt nur das Anhörungsgutachten (stateZweit).
 
+/* Wie viele Sätze der Mitschrift nicht mehr in die Allgemeinen Angaben gepasst haben
+   (Drittelseite, js/laenge.js). Wird beim Aufbau gesetzt und im Schriftstück als
+   data-gekuerzt vermerkt, damit die App es dem Berater melden kann. */
+let anhoerungGekuerzt = 0;
+
 // Kopfangaben des Anhörungsverfahrens. Die Kennungen beginnen mit "anh-", damit sie
 // beim Speichern eines Falls mit erfasst werden (siehe saveCase).
 const ANHOERUNG_FELDER = [
@@ -429,12 +434,13 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
     // Der Verweis auf das Verhältnis zur ursprünglichen Stellungnahme steht IMMER –
     // er wird gerechnet und angehängt, nicht der KI überlassen. Der Standardtext ohne
     // KI enthält dieselbe Gegenüberstellung bereits im Fließtext.
-    const kiText = (allgemeinText && allgemeinText.trim()) ? allgemeinText.trim() : '';
+    const kiText = (allgemeinText && allgemeinText.trim()) ? alsFliesstext(allgemeinText.trim()) : '';
     // Nur anhängen, wenn der Text den Bezug nicht ohnehin schon herstellt.
     const verweis = (kiText && anhoerungVerweisVorhanden(kiText))
         ? '' : anhoerungVerweisSatz(analyse, org);
+    anhoerungGekuerzt = 0;
     const allgemein = kiText
-        ? nummernImText(kiText, org).split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
+        ? allgemeinAbsaetzeHtml(nummernImText(kiText, org))
           + (verweis ? `<p class="anh-verweis">${esc(verweis)}</p>` : '')
         : anhoerungAllgemeinStandard(analyse, { org, begut, art, zweitDatum, zweitArt, origPts, zweitPts,
               origPG, zweitPG, ePts: f2(rE.total), ePG: rE.pg, psDatum: formatDE(g('anh-ps-datum')),
@@ -484,7 +490,7 @@ function buildAnhoerung(notesOverride, begruendungen, allgemeinText) {
     <hr>
 
     <h2>Allgemeine Angaben</h2>
-    <div id="stmt-notes" data-sig="${esc(anhoerungSignatur(analyse, notizenAnh))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${allgemein}</div>
+    <div id="stmt-notes" data-sig="${esc(anhoerungSignatur(analyse, notizenAnh))}" data-ai="${kiText ? '1' : '0'}" data-gekuerzt="${anhoerungGekuerzt}">${allgemein}</div>
     ${(typeof verfahrenAbsatzHtml === 'function') ? verfahrenAbsatzHtml() : ''}
     ${(typeof belegeAllgemeinHtml === 'function') ? belegeAllgemeinHtml() : ''}
     <p>Die nachfolgende Übersicht stellt die Ergebnisse des Erstgutachtens, des Zweitgutachtens und meiner Beurteilung einander gegenüber:</p>
@@ -618,10 +624,18 @@ function anhoerungAllgemeinStandard(a, f) {
         }
     }
     if (fehler.trim()) p += `<p>${fehler.trim()}</p>`;
+    /* Die Mitschrift kam hier früher im Rohzustand hinein – Absatz für Absatz, so wie
+       im Gespräch getippt, ohne Längengrenze. Jetzt eine Kurzfassung (js/kurzfassung.js),
+       und zwar nur so lang, wie nach dem obenstehenden Text von der Drittelseite noch
+       übrig ist. Was nicht mehr hineinpasst, meldet die App (anhoerungGekuerzt). */
+    anhoerungGekuerzt = 0;
     const notizen = f.notizen;
-    if ((notizen || '').trim()) {
-        p += (notizen || '').trim().split(/\r?\n\s*\r?\n/)
-            .map(t => `<p>${esc(t.trim()).replace(/\n/g, '<br>')}</p>`).join('');
+    if ((notizen || '').trim() && typeof kurzfassungAusNotizen === 'function') {
+        const platz = ((typeof allgemeinZeichenGrenze === 'function') ? allgemeinZeichenGrenze() : 1300)
+                    - ((typeof zaehleZeichen === 'function') ? zaehleZeichen(p) : 0);
+        const kurz = kurzfassungAusNotizen(notizen, 'anhoerung', platz);
+        anhoerungGekuerzt = kurz.ausgelassen;
+        if (kurz.text) p += allgemeinAbsaetzeHtml(kurz.text);
     }
     return p;
 }

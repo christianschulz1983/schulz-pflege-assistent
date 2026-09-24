@@ -302,9 +302,17 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
         row('Pflegegrad', pgWert(altPG), pgWert(rE.pg), true)
     ].join('');
 
-    const notesBlock = (allgemeinText && allgemeinText.trim())
-        ? nummernImText(allgemeinText.trim(), org).split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
-        : (notes ? `<p>${esc(notes).replace(/\n/g, '<br>')}</p>` : '');
+    /* „Aktuelle Situation": ohne KI-Text nicht mehr die Mitschrift im Rohzustand, sondern
+       eine Kurzfassung daraus (js/kurzfassung.js) – Fließtext, thematisch gebündelt,
+       höchstens eine Drittelseite (js/laenge.js). */
+    const kiAllgemein = (allgemeinText && allgemeinText.trim())
+        ? alsFliesstext(allgemeinText.trim()) : '';
+    const ersatzAllgemein = kiAllgemein
+        ? null : kurzfassungAusNotizen(notes, istHoeher ? 'hoeherstufung' : 'erstantrag');
+    const notesBlock = kiAllgemein
+        ? allgemeinAbsaetzeHtml(nummernImText(kiAllgemein, org))
+        : (ersatzAllgemein && ersatzAllgemein.text
+            ? allgemeinAbsaetzeHtml(nummernImText(ersatzAllgemein.text, org)) : '');
 
     /* Angaben laut Vorgutachten: NUR die von der KI gekürzte Fassung (Viertelseite).
        Früher stand hier ersatzweise der ROHTEXT, wenn die KI ausfiel – im Fall des Verfassers
@@ -379,7 +387,7 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
     ${anamneseBlock ? `<h3>Angaben laut Vorgutachten</h3>
     <div id="stmt-anamnese" data-ai="1">${anamneseBlock}</div>` : ''}
     <h3>Aktuelle Situation</h3>
-    <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${notesBlock}</div>
+    <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${kiAllgemein ? '1' : '0'}" data-gekuerzt="${ersatzAllgemein ? ersatzAllgemein.ausgelassen : 0}">${notesBlock}</div>
     ${(istHoeher && typeof chronikAbschnittHtml === 'function') ? chronikAbschnittHtml() : ''}
 
     ${/* Einfache Aufzählung: welche Hilfsmittel liegen vor, werden sie genutzt, und was

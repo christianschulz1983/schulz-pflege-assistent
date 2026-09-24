@@ -5871,6 +5871,150 @@ async function selbsttest() {
             }
         }
 
+
+        /* 37. Kurzfassung der Mitschrift statt Rohnotizen (js/kurzfassung.js).
+           Gemeldet: Unter „Allgemeine Angaben" stand die Mitschrift des Erstgesprächs als
+           Stichpunktliste, wörtlich so, wie sie im Gespräch getippt wurde. Ursache: Fiel die
+           KI aus, kamen ersatzweise die Rohnotizen ins Schriftstück – ohne Längengrenze.
+           Ab jetzt: immer Fließtext, thematisch gebündelt, höchstens die Länge des
+           Abschnitts (js/laenge.js) – und zwar in ALLEN Vorgängen. */
+        if (typeof kurzfassungAusNotizen === 'function') {
+            const merk37 = { modus: appModus, notizen: erstgespraechNotes };
+            try {
+                const notizen37 = '- Die Begutachtung erfolgte innerhalb von ca. 45 Minuten.\n'
+                    + '- Es erfolgte eine Befragung und die Gutachterin hat lediglich aufgeschrieben, was der Versicherte gesagt hat.\n'
+                    + '- Das Umsetzen von einem Stuhl und das Steigen von Treppen ist selbständig nicht möglich. Es ist somit nicht nachvollziehbar, wie er eine Physiotherapiepraxis aufsuchen soll.\n'
+                    + 'Die Tochter hilft täglich beim Anziehen der Hose und der Strümpfe.\n'
+                    + 'Nachts steht er mehrfach auf und ist desorientiert.\n'
+                    + 'Die Tochter hilft täglich beim Anziehen der Hose und der Strümpfe.\n';
+
+                // Sätze sauber trennen
+                const s37 = notizSaetze(notizen37);
+                pruefeWahr('Aufzählungszeichen verschwinden', s37.every(s => !/^[-•*]/.test(s)));
+                pruefeWahr('Jeder Satz endet mit einem Satzzeichen', s37.every(s => /[.!?]$/.test(s)));
+                pruefeWahr('An „ca." wird nicht getrennt',
+                    s37.some(s => /ca\. 45 Minuten\.$/.test(s)));
+                pruefe('Doppelte Angaben stehen nur einmal',
+                    s37.filter(s => /beim Anziehen der Hose/.test(s)).length, 1);
+                pruefeWahr('Ein Datum beendet den Satz',
+                    notizSaetze('Der Bescheid datiert vom 10.09.2026. Die Frist läuft.').length === 2);
+                pruefeWahr('Eine Aufzählungsziffer beendet den Satz nicht',
+                    notizSaetze('Der Gutachter kam um 1. Dann ging er.').length === 1);
+
+                // Zusammengehörende Sätze einer Zeile bleiben zusammen
+                const e37 = notizEinheiten(notizen37);
+                pruefeWahr('Eine Zeile bleibt eine Angabe',
+                    e37.some(e => e.saetze.length === 2 && /Umsetzen/.test(e.text) && /Physiotherapiepraxis/.test(e.text)));
+
+                // Themen
+                pruefe('Begutachtungsdauer gehört zum Ablauf', notizThema('Die Begutachtung dauerte 45 Minuten.'), 'ablauf');
+                pruefe('Treppensteigen gehört zur Mobilität', notizThema('Treppen kann er nicht steigen.'), 'mobilitaet');
+                pruefe('Anziehen gehört zur Selbstversorgung', notizThema('Beim Anziehen hilft die Tochter.'), 'selbst');
+                pruefe('Desorientierung gehört zur psychischen Lage', notizThema('Nachts ist er desorientiert.'), 'psych');
+                pruefe('Ohne Stichwort bleibt das Thema offen', notizThema('Das Wetter war schön.'), 'rest');
+
+                // Widerspruch: Fließtext mit Einleitungen, Ablauf zuerst
+                const kw37 = kurzfassungAusNotizen(notizen37, 'widerspruch');
+                pruefeWahr('Die Kurzfassung ist Fließtext ohne Aufzählungszeichen',
+                    kw37.text.length > 0 && !/[•*]|(^|\n)\s*-\s/.test(kw37.text));
+                pruefeWahr('Der Ablauf der Begutachtung steht im Widerspruch zuerst',
+                    /^Zum Ablauf der Begutachtung: /.test(kw37.absaetze[0] || ''));
+                pruefeWahr('Die Themen sind benannt',
+                    /Zur Mobilität: /.test(kw37.text) && /Zur Selbstversorgung: /.test(kw37.text));
+                pruefeWahr('Zusammengehörende Sätze bleiben beieinander',
+                    /nicht möglich\. Es ist somit nicht nachvollziehbar/.test(kw37.text));
+                pruefe('Höchstens drei Absätze', kw37.absaetze.length <= 3, true);
+                pruefe('Nichts ausgelassen, solange der Platz reicht', kw37.ausgelassen, 0);
+
+                // Antrag: die Begutachtung steht dort nicht am Anfang
+                const ka37 = kurzfassungAusNotizen(notizen37, 'erstantrag');
+                pruefeWahr('Im Antrag beginnt es mit der Pflegesituation',
+                    !/^Zum Ablauf/.test(ka37.absaetze[0] || '') && /^Zur Mobilität/.test(ka37.absaetze[0] || ''));
+
+                // Längengrenze: Es wird gekürzt und gesagt, wie viel
+                let lang37 = '';
+                for (let i = 1; i <= 40; i++) lang37 += 'Die Tochter unterstützt bei der Körperpflege am Morgen, Angabe Nummer ' + i + ' aus dem Gespräch.\n';
+                appModus = 'widerspruch';
+                const kl37 = kurzfassungAusNotizen(lang37, 'widerspruch');
+                pruefeWahr('Die halbe Seite wird eingehalten',
+                    kl37.text.length <= allgemeinZeichenGrenze());
+                pruefeWahr('Ausgelassenes wird gezählt',
+                    kl37.ausgelassen > 0 && kl37.uebernommen + kl37.ausgelassen === 40);
+                pruefeWahr('Ein knappes Budget wird beachtet',
+                    kurzfassungAusNotizen(lang37, 'anhoerung', 300).text.length <= 300);
+                pruefe('Ohne Notizen keine Kurzfassung', kurzfassungAusNotizen('', 'widerspruch').text, '');
+
+                // Aufzählung der KI wird zu Fließtext, gewöhnliche Absätze bleiben unberührt
+                pruefe('Aufzählung der KI wird zusammengezogen',
+                    alsFliesstext('- Erstens hier.\n- Zweitens dort.'), 'Erstens hier. Zweitens dort.');
+                pruefe('Ein gewöhnlicher Absatz bleibt, wie er ist',
+                    alsFliesstext('Ein Satz\nüber zwei Zeilen.'), 'Ein Satz\nüber zwei Zeilen.');
+                pruefeWahr('Absatzgrenzen bleiben erhalten',
+                    alsFliesstext('Erster Absatz.\n\n- Punkt eins.\n- Punkt zwei.').split(/\n\s*\n/).length === 2);
+
+                // Schriftstück: Widerspruch ohne KI-Text
+                appModus = 'widerspruch';
+                const hw37 = document.createElement('div');
+                hw37.innerHTML = buildStellungnahme(notizen37, {}, '');
+                const nw37 = hw37.querySelector('#stmt-notes');
+                pruefe('Widerspruch: keine Stichpunktliste im Schriftstück', hw37.querySelectorAll('#stmt-notes ul').length, 0);
+                pruefeWahr('Widerspruch: Absätze statt Rohtext',
+                    nw37.querySelectorAll('p').length > 0 && /Zum Ablauf der Begutachtung/.test(nw37.textContent));
+                pruefe('Widerspruch: Ersatzfassung ist als solche gekennzeichnet', nw37.getAttribute('data-ai'), '0');
+                pruefeWahr('Widerspruch: die Anzahl der ausgelassenen Angaben steht am Abschnitt',
+                    nw37.getAttribute('data-gekuerzt') === '0');
+                pruefeWahr('Widerspruch: der Abschnitt bleibt in der vorgesehenen Länge',
+                    zaehleZeichen(nw37.textContent) <= allgemeinZeichenGrenze());
+
+                // Schriftstück: Aufzählung der KI wird auch dort aufgelöst
+                const hk37 = document.createElement('div');
+                hk37.innerHTML = buildStellungnahme(notizen37, {}, '- Das Gutachten erhebt nichts.\n- Es fehlt die Erprobung.');
+                pruefe('Widerspruch: KI-Aufzählung erscheint nicht als Liste', hk37.querySelectorAll('#stmt-notes ul').length, 0);
+                pruefeWahr('Widerspruch: KI-Text steht als Fließtext',
+                    /Das Gutachten erhebt nichts\. Es fehlt die Erprobung\./.test(hk37.querySelector('#stmt-notes').textContent));
+
+                // Schriftstück: Erstantrag und Höherstufung
+                ['erstantrag', 'hoeherstufung'].forEach(m => {
+                    appModus = m;
+                    const h = document.createElement('div');
+                    h.innerHTML = buildHoeherstufung(notizen37, {}, '', '');
+                    const nn = h.querySelector('#stmt-notes');
+                    pruefeWahr(m + ': keine Rohnotizen im Schriftstück',
+                        !!nn && /Zur Mobilität: /.test(nn.textContent) && !/^- /.test(nn.textContent.trim()));
+                    pruefeWahr(m + ': der Abschnitt bleibt in der vorgesehenen Länge',
+                        zaehleZeichen(nn.textContent) <= allgemeinZeichenGrenze());
+                });
+
+                // Schriftstück: Anhörung – Standardtext plus Kurzfassung, zusammen eine Drittelseite
+                appModus = 'anhoerung';
+                const ha37 = document.createElement('div');
+                ha37.innerHTML = buildAnhoerung(notizen37, {}, '');
+                const na37 = ha37.querySelector('#stmt-notes');
+                pruefeWahr('Anhörung: keine Rohnotizen im Schriftstück',
+                    /Zum Ablauf der Begutachtung|Zur Mobilität/.test(na37.textContent));
+                pruefeWahr('Anhörung: der Abschnitt bleibt in der vorgesehenen Länge',
+                    zaehleZeichen(na37.textContent) <= allgemeinZeichenGrenze());
+                pruefeWahr('Anhörung: Ausgelassenes wird vermerkt',
+                    na37.getAttribute('data-gekuerzt') !== null);
+
+                // Eine alte Stichpunktliste wird beim Aktualisieren ersetzt
+                appModus = 'widerspruch';
+                const alt37 = buildStellungnahme(notizen37, {}, '')
+                    .replace(/<div id="stmt-notes"([^>]*)>[\s\S]*?<\/div>/,
+                             '<div id="stmt-notes"$1><ul class="aa"><li>Die Begutachtung erfolgte innerhalb von ca. 45 Minuten.</li></ul></div>');
+                const neu37 = buildStellungnahme(notizen37, {}, '');
+                const zus37 = document.createElement('div');
+                zus37.innerHTML = mergeStellungnahme(alt37, neu37);
+                pruefe('Alte Stichpunktliste verschwindet beim Aktualisieren',
+                    zus37.querySelectorAll('#stmt-notes ul').length, 0);
+                pruefeWahr('An ihrer Stelle steht die Kurzfassung',
+                    /Zum Ablauf der Begutachtung/.test(zus37.querySelector('#stmt-notes').textContent));
+            } finally {
+                appModus = merk37.modus;
+                erstgespraechNotes = merk37.notizen;
+            }
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

@@ -26,6 +26,7 @@ pflege-app/
   js/modus.js         Startauswahl: Verfasser und Vorgangsart
   js/bewertung.js     Einzige Schreibstelle fuer Bewertungen, Protokoll
   js/laenge.js        Laengengrenzen der erzeugten Texte
+  js/kurzfassung.js   Kurzfassung der Mitschrift fuer den einleitenden Abschnitt
   js/korrektur.js     Erfasste Daten nachtraeglich korrigieren
   js/anhoerung.js     Anhoerungsverfahren: Erfassung und Vorlage
   js/grundlage.js     Anhoerung: Grundlage aus einer alten Stellungnahme (Ausweichweg)
@@ -679,6 +680,21 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Neuzeichnen verwirft die Vorschlagsliste und die Stilvorlage im selben Reiter, und zwar bei
    jeder Reglerbewegung. Die Auswertung wird beim Reiterwechsel neu aufgebaut (`js/basis.js`).
 
+49. **Nie die rohe Mitschrift im Schriftstück** (`js/kurzfassung.js`). Der einleitende
+   Abschnitt („Allgemeine Angaben" bzw. „Aktuelle Situation") wird von der KI verfasst.
+   Fiel sie aus, standen dort ersatzweise die Notizen des Erstgesprächs – im Widerspruch
+   sogar als Stichpunktliste, im Antrag als Textblock, beides ohne Längengrenze.
+   Regel: In das Schriftstück kommt **nie** der Rohtext. Ohne KI bildet die App selbst eine
+   Kurzfassung (`kurzfassungAusNotizen`): Fließtext, nach Themen gebündelt (Ablauf der
+   Begutachtung, Mobilität, Selbstversorgung, psychische Situation, therapiebedingte
+   Anforderungen, Versorgung), höchstens so lang wie der Abschnitt darf (`js/laenge.js`).
+   Eine Zeile der Mitschrift ist EINE Angabe: Ihre Sätze bleiben zusammen, sonst zerreißt
+   es zusammengehörende Gedanken. Was nicht mehr hineinpasst, wird weggelassen **und**
+   gemeldet (`data-gekuerzt` am Abschnitt, Schlussmeldung in `generateAppealText`).
+   `alsFliesstext()` zieht auch eine Aufzählung der KI zu Fließtext zusammen; ein Absatz
+   ohne Aufzählungszeichen bleibt unangetastet. Beim Zusammenführen wird eine alte
+   Stichpunktliste ersetzt – sie ist keine Überarbeitung des Beraters.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -731,7 +747,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1509 Pruefungen.
+Der Selbsttest umfasst 1551 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

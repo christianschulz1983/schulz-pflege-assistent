@@ -113,13 +113,17 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
         }).join('')
         : `<p>Es wurden keine von der Begutachtung abweichenden Einzelkriterien erfasst.</p>`;
 
-    // „Allgemeine Angaben": bevorzugt der ausformulierte, fallbezogene Text der KI (Absätze).
-    // Ohne KI-Text werden die Notizen wie bisher als Stichpunkte übernommen.
-    const notesBullets = (allgemeinText && allgemeinText.trim())
-        ? nummernImText(allgemeinText.trim(), org).split(/\n\s*\n/).map(a => `<p>${esc(a.trim()).replace(/\n/g, '<br>')}</p>`).join('')
-        : (notes
-            ? `<ul class="aa">${notes.split(/\r?\n/).filter(l => l.trim()).map(l => `<li>${esc(l.trim())}</li>`).join('')}</ul>`
-            : '');
+    /* „Allgemeine Angaben": bevorzugt der ausformulierte, fallbezogene Text der KI.
+       Fällt die KI aus, stand hier früher die Mitschrift als Stichpunktliste – wörtlich
+       und ohne Längengrenze. Stattdessen wird jetzt eine Kurzfassung gebildet
+       (js/kurzfassung.js): Fließtext, thematisch gebündelt, höchstens eine halbe Seite. */
+    const kiAllgemein = (allgemeinText && allgemeinText.trim())
+        ? alsFliesstext(allgemeinText.trim()) : '';
+    const ersatzAllgemein = kiAllgemein ? null : kurzfassungAusNotizen(notes, 'widerspruch');
+    const notesBullets = kiAllgemein
+        ? allgemeinAbsaetzeHtml(nummernImText(kiAllgemein, org))
+        : (ersatzAllgemein && ersatzAllgemein.text
+            ? allgemeinAbsaetzeHtml(nummernImText(ersatzAllgemein.text, org)) : '');
 
     // Doppelpunkt direkt hinter der Bezeichnung; die Angaben bleiben in ihrer Spalte
     // (Breite von .k in STELLUNGNAHME_CSS).
@@ -161,7 +165,7 @@ function buildStellungnahme(notesOverride, begruendungen, allgemeinText) {
 
     <h2>Allgemeine Angaben</h2>
     <p>Im Gutachten ${df('org', orgGenitiv(org))} vom ${df('begut', begut || '—')} erfolgte die Einstufung mit ${df('opts', origPts)} gewichteten Punkten, woraus sich ${istKeinPG(origPG) ? df('opgsatz', 'kein Pflegegrad') : 'ein ' + df('opgsatz', pgSatz(origPG))} ergeben hat. Die Verteilung der gewichteten Punkte auf die einzelnen Module ist der nachfolgenden Übersicht zu entnehmen.</p>
-    <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${(allgemeinText && allgemeinText.trim()) ? '1' : '0'}">${notesBullets}</div>
+    <div id="stmt-notes" data-sig="${esc(allgemeinSignature(notes, diffs))}" data-ai="${kiAllgemein ? '1' : '0'}" data-gekuerzt="${ersatzAllgemein ? ersatzAllgemein.ausgelassen : 0}">${notesBullets}</div>
     ${(typeof verfahrenAbsatzHtml === 'function') ? verfahrenAbsatzHtml() : ''}
     ${(typeof belegeAllgemeinHtml === 'function') ? belegeAllgemeinHtml() : ''}
     <p>Ich bin in mehreren dieser Module zu abweichenden Einschätzungen gekommen. Dies ergibt eine höhere Punktzahl in den Modulen und in der Folge eine höhere Gesamtpunktzahl. Die nachfolgende Übersicht stellt die Ergebnisse des Vorgutachtens und meiner Beurteilung einander gegenüber:</p>
@@ -460,7 +464,15 @@ function mergeStellungnahme(existingHtml, freshHtml) {
         // Ersetzen nur, wenn bisher nichts dasteht oder tatsächlich ein neu verfasster
         // KI-Text vorliegt. Scheitert die KI, bleibt der vorhandene Text unangetastet.
         const altNurNotizen = cN.getAttribute('data-ai') === '0';
-        if (altLeer || (fN.getAttribute('data-ai') === '1' && (alt !== neu || altNurNotizen))) {
+        /* Rohe Mitschrift aus früheren Fassungen (Stichpunktliste oder ein Block über der
+           zulässigen Länge) ist keine Überarbeitung des Beraters, sondern der Ausfall der
+           Kurzfassung. Sie wird auch durch die selbst gebildete Kurzfassung ersetzt –
+           sonst bliebe die Stichpunktliste für immer im Schriftstück stehen. */
+        const istRohnotiz = el => !!el && el.getAttribute('data-ai') !== '1'
+            && (!!el.querySelector('ul.aa')
+                || zaehleZeichen(el.textContent || '') > allgemeinZeichenGrenze());
+        if (altLeer || (fN.getAttribute('data-ai') === '1' && (alt !== neu || altNurNotizen))
+                    || (istRohnotiz(cN) && fN.innerHTML.trim())) {
             cN.innerHTML = fN.innerHTML;
             cN.setAttribute('data-sig', neu);
             cN.setAttribute('data-ai', fN.getAttribute('data-ai') || '0');
@@ -715,6 +727,19 @@ async function generateAppealText() {
         }
         if (warnAnzahl) {
             offen.push(`In ${warnAnzahl} Begründung${warnAnzahl > 1 ? 'en' : ''} steht ein Zitat, das sich nicht wörtlich in den BRi belegen lässt – rot markiert, bitte streichen oder korrigieren.`);
+        }
+        /* Einleitender Abschnitt ohne KI: Die App hat die Mitschrift selbst zusammengefasst.
+           Das ist zu sagen – und ebenso, wenn dafür Angaben weggelassen werden mussten.
+           Nie wieder soll die Mitschrift unbemerkt im Rohzustand im Schriftstück stehen. */
+        const notizBlock = docEl ? docEl.querySelector('#stmt-notes') : null;
+        if (notizBlock && notizBlock.getAttribute('data-ai') === '0' && notizBlock.textContent.trim()) {
+            const weg = parseInt(notizBlock.getAttribute('data-gekuerzt') || '0', 10) || 0;
+            offen.push('Der einleitende Abschnitt ist eine Kurzfassung Ihrer Mitschrift, die die App selbst '
+                + 'gebildet hat (ohne KI). '
+                + (weg ? weg + ' Angabe' + (weg > 1 ? 'n haben' : ' hat') + ' nicht mehr in die vorgesehene '
+                       + 'Länge gepasst und ' + (weg > 1 ? 'wurden' : 'wurde') + ' weggelassen – bitte prüfen. ' : '')
+                + (keyPresent ? 'Mit „Stellungnahme erstellen" wird er ausformuliert nachgeholt.'
+                              : 'Für eine ausformulierte Fassung bitte oben rechts einen API-Schlüssel eintragen.'));
         }
         angabenWiderspruch.forEach(t => offen.push(t));
         if (offen.length) {
