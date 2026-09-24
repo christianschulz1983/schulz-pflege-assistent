@@ -96,6 +96,63 @@ function vorgutachtenAbweichung() {
     };
 }
 
+const MODUL_NAMEN = ['Mobilität', 'Kognitive Fähigkeiten', 'Verhaltensweisen',
+                     'Selbstversorgung', 'Krankheitsbedingte Anforderungen', 'Alltagsgestaltung'];
+
+/* WO die Zusammenfassung des Gutachtens und die eingelesenen Kriterien auseinandergehen.
+   Gemeldet wurde genau dieser Fall: In der Kriterienliste stand „4.3.13 Vorgutachten:
+   selten", in den Modulergebnissen „Modul 3 laut Vorgutachten: 0,00" und in der
+   Auswertung „23,75 gegen 27,50" – drei Ansichten, die einander widersprachen, ohne zu
+   sagen, wo der Fehler steckt. Diese Prüfung nennt das Modul und die dort bewerteten
+   Kriterien, damit das falsch gelesene Kreuz zu finden ist.
+   Rückgabe je Modul: was das Gutachten ausweist, was die Kriterien ergeben. */
+function modulAbweichungen() {
+    if (!stateOrig.extracted) return [];
+    const gemerkt = stateOrig.extracted;
+    delete stateOrig.extracted;
+    let k;
+    try { k = calculateInternal('orig'); } finally { stateOrig.extracted = gemerkt; }
+    const out = [];
+    for (let m = 0; m < 6; m++) {
+        const gEinzel = Number(gemerkt.raws[m]), gGew = Number(gemerkt.weights[m]);
+        if (!Number.isFinite(gEinzel) || !Number.isFinite(gGew)) continue;
+        const kEinzel = Number(k.raws[m]), kGew = Number(k.weights[m]);
+        if (Math.round(gEinzel) === Math.round(kEinzel) && Math.abs(gGew - kGew) < 0.005) continue;
+        out.push({
+            modul: m + 1, name: MODUL_NAMEN[m],
+            lautGutachten: { einzel: gEinzel, gew: gGew },
+            ausKriterien: { einzel: kEinzel, gew: kGew },
+            kriterien: bewerteteKriterien('orig', m + 1)
+        });
+    }
+    return out;
+}
+
+// Die in einem Modul überhaupt bewerteten Kriterien – die Kandidaten für ein falsch
+// gelesenes Kreuz, wenn die Kriterien MEHR ergeben als das Gutachten ausweist.
+function bewerteteKriterien(spalte, m) {
+    const st = zustandZu(spalte);
+    return ITEMS.filter(i => i.m === m).filter(i => {
+        const v = st.values[i.id];
+        return (v && typeof v === 'object') ? (Number(v.count) || 0) > 0 : (Number(v) || 0) > 0;
+    }).map(i => i.nr);
+}
+
+/* Ein Satz je Modul – gleich lautend in der Kriterienliste und in der Auswertung,
+   damit beide Ansichten dasselbe sagen. */
+function modulAbweichungSatz(a) {
+    const f2 = n => Number(n).toFixed(2).replace('.', ',');
+    const zuViel = a.ausKriterien.gew > a.lautGutachten.gew
+                || a.ausKriterien.einzel > a.lautGutachten.einzel;
+    return 'Modul ' + a.modul + ' ' + a.name + ': Das Gutachten weist ' + a.lautGutachten.einzel
+        + ' Einzelpunkte (' + f2(a.lautGutachten.gew) + ' gewichtet) aus, die eingelesenen '
+        + 'Kriterien ergeben ' + a.ausKriterien.einzel + ' (' + f2(a.ausKriterien.gew) + '). '
+        + (zuViel
+            ? 'Hier wurde beim Einlesen mindestens ein Kreuz zu viel erkannt'
+              + (a.kriterien.length ? ' – bewertet sind ' + a.kriterien.join(', ') : '') + '.'
+            : 'Hier wurde beim Einlesen mindestens ein Kreuz nicht erkannt.');
+}
+
 /* Handeingaben zu Pflegegrad/Punkten, die den erfassten Einzelkriterien widersprechen –
    je nach Vorgang für das (Erst-/Vor-)Gutachten und das Zweitgutachten. Siehe
    gutachtenAngaben in js/basis.js. Rückgabe: lesbare Meldungen. */
@@ -128,14 +185,18 @@ function abweichungHtml() {
     if (!a) return '';
     const pgTxt = p => p > 0 ? 'Pflegegrad ' + p : 'kein Pflegegrad';
     const z = n => n.toFixed(2).replace('.', ',');
+    const module = modulAbweichungen();
     return `<div class="hinweis-warnung">
         <b>Bitte prüfen:</b> Die Angaben im Gutachten und die freigegebenen Einzelkriterien ergeben
         nicht dasselbe Ergebnis. Im Vergleich und in der Stellungnahme wird die Angabe aus dem
         Gutachten verwendet.<br>
         Laut Gutachten: <b>${z(a.lautGutachten.total)} Punkte, ${pgTxt(a.lautGutachten.pg)}</b> &nbsp;·&nbsp;
-        Aus den Einzelkriterien errechnet: <b>${z(a.ausKriterien.total)} Punkte, ${pgTxt(a.ausKriterien.pg)}</b><br>
-        Ursache ist meist ein Kriterium, das beim Einlesen nicht erkannt wurde. Ergänzen Sie es
-        über den Regler, dann stimmen beide Angaben überein.
+        Aus den Einzelkriterien errechnet: <b>${z(a.ausKriterien.total)} Punkte, ${pgTxt(a.ausKriterien.pg)}</b>
+        ${module.length ? '<br><b>Betroffen sind:</b><br>' + module.map(x => escapeHtml(modulAbweichungSatz(x))).join('<br>') : ''}
+        <br>Ursache ist ein Kreuz, das beim Einlesen nicht erkannt oder zu viel erkannt wurde.
+        Berichtigen Sie den Wert im Reiter „Einschätzung &amp; Vergleich“ unmittelbar am Kriterium
+        (Zeile „Vorgutachten“, Feld „berichtigen“). Danach rechnen Kriterienliste,
+        Modulergebnisse und Gesamtpunktzahl wieder dasselbe.
     </div>`;
 }
 

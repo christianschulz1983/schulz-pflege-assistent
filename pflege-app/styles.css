@@ -290,6 +290,24 @@
             color: var(--text-secondary); background: var(--bg-card2);
             border-bottom: 1px solid var(--border); border-left: 3px solid var(--accent);
         }
+        /* Zusammenfassung des Gutachtens und Einzelkriterien gehen auseinander –
+           das ist ein Lesefehler und keine Erlaeuterung. */
+        .mod-hinweis-row td.mod-hinweis.warn {
+            border-left-color: var(--red); color: var(--text-primary);
+        }
+
+        /* Wert laut Gutachten berichtigen (js/oberflaeche.js, vorgEditFeld) */
+        .vorg-edit {
+            display: flex; align-items: center; gap: 6px; margin-top: 6px;
+            font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em;
+            text-transform: uppercase; color: var(--text-muted);
+        }
+        .vorg-edit select, .vorg-edit input {
+            flex: 1; min-width: 0; font-size: 11px; padding: 3px 5px; text-transform: none;
+            letter-spacing: 0; font-family: inherit; color: var(--text-primary);
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
+        }
+        .vorg-edit input { flex: 0 0 56px; }
 
         /* RESULT TABLE */
         .result-table { width: 100%; border-collapse: collapse; }

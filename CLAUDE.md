@@ -661,6 +661,24 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Browser** (`localStorage`, höchstens `STIL_LERNEN_MAX`), **nicht in der Falldatei** und nicht
    im Repository. In der Auswertung sind sie einzeln sichtbar, löschbar und ganz abschaltbar.
 
+48. **Kriterienliste, Modulergebnisse und Auswertung sagen dasselbe** (`js/bewertung.js`,
+   `js/berechnung.js`, `js/oberflaeche.js`). Liegt eine Zusammenfassung aus dem Gutachten vor
+   (`stateOrig.extracted`), gilt sie für die Rechnung – die Kriterienliste zeigte aber weiter die
+   eingelesenen Kreuze. Gemeldet: „4.3.13 Vorgutachten: selten" in der Liste, „Modul 3 laut
+   Vorgutachten 0,00" in der Tabelle, „23,75 gegen 27,50" in der Auswertung; drei Ansichten,
+   die einander widersprachen, und kein Weg, das falsch gelesene Kreuz zu berichtigen.
+   Regel: Eine Abweichung wird **an dem Modul** ausgewiesen, in dem sie auftritt
+   (`modulAbweichungen()`, `modulAbweichungSatz()` – gleicher Wortlaut in Hinweiszeile und
+   Auswertung), die Summenzeile nennt **beide** Zahlen (`origRefText()`), und die Warnung nennt
+   beide Ursachen: ein Kreuz zu viel erkannt ODER nicht erkannt.
+   Berichtigt wird unmittelbar in der Kriterienliste (`vorgEditFeld()`, Feld „berichtigen" in
+   der Zeile „Vorgutachten"); die Handkorrektur verwirft die Zusammenfassung (Regel: siehe
+   `updateValue`), der gedruckte Wert des Gutachtens bleibt als Gegenprobe in „Pflegegrad
+   (Gutachten)"/„Gesamtpunkte (Gutachten)" (`gutachtenAngaben`).
+   **Nicht** aus `calculate()`/`updateLiveCompRows()` heraus `renderAuswertung()` aufrufen: Das
+   Neuzeichnen verwirft die Vorschlagsliste und die Stilvorlage im selben Reiter, und zwar bei
+   jeder Reglerbewegung. Die Auswertung wird beim Reiterwechsel neu aufgebaut (`js/basis.js`).
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -713,7 +731,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1480 Pruefungen.
+Der Selbsttest umfasst 1509 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

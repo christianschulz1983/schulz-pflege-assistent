@@ -219,7 +219,7 @@ function fillTable(pref) {
             <td></td>
         </tr>
         ${pref==='own' ? `<tr class="mod-comp-row">
-            <td colspan="2" style="padding-left:28px">↳ laut Vorgutachten</td>
+            <td colspan="2" style="padding-left:28px" id="mod-comp-label-${m}">↳ laut Vorgutachten</td>
             <td>Gew.: <span id="mod-w-comp-${m}">0,00</span></td>
             <td id="mod-r-comp-${m}" style="text-align:center;border-left:1px solid var(--border)">0</td>
             <td></td>
@@ -324,20 +324,52 @@ function getVergleichsRef(spalte, itemId) {
     const item = ITEMS.find(it=>it.id===itemId);
     const val = zustandZu(spalte).values[itemId];
     const tag = `<span class="vorg-tag">${SPALTEN_NAMEN[spalte] || ''}</span>`;
+    const edit = vorgEditFeld(spalte, item);
     if(val===undefined || val===null) {
-        return tag + '<div class="vorg-content"><span class="vorg-val vorg-empty">—</span></div>';
+        return tag + '<div class="vorg-content"><span class="vorg-val vorg-empty">—</span></div>' + edit;
     }
     if(item.m===5 && item.group!=='D'){
         const c = (val && typeof val==='object') ? val.count : 0;
         const p = (val && typeof val==='object') ? val.period : 'W';
         const pTxt = p==='D' ? 'pro Tag' : p==='W' ? 'pro Woche' : 'pro Monat';
-        return tag + `<div class="vorg-content"><span class="vorg-val">${c}× ${pTxt}</span></div>`;
+        return tag + `<div class="vorg-content"><span class="vorg-val">${c}× ${pTxt}</span></div>` + edit;
     }
     const idx = (typeof val==='number') ? val : 0;
     const label = (item.opts && item.opts[idx]) ? item.opts[idx] : '-';
     let dots = '';
     if(item.opts){ for(let k=0;k<item.opts.length;k++){ dots += `<span class="vorg-dot${k===idx?' on':''}"></span>`; } }
-    return tag + `<div class="vorg-content"><span class="vorg-val">${escapeHtml(label)}</span><span class="vorg-scale">${dots}</span></div>`;
+    return tag + `<div class="vorg-content"><span class="vorg-val">${escapeHtml(label)}</span><span class="vorg-scale">${dots}</span></div>` + edit;
+}
+
+/* Der Wert des Gutachtens ist nicht mehr nur Anzeige, sondern berichtigbar.
+   Gemeldet wurde: In der Kriterienliste stand „4.3.13 Vorgutachten: selten", in den
+   Modulergebnissen „Modul 3 laut Vorgutachten: 0,00" und in der Auswertung eine
+   Abweichung von 23,75 zu 27,50 – drei Ansichten, die einander widersprachen, und
+   keine Möglichkeit, das falsch gelesene Kreuz zu berichtigen, ausser das Gutachten
+   erneut einzulesen. Wird hier berichtigt, gilt die Zusammenfassung des Gutachtens
+   nicht mehr (siehe updateValue) und alle drei Ansichten rechnen wieder dasselbe. */
+function vorgEditFeld(spalte, item) {
+    if (!item) return '';
+    const val = zustandZu(spalte).values[item.id];
+    if (item.m === 5 && item.group !== 'D') {
+        const c = (val && typeof val === 'object') ? Number(val.count) || 0 : 0;
+        const p = (val && typeof val === 'object') ? (val.period || 'W') : 'W';
+        const ohneTag = [55, 56, 57].includes(item.id);
+        const perioden = [['D', 'pro Tag'], ['W', 'pro Woche'], ['M', 'pro Monat']]
+            .filter(x => !(ohneTag && x[0] === 'D'));
+        return `<span class="vorg-edit">berichtigen:
+            <input type="number" min="0" max="30" step="1" value="${c}" title="Häufigkeit laut Gutachten"
+                   onchange="updateM5Count('${spalte}',${item.id},this.value)">
+            <select title="Zeitraum laut Gutachten" onchange="updateM5Period('${spalte}',${item.id},this.value)">
+                ${perioden.map(([w, t]) => `<option value="${w}" ${p === w ? 'selected' : ''}>${t}</option>`).join('')}
+            </select></span>`;
+    }
+    const idx = (typeof val === 'number') ? val : 0;
+    return `<span class="vorg-edit">berichtigen:
+        <select title="Wert laut Gutachten" onchange="updateValue('${spalte}',${item.id},this.value)">
+            ${(item.opts || []).map((o, k) =>
+                `<option value="${k}" ${k === idx ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}
+        </select></span>`;
 }
 
 // Bisheriger Name – der Vorgutachten-Balken ist der Regelfall.

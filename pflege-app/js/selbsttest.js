@@ -5759,6 +5759,118 @@ async function selbsttest() {
             }
         }
 
+
+        /* 36. Kriterienliste, Modulergebnisse und Auswertung sagen dasselbe (js/bewertung.js,
+           js/berechnung.js, js/oberflaeche.js).
+           Gemeldet: In der Kriterienliste stand „4.3.13 Vorgutachten: selten", in den
+           Modulergebnissen „Modul 3 laut Vorgutachten 0,00" und in der Auswertung „23,75
+           gegen 27,50" – drei Ansichten, die einander widersprachen, und kein Weg, das
+           falsch gelesene Kreuz zu berichtigen, ausser das Gutachten neu einzulesen. */
+        if (typeof modulAbweichungen === 'function') {
+            const k36 = nr => ITEMS.find(i => i.nr === nr);
+            const merk36 = { werte: JSON.parse(JSON.stringify(stateOrig.values || {})),
+                             ex: stateOrig.extracted ? JSON.parse(JSON.stringify(stateOrig.extracted)) : null,
+                             prot: bewertungsProtokoll.slice() };
+            try {
+                // Der gemeldete Fall, Zahl für Zahl: Modul 1 = 5,00 (4 Einzelpunkte),
+                // Modul 4 = 10,00 (3), Modul 5 = 5,00 (1), Modul 6 = 3,75 (1) – zusammen
+                // 23,75 wie im Gutachten. Dazu ein beim Einlesen zu viel gesetztes Kreuz
+                // bei 4.3.13 („selten"), das Modul 3 auf 3,75 bringt: 27,50 aus den Kriterien.
+                ITEMS.forEach(i => { stateOrig.values[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+                stateOrig.values[k36('4.1.1').id] = 2;
+                stateOrig.values[k36('4.1.2').id] = 2;
+                stateOrig.values[k36('4.4.1').id] = 3;
+                stateOrig.values[k36('4.5.16').id] = 1;
+                stateOrig.values[k36('4.6.1').id] = 1;
+                stateOrig.values[k36('4.3.13').id] = 1;
+                delete stateOrig.extracted;
+                pruefe('Ausgangslage: aus den Kriterien 27,50', calculateInternal('orig').total, 27.5);
+                stateOrig.extracted = { raws: [4, 0, 0, 3, 1, 1], weights: [5, 0, 0, 10, 5, 3.75], total: 23.75, pg: 1 };
+                pruefe('Ausgangslage: laut Gutachten 23,75', calculateInternal('orig').total, 23.75);
+
+                const abw36 = modulAbweichungen();
+                pruefe('Die Abweichung wird einem Modul zugeordnet', abw36.length, 1);
+                // Ersatzwerte, damit eine fehlgeschlagene Prüfung den Testlauf nicht abbricht
+                const a36 = abw36[0] || { modul: 0, name: '', kriterien: [],
+                                          lautGutachten: { einzel: 0, gew: 0 }, ausKriterien: { einzel: 0, gew: 0 } };
+                pruefe('Betroffen ist Modul 3', a36.modul, 3);
+                pruefe('Zahl des Gutachtens', a36.lautGutachten.gew, 0);
+                pruefe('Zahl aus den Kriterien', a36.ausKriterien.gew, 3.75);
+                pruefeWahr('Das bewertete Kriterium wird genannt', a36.kriterien.includes('4.3.13'));
+                const satz36 = modulAbweichungSatz(a36);
+                pruefeWahr('Der Satz nennt beide Lesarten',
+                    satz36.includes('0,00') && satz36.includes('3,75') && satz36.includes('4.3.13'));
+                pruefeWahr('Ein Kreuz zu viel wird als solches benannt', /zu viel erkannt/.test(satz36));
+
+                // Andere Richtung: Das Gutachten weist mehr aus, als die Kriterien hergeben
+                stateOrig.values[k36('4.3.13').id] = 0;
+                stateOrig.extracted = { raws: [4, 0, 3, 3, 1, 1], weights: [5, 0, 7.5, 10, 5, 3.75], total: 31.25, pg: 2 };
+                const fehlt36 = modulAbweichungen();
+                pruefeWahr('Auch ein nicht erkanntes Kreuz wird gemeldet',
+                    fehlt36.length === 1 && /nicht erkannt/.test(modulAbweichungSatz(fehlt36[0])));
+
+                // Stimmen beide überein, gibt es keine Meldung
+                stateOrig.extracted = { raws: [4, 0, 0, 3, 1, 1], weights: [5, 0, 0, 10, 5, 3.75], total: 23.75, pg: 1 };
+                pruefe('Stimmige Zusammenfassung meldet nichts', modulAbweichungen().length, 0);
+                const exMerk36 = stateOrig.extracted;
+                delete stateOrig.extracted;
+                pruefe('Ohne Zusammenfassung keine Meldung', modulAbweichungen().length, 0);
+                stateOrig.extracted = exMerk36;
+                pruefeWahr('Die Prüfung lässt die Zusammenfassung stehen',
+                    !!stateOrig.extracted && stateOrig.extracted.total === 23.75);
+
+                // Die Warnung in der Auswertung nennt Modul, Ursache und den Weg zur Berichtigung
+                stateOrig.values[k36('4.3.13').id] = 1;
+                const html36 = abweichungHtml();
+                pruefeWahr('Warnung nennt beide Gesamtzahlen',
+                    html36.includes('23,75') && html36.includes('27,50'));
+                pruefeWahr('Warnung nennt das betroffene Modul', /Modul 3 Verhaltensweisen/.test(html36));
+                pruefeWahr('Warnung nennt beide Ursachen', /nicht erkannt oder zu viel erkannt/.test(html36));
+                pruefeWahr('Warnung sagt, wo berichtigt wird', /berichtigen/.test(html36));
+
+                // Der Wert des Gutachtens ist in der Kriterienliste berichtigbar
+                const box36 = getVergleichsRef('orig', k36('4.3.13').id);
+                pruefeWahr('Kriterienliste bietet die Berichtigung an', box36.includes('vorg-edit'));
+                pruefeWahr('Berichtigung schreibt in die Spalte Vorgutachten',
+                    box36.includes("updateValue('orig'," + k36('4.3.13').id));
+                pruefeWahr('Der gelesene Wert steht ausgewählt im Feld',
+                    /value="1"\s+selected/.test(box36));
+                const m5box36 = getVergleichsRef('orig', k36('4.5.1').id);
+                pruefeWahr('Modul 5 wird mit Häufigkeit und Zeitraum berichtigt',
+                    m5box36.includes('updateM5Count') && m5box36.includes('updateM5Period'));
+
+                // In der Tabelle steht die Abweichung an dem Modul, in dem sie auftritt
+                pruefeWahr('Die Summenzeile nennt beide Zahlen',
+                    /aus den Kriterien 27,50/.test(origRefText(calculateInternal('orig'))));
+                updateLiveCompRows();
+                const hinweis36 = document.getElementById('mod-hinweis-3');
+                const label36 = document.getElementById('mod-comp-label-3');
+                if (hinweis36 && label36) {
+                    pruefeWahr('Hinweiszeile des Moduls zeigt die Abweichung',
+                        /4\.3\.13/.test(hinweis36.innerText) && hinweis36.classList.contains('warn'));
+                    pruefeWahr('Die Zeile weist die Zusammenfassung als abweichend aus',
+                        /weicht von den Kriterien ab/.test(label36.innerText));
+                }
+
+                // Berichtigen: danach rechnen alle drei Ansichten dasselbe
+                updateValue('orig', k36('4.3.13').id, 0);
+                pruefe('Nach der Berichtigung passt die Summe zum Gutachten',
+                    calculateInternal('orig').total, 23.75);
+                pruefe('Nach der Berichtigung keine Abweichung mehr', modulAbweichungen().length, 0);
+                pruefe('Nach der Berichtigung keine Warnung mehr', abweichungHtml(), '');
+                updateLiveCompRows();
+                const nachher36 = document.getElementById('mod-hinweis-3');
+                if (nachher36) pruefeWahr('Die Hinweiszeile verschwindet', !/4\.3\.13/.test(nachher36.innerText));
+                pruefeWahr('Die Berichtigung steht im Protokoll mit ihrer Spalte',
+                    bewertungsProtokoll.some(e => e.nr === '4.3.13' && e.spalte === 'Vorgutachten'));
+            } finally {
+                stateOrig.values = merk36.werte;
+                if (merk36.ex) stateOrig.extracted = merk36.ex; else delete stateOrig.extracted;
+                bewertungsProtokoll = merk36.prot;
+                try { fillTable('own'); calculate('own'); } catch (e) {}
+            }
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

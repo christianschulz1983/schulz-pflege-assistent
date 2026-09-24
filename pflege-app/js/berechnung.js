@@ -337,7 +337,8 @@ function calculate(pref) {
                 </tr>`;
             }).join('');
             setEl('total-w-orig-ref', rO.total.toFixed(2).replace('.',','));
-            setEl('pg-title-orig-ref', rO.pg>0?'VORGUTACHTEN: PFLEGEGRAD '+rO.pg:'VORGUTACHTEN: KEIN PFLEGEGRAD');
+            const refEl = document.getElementById('pg-title-orig-ref');
+            if (refEl) refEl.innerHTML = origRefText(rO);
             updateLiveCompRows();
         } else {
             grid.innerHTML=[1,2,3,4,5,6].map(m=>{
@@ -403,13 +404,42 @@ function zeigeKontinenzHinweis(pref, st) {
 function updateLiveCompRows() {
     const rO=calculateInternal('orig');
     const rE=calculateInternal('own');
+    // Wo Zusammenfassung und Kriterien auseinandergehen, steht es an genau dem Modul,
+    // in dem es passiert – nicht nur als Gesamtzahl in der Auswertung (js/bewertung.js).
+    const abw = (typeof modulAbweichungen === 'function') ? modulAbweichungen() : [];
     for(let m=1;m<=6;m++){
         const ew=document.getElementById('mod-w-comp-'+m);
         const er=document.getElementById('mod-r-comp-'+m);
         if(ew)ew.innerText=zahlDE(rO.weights[m-1]);
         if(er)er.innerText=rO.raws[m-1];
-        zeigeModulHinweis(m, rO, rE);
+        const a = abw.find(x => x.modul === m) || null;
+        const lab = document.getElementById('mod-comp-label-'+m);
+        if (lab) {
+            lab.innerText = a ? '↳ laut Vorgutachten (Zusammenfassung – weicht von den Kriterien ab)'
+                : (stateOrig.extracted ? '↳ laut Vorgutachten (Zusammenfassung des Gutachtens)'
+                                       : '↳ laut Vorgutachten');
+        }
+        zeigeModulHinweis(m, rO, rE, a);
     }
+    // Die Auswertung zeigt dieselbe Abweichung; sie wird bei jedem Wechsel auf den
+    // Reiter neu aufgebaut (js/basis.js). Von hier aus wird sie NICHT neu gezeichnet:
+    // Das Neuzeichnen würde die Vorschlagsliste und die Stilvorlage im selben Reiter
+    // verwerfen, und zwar bei jeder Reglerbewegung.
+}
+
+/* Fussnote unter „Summe laut Vorgutachten": Gilt die Zusammenfassung des Gutachtens und
+   ergeben die Kriterien etwas anderes, muss die Tabelle beide Zahlen nennen. Sonst steht
+   dort eine Summe, die zur darüberliegenden Kriterienliste nicht passt. */
+function origRefText(rO) {
+    const basis = rO.pg > 0 ? 'VORGUTACHTEN: PFLEGEGRAD ' + rO.pg : 'VORGUTACHTEN: KEIN PFLEGEGRAD';
+    if (!stateOrig.extracted || typeof vorgutachtenAbweichung !== 'function') return escapeHtml(basis);
+    const a = vorgutachtenAbweichung();
+    if (!a) return escapeHtml(basis);
+    const z = n => Number(n).toFixed(2).replace('.', ',');
+    return escapeHtml(basis) + '<span style="color:var(--red);font-weight:600"> · aus den Kriterien '
+         + z(a.ausKriterien.total) + ' ('
+         + (a.ausKriterien.pg > 0 ? 'Pflegegrad ' + a.ausKriterien.pg : 'kein Pflegegrad')
+         + ') – bitte prüfen</span>';
 }
 
 /* Erklärt in der Ansicht, warum sich die gewichteten Punkte nicht bewegen, obwohl die
@@ -427,12 +457,22 @@ function modulHinweisText(m, rO, rE) {
          + 'dieselbe Spanne (' + spannenText(m, einzelE) + '). Das ist richtig gerechnet.';
 }
 
-function zeigeModulHinweis(m, rO, rE) {
+/* a = Abweichung dieses Moduls aus modulAbweichungen() oder null. Die Abweichung steht
+   vor der Spannen-Erklärung: Solange Zusammenfassung und Kriterien auseinandergehen,
+   ist sie der wichtigere Hinweis. */
+function zeigeModulHinweis(m, rO, rE, a) {
     const zeile = document.getElementById('mod-hinweis-row-' + m);
     const zelle = document.getElementById('mod-hinweis-' + m);
     if (!zeile || !zelle) return;
-    const txt = modulHinweisText(m, rO, rE);
+    const spannen = modulHinweisText(m, rO, rE);
+    const abwTxt = (a && typeof modulAbweichungSatz === 'function')
+        ? modulAbweichungSatz(a) + ' Berichtigen Sie das Kreuz oben in der Zeile „Vorgutachten“ '
+          + 'am betroffenen Kriterium („berichtigen“); dann rechnen Kriterienliste, '
+          + 'Modulergebnis und Gesamtpunktzahl wieder dasselbe.'
+        : '';
+    const txt = [abwTxt, spannen].filter(Boolean).join(' ');
     zelle.innerText = txt;
+    zelle.classList.toggle('warn', !!abwTxt);
     zeile.style.display = txt ? '' : 'none';
 }
 
