@@ -52,7 +52,7 @@ werkzeuge/bri_abgleich.py  Prüft bri_texte.js wörtlich gegen Richtlinien/*.pdf
   laien_hinweise.js   Praxishinweise, 58 Kriterien (Hilfsmittel-Regeln, Fallstricke)
   pdf-lib.min.js      pdf-lib 1.17.1 (MIT, pdf-lib.LICENSE.md), aus dem npm-Paket, Prüfsumme geprüft
   pflege_server.py    Lokaler Server: PDF-Text, OCR, liefert die App aus
-  test_pflege_server.py  Selbsttest für den Server, 24 Pruefungen (python test_pflege_server.py)
+  test_pflege_server.py  Selbsttest für den Server, 58 Pruefungen (python test_pflege_server.py)
 ```
 Alle Skripte sind klassische Skripte im gemeinsamen Namensraum – **keine ES-Module**,
 weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
@@ -694,6 +694,27 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    `alsFliesstext()` zieht auch eine Aufzählung der KI zu Fließtext zusammen; ein Absatz
    ohne Aufzählungszeichen bleibt unangetastet. Beim Zusammenführen wird eine alte
    Stichpunktliste ersetzt – sie ist keine Überarbeitung des Beraters.
+
+50. **Medicproof lesen** (`pflege_server.py`). Gemeldet: Ein Medicproof-Gutachten wurde als
+   Gutachten des Medizinischen Dienstes erkannt, der Name war der einer Kassenabteilung, die
+   Punktzahl stammte aus einer Modulzeile, die Diagnosen aus dem Vorgutachten.
+   Drei Ursachen, drei Regeln:
+   - **„Medicproof" steht nur im Logo, nicht im Text.** Erkannt wird an der Formularsoftware
+     `ProofForms` (`ist_medicproof`). Diese Prüfung steht VOR der Suche nach „Medizinischer
+     Dienst" – im Anschreiben der privaten Kasse steht „der medizinische Dienst überprüfte …".
+     Die Organisation entscheidet über die Nummerierung 4.x.y gegen 5.x.y (Regel 30).
+   - **Die Ankreuzfelder sind keine Sonderzeichen.** Medicproof setzt FontAwesome-Zeichen aus
+     dem privaten Unicode-Bereich (`` voll, `` leer), der Medizinische Dienst
+     zeichnet Quadrate als Vektorgrafik (`_zeichnungs_marken`, schwarz gefüllt = angekreuzt).
+     Ohne beides fand der Server KEINE Markierung und riet über `_row_filled_index`.
+   - **Häufigkeiten gibt es nur in Modul 5.** Steht der Modul-5-Kopf auf derselben Seite wie
+     die letzten Zeilen des Moduls 4, wurden 4.4.11 und 4.4.12 als Häufigkeit gelesen (`ist_m5`).
+   Dazu: „Beurteilung nicht erforderlich" ist die Null und kein fehlender Wert; mehrzeilige
+   Zeilen reichen bis zur nächsten Kriteriumsnummer (`y_ende`); das Wasserzeichen „Kopie stimmt
+   mit dem Original überein" wird vor dem Lesen der Stammdaten entfernt (`_ohne_wasserzeichen`).
+   **Prüfmaßstab ist das Gutachten selbst:** Die gelesenen Modulsummen müssen den im Gutachten
+   ausgewiesenen „Summe der Einzelpunkte" entsprechen. Für das gemeldete Gutachten: 64 von 64
+   Kriterien, 63 davon sicher, alle sechs Modulsummen exakt.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung

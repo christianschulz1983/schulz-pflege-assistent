@@ -168,6 +168,13 @@ def extract_pages(file_bytes, mime):
 # Bekannte gefuellte / leere Ankreuz-Symbole (verschiedene Schriften/Organisationen):
 KNOWN_FILLED = set("¤●◉■◼▪☒⊠✓✔✗✘")
 KNOWN_EMPTY = set("¡○◯□☐")
+# MEDICPROOF (ProofForms): Die Ankreuzfelder sind keine Sonderzeichen, sondern Zeichen der
+# Schrift FontAwesome aus dem privaten Unicode-Bereich. Ohne sie findet der Leser in einem
+# Medicproof-Gutachten KEINE einzige Markierung und faellt auf die Heuristik zurueck.
+# f192 = ausgefuellter Kreis (angekreuzt), f111 = leerer Kreis (nicht angekreuzt);
+# die uebrigen sind die gaengigen Haken- und Kaestchenzeichen derselben Schrift.
+KNOWN_FILLED |= {"", "", "", "", "", "", ""}
+KNOWN_EMPTY |= {"", "", "", "", "", ""}
 PUNCT = set(".,;:!?-–—/()[]{}\"'`*…|_=+")
 # Kriteriumsnummer: 4.x.y (Med. Dienst) ODER 5.x.y (MEDICPROOF). Erste Stelle wird zu 4 normalisiert.
 CRIT_RE = re.compile(r"^([45])\.([1-6])\.(\d{1,2})$")
@@ -220,6 +227,38 @@ def _widget_marken(page):
             marken.append(((r.x0 + r.x1) / 2.0, (r.y0 + r.y1) / 2.0, gefuellt))
         except Exception:
             continue
+    return marken
+
+
+def _zeichnungs_marken(page):
+    """Ankreuzfelder, die als VEKTORGRAFIK gezeichnet sind – kleine Quadrate oder Kreise.
+
+    Viele Gutachten des Medizinischen Dienstes enthalten weder Formularfelder noch
+    Sonderzeichen: Das Kästchen ist ein gezeichnetes Rechteck von rund neun mal neun
+    Punkten, schwarz gefüllt bedeutet angekreuzt, weiss gefüllt bedeutet leer. Ohne diese
+    Lesart fand der Server in solchen Gutachten KEINE Markierung und musste raten."""
+    marken = []
+    try:
+        zeichnungen = page.get_drawings()
+    except Exception:
+        return marken
+    for d in zeichnungen:
+        r = d.get("rect")
+        if r is None:
+            continue
+        b, h = r.width, r.height
+        if not (3.5 <= b <= 22 and 3.5 <= h <= 22):
+            continue
+        if min(b, h) / max(b, h) < 0.6:          # nur annaehernd quadratisch
+            continue
+        fuellung = d.get("fill")
+        if fuellung is None:
+            continue                              # nur Umriss -> leeres Kaestchen
+        try:
+            helligkeit = sum(float(x) for x in fuellung[:3]) / 3.0
+        except Exception:
+            continue
+        marken.append(((r.x0 + r.x1) / 2.0, (r.y0 + r.y1) / 2.0, helligkeit < 0.5))
     return marken
 
 
@@ -298,6 +337,10 @@ def extract_values(file_bytes, mime):
                 haeufigkeit_x = (x0 + x1) / 2.0
 
         marken = _text_marken(words) + _widget_marken(page)
+        # Nur wenn es weder Zeichen noch Formularfelder gibt, die gezeichneten Kaestchen
+        # heranziehen – sonst stuenden zwei Lesarten derselben Zeile nebeneinander.
+        if not marken:
+            marken = _zeichnungs_marken(page)
 
         # Kriteriumszeilen der Seite: Nummer, Hoehe und Modul
         crit_tokens = []
@@ -306,6 +349,14 @@ def extract_values(file_bytes, mime):
             if m:
                 nr = "4.%s.%s" % (m.group(2), m.group(3))  # 5.x.y -> 4.x.y normalisieren
                 crit_tokens.append({"y0": y0, "y1": y1, "nr": nr, "modul": m.group(2)})
+
+        # Wie weit reicht eine Zeile nach unten? Bis zur naechsten Kriteriumsnummer.
+        # Zweizeilige Zeilen (Medicproof: „5.5.14 Besuch anderer medizinischer und
+        # therapeutischer | Einrichtungen (bis zu drei Stunden)") tragen ihre Markierung
+        # neben der ZWEITEN Zeile; mit der engen Zeilentoleranz wurde sie nie gefunden.
+        nach_y = sorted(crit_tokens, key=lambda c: c["y0"])
+        for i, c in enumerate(nach_y):
+            c["y_ende"] = nach_y[i + 1]["y0"] - 2.0 if i + 1 < len(nach_y) else c["y0"] + 40.0
 
         # Zeilenmarken je Kriterium (Toleranz aus der Zeilenhoehe, nicht fest)
         for c in crit_tokens:
@@ -334,7 +385,12 @@ def extract_values(file_bytes, mime):
             sicher = True
             grund = ""
 
-            if cols and haeufigkeit_x is not None:
+            # Haeufigkeiten gibt es NUR in Modul 5. Steht der Modul-5-Kopf auf derselben
+            # Seite wie die letzten Zeilen des Moduls 4 (bei Medicproof der Regelfall),
+            # wurden 4.4.11 und 4.4.12 sonst als Haeufigkeit statt als Stufe gelesen.
+            ist_m5 = (c["modul"] == "5")
+
+            if ist_m5 and cols and haeufigkeit_x is not None:
                 # MEDICPROOF: Markierung sagt den Zeitraum, die Zahl steht in "Haeufigkeit".
                 gefuellt = [m for m in c["marken"] if m[2]]
                 if gefuellt:
@@ -361,7 +417,7 @@ def extract_values(file_bytes, mime):
                     if len(gefuellt) > 1:
                         sicher = False
                         grund = "mehrere"
-            elif cols:
+            elif ist_m5 and cols:
                 # Medizinischer Dienst: die Zahl steht unmittelbar in der Zeitraumspalte.
                 for x0, y0, x1, y1, wd, b, l, n in roww:
                     s = wd.strip()
@@ -406,6 +462,45 @@ def extract_values(file_bytes, mime):
                 sicher = False
                 grund = grund or "keine"
 
+            # „Beurteilung nicht erforderlich" / „entfaellt": Das Gutachten sagt ausdruecklich,
+            # dass hier nichts zu bewerten ist – das ist kein fehlender Wert, sondern die Null.
+            # Ohne diese Regel fehlten in einem Medicproof-Gutachten 4.4.13 und 4.5.16 ganz.
+            if idx is None and count is None and not gefuellt:
+                # Bis zur naechsten Kriteriumsnummer schauen: Der Hinweis und die Markierung
+                # stehen bei mehrzeiligen Zeilen in der zweiten Zeile.
+                unten = max(c["y_ende"], c["y0"] + 3.0 * c["tol"])
+                weit = [m for m in marken if c["y0"] - c["tol"] <= m[1] < unten and m[2]]
+                if weit:
+                    spalten = spalten_je_modul.get(c["modul"], [])
+                    if ist_m5 and cols and haeufigkeit_x is not None:
+                        mx = weit[0][0]
+                        best, bestd = None, 1e9
+                        for nm, hx in cols.items():
+                            if abs(mx - hx) < bestd:
+                                bestd, best = abs(mx - hx), nm
+                        period = {"Tag": "D", "Woche": "W", "Monat": "M"}[best] if (best and bestd < 30) else "W"
+                        zahl = [w for w in words if c["y0"] - c["tol"] <= w[1] < unten
+                                and w[4].strip().isdigit() and abs((w[0] + w[2]) / 2.0 - haeufigkeit_x) < 40]
+                        count = int(zahl[0][4].strip()) if zahl else 0
+                        sicher, grund = True, "zweizeilig"
+                    elif spalten:
+                        pos, abstand = _naechste_spalte(weit[0][0], spalten)
+                        if abstand <= 20:
+                            idx, sicher, grund = pos, True, "zweizeilig"
+                nahe = [w for w in words if c["y0"] - c["tol"] <= w[1] <= unten]
+                zeilentext = " ".join(w[4] for w in sorted(nahe, key=lambda w: (w[1], w[0])))
+                if re.search(r"nicht\s+erforderlich|entf[aä]llt", zeilentext, re.IGNORECASE):
+                    if ist_m5 and not cnr.endswith(".16"):
+                        count, period = 0, "W"
+                    else:
+                        idx = 0
+                    sicher = True
+                    grund = "entfaellt"
+                elif ist_m5 and not cnr.endswith(".16") and any(
+                        w[4].strip() in ("-", "–", "—") for w in roww):
+                    # Modul 5: Der Strich in der Haeufigkeitsspalte heisst „keine".
+                    count, period, sicher, grund = 0, "W", True, "ohne"
+
             # Bei MEDICPROOF-Modul-5-Zeilen ist die Markierungsposition kein Stufenindex.
             if haeufigkeit_x is not None and count is not None:
                 idx = None
@@ -425,8 +520,49 @@ def extract_values(file_bytes, mime):
 KASSEN = [
     "AOK", "Barmer", "Techniker Krankenkasse", "DAK", "IKK", "Knappschaft",
     "Pronova", "hkk", "KKH", "vivida", "Bahn-BKK", "SBK", "Securvita", "mhplus",
-    "Continentale", "Debeka", "BKK", "TK",
+    # Private Krankenversicherungen – ihre Gutachten erstellt Medicproof, nicht der
+    # Medizinische Dienst. Ohne sie blieb bei jedem Medicproof-Fall das Feld „Kasse" leer.
+    "HUK-COBURG", "HUK-Coburg", "Debeka", "Allianz", "AXA", "Barmenia", "Continentale",
+    "DKV", "Generali", "Gothaer", "HanseMerkur", "LVM", "Nürnberger", "R+V", "SIGNAL IDUNA",
+    "Signal Iduna", "Süddeutsche Krankenversicherung", "SDK", "uniVersa", "Universa",
+    "Württembergische", "Central Krankenversicherung", "Concordia", "Hallesche",
+    "Landeskrankenhilfe", "Mecklenburgische", "Münchener Verein", "Provinzial",
+    "Alte Oldenburger", "Bayerische Beamtenkrankenkasse", "UKV", "Postbeamtenkrankenkasse",
+    "BKK", "TK",
 ]
+
+# Woran ein Medicproof-Gutachten zu erkennen ist. WICHTIG: Das Wort „Medicproof" steht in
+# vielen Gutachten NUR im Logo und damit nicht in der Textebene. Zugleich steht im
+# Anschreiben der privaten Krankenversicherung oft „der medizinische Dienst überprüfte …",
+# sodass die Suche nach „Medizinischer Dienst" fälschlich anschlägt. Deshalb wird
+# Medicproof zuerst geprüft, und zwar an der Formularsoftware ProofForms.
+MEDICPROOF_MARKER = re.compile(
+    r"MEDICPROOF|Medicproof|ProofForms|medizinische[rn]?\s+Dienst\s+der\s+Privaten", re.IGNORECASE)
+
+# Wörter, die in der Anschrift eines Kassenbriefs neben „Herrn"/„Frau" stehen, aber kein
+# Name sind. Ohne diese Sperre wurde aus dem zweispaltigen Briefkopf „Herr Serviceteam
+# Leistung" statt des Versicherten.
+NICHT_NAME = {
+    "serviceteam", "leistung", "leistungen", "service", "team", "abteilung", "postfach",
+    "zentrale", "kundenservice", "sachbearbeitung", "sachbearbeiter", "pflegekasse",
+    "pflegeversicherung", "krankenversicherung", "krankenkasse", "gutachter", "gutachterin",
+    "vorstand", "geschäftsführer", "personalabteilung", "widerspruchsstelle", "doktor",
+}
+
+
+def ist_medicproof(text):
+    """Stammt das Gutachten von der Medicproof GmbH (Gutachter der privaten Versicherer)?"""
+    return bool(MEDICPROOF_MARKER.search(text or ""))
+
+
+def _ohne_wasserzeichen(text):
+    """Medicproof druckt „Kopie stimmt mit dem Original überein" quer über die Seite.
+    In der Textebene landen die vier Wörter mitten in den Sätzen und zerreißen sie
+    (aus „Diagnosen" wurde „4 PFLEGEBEGRÜNDENDE stimmt DIAGNOSE(N)")."""
+    ohne = re.sub(r"\s(Kopie|Original|stimmt|überein)(?=\s)", " ", text)
+    # Fusszeile jeder Seite: „Signiert von 1762 ProofForms 8 … Seite 3/18 (hash) am TT.MM.JJJJ"
+    ohne = re.sub(r"Signiert von[^\n]{0,120}?ProofForms[^\n]{0,120}", " ", ohne)
+    return re.sub(r"[ \t]{2,}", " ", ohne)
 
 
 def _find1(pattern, text, flags=re.IGNORECASE):
@@ -461,19 +597,37 @@ def extract_diagnoses(text):
     """Diagnosen robust auslesen – auch wenn der ICD-Code rechts steht oder fehlt
     ('Weitere Diagnosen: ...'). Liefert Liste {icd, text}."""
     diags = []
-    m = re.search(r"Pflegebegr[uü]ndende?\s+Diagnose", text, re.IGNORECASE)
+    if ist_medicproof(text):
+        text = _ohne_wasserzeichen(text)
+    # Die Diagnosen des VORGUTACHTENS stehen bei Medicproof weiter vorne im Dokument
+    # („Pflegebegründende Diagnosen aus dem Vorgutachten: …") und sind nicht gemeint.
+    # Gesucht ist der eigene Abschnitt („4 PFLEGEBEGRÜNDENDE DIAGNOSE(N)").
+    m = None
+    for kandidat in re.finditer(r"Pflegebegr[uü]ndende?\s+Diagnose", text, re.IGNORECASE):
+        if re.match(r"\s*(?:\(n\)|n)?\s*aus\s+dem\s+Vorgutachten", text[kandidat.end():kandidat.end() + 40], re.IGNORECASE):
+            continue
+        m = kandidat
+        break
     if not m:
         m = re.search(r"\bDiagnose[n]?\b", text, re.IGNORECASE)
     if not m:
         return diags
     seg = text[m.end():]
-    em = re.search(r"(Module?\s+des\s+Begutachtung|Begutachtungsinstrument|\bModul\s*1\b|\b4\.1\b)", seg, re.IGNORECASE)
+    em = re.search(r"(Module?\s+des\s+Begutachtung|Begutachtungsinstrument|\bModul\s*1\b|\b4\.1\b|\b5\.1\s+Modul)", seg, re.IGNORECASE)
     if em:
         seg = seg[:em.start()]
     seg = re.sub(r"===\s*Seite[^\n]*===", "", seg)[:3500]
+    # Aufzählungen stehen bei Medicproof mit Punkten in EINER Zeile; die angehängte
+    # Aufzählung „weitere pflegebegründende Diagnosen: a, b, c" wird zu eigenen Einträgen.
+    tail = re.search(r"(?:Beeintr[aä]chtigungen\s+oder\s+)?weitere\s+pflegebegr[uü]ndende?\s+Diagnosen\s*:?\s*(.+)", seg, re.IGNORECASE | re.DOTALL)
+    extra = []
+    if tail:
+        seg = seg[:tail.start()]
+        extra = [t.strip() for t in re.split(r"[,;]|\n", tail.group(1)) if t.strip()]
+    seg = seg.replace("•", "\n").replace("▪", "\n").replace("·", "\n")
     icd_re = re.compile(r"(?:ICD[\s\-]*10[\s:]*)?\b([A-TV-Z]\d{2}(?:\.\d{1,2})?)\b")
     seen = set()
-    for raw in seg.split("\n"):
+    for raw in seg.split("\n") + extra:
         line = raw.strip()
         if not line:
             continue
@@ -501,7 +655,7 @@ def extract_diagnoses(text):
                 continue
             seen.add(key)
             diags.append({"icd": icd, "text": desc})
-        if len(diags) >= 6:
+        if len(diags) >= 10:
             break
     return diags
 
@@ -510,19 +664,45 @@ def extract_meta(text):
     """Liest Stammdaten, Diagnosen, Anamnese, Befund lokal aus dem Text (auch OCR).
     Best-effort und tolerant – der Nutzer prueft/korrigiert in der Vorschau."""
     meta = {}
+    roh = text
+    mp = ist_medicproof(text)
+    if mp:
+        text = _ohne_wasserzeichen(text)
+    meta["medicproof"] = mp
+    # Anrede aus der Briefanrede – sie steht im Kassenschreiben und ist eindeutig.
+    anrede_brief = ""
+    ma = re.search(r"Sehr\s+geehrte(?:r)?\s+(Herr|Frau)\s+[A-ZÄÖÜ]", text)
+    if ma:
+        anrede_brief = ma.group(1)
     # Name (Betreffend) – immer "Herr/Frau Vorname Nachname"
     name = ""
-    m = re.search(r"\b(Herrn|Herr|Frau)\s+([A-ZÄÖÜ][a-zäöüß\-]+)\s+([A-ZÄÖÜ][a-zäöüß\-]+)\b", text)
-    if m:
-        anrede = "Frau" if m.group(1).lower().startswith("frau") else "Herr"
-        name = "%s %s %s" % (anrede, m.group(2), m.group(3))
-    else:
+    # 1. Medicproof und viele Kassenbriefe benennen die Person ausdrücklich.
+    mv = re.search(r"Versicherte[rn]?\s+Person\s*:?\s*([A-ZÄÖÜ][a-zäöüß\-]+)\s+([A-ZÄÖÜ][a-zäöüß\-]+)", text)
+    if mv:
+        name = "%s %s %s" % (anrede_brief or "Herr", mv.group(1), mv.group(2))
+    if not name:
+        # 2. „Herrn/Frau Vorname Nachname" – mit Sperre gegen Abteilungsnamen im Briefkopf
+        for m in re.finditer(r"\b(Herrn|Herr|Frau)\s+([A-ZÄÖÜ][a-zäöüß\-]+)\s+([A-ZÄÖÜ][a-zäöüß\-]+)\b", text):
+            if m.group(2).lower() in NICHT_NAME or m.group(3).lower() in NICHT_NAME:
+                continue
+            anrede = "Frau" if m.group(1).lower().startswith("frau") else "Herr"
+            name = "%s %s %s" % (anrede, m.group(2), m.group(3))
+            break
+    if not name:
         m2 = re.search(r"(?:Pflege)?[Gg]utachten\s+f[uü\W]?r\s+([A-ZÄÖÜ][\wÄÖÜäöüß.\-]+)\s*,\s*([A-ZÄÖÜ][\wÄÖÜäöüß.\-]+)", text)
         if m2:
             name = "%s %s" % (m2.group(2), m2.group(1))  # Vorname Nachname (Anrede unbekannt)
     meta["betreffend"] = name
     meta["geboren"] = _find1(r"geb(?:oren)?\.?\s*(?:am)?\s*:?\s*(\d{1,2}\.\d{1,2}\.\d{4})", text)
-    meta["begutachtung"] = _find1(r"[Gg]utachten\s+vom\s+(\d{1,2}\.\d{1,2}\.\d{4})", text)
+    # Begutachtungsdatum: NICHT das Datum des Vorgutachtens. „In dem Einstufungsgutachten
+    # vom 22.09.2023" hat den Fall eines Medicproof-Gutachtens um drei Jahre zurückdatiert;
+    # die Sperre (?<![a-zäöüß]) schliesst Einstufungs- und Vorgutachten aus.
+    meta["begutachtung"] = (
+        _find1(r"gutachterliche[nr]?\s+Untersuchung\s+vom\s+(\d{1,2}\.\d{1,2}\.\d{4})", text)
+        or _find1(r"Begutachtung(?:sdatum)?\s*(?:am|vom)?\s*:?\s*(\d{1,2}\.\d{1,2}\.\d{4})", text)
+        or _find1(r"(?<![a-zäöüß])[Gg]utachten\s+vom\s+(\d{1,2}\.\d{1,2}\.\d{4})", text)
+        or _find1(r"Hausbesuch\s+(?:am|vom)\s*(\d{1,2}\.\d{1,2}\.\d{4})", text)
+    )
     # Antragsdatum: oft "Antrag ... vom TT.MM.JJJJ" (z.B. "Ablehnung Ihres Antrags ... vom ...")
     meta["antrag"] = (
         _find1(r"Antrag(?:s)?datum\s*:?\s*(\d{1,2}\.\d{1,2}\.\d{4})", text)
@@ -532,8 +712,15 @@ def extract_meta(text):
     meta["bescheid"] = (
         _find1(r"Bescheid(?:datum)?\s*(?:vom)?\s*:?\s*(\d{1,2}\.\d{1,2}\.\d{4})", text)
         or _find1(r"\bDatum\b\s*[:\s]*?(\d{1,2}\.\d{1,2}\.\d{4})", text)
+        # Briefkopf der Kasse: „Coburg, 05.09.2026" – nur am Anfang des Schreibens suchen.
+        or _find1(r"\b[A-ZÄÖÜ][a-zäöüß\-]{2,},\s*(\d{1,2}\.\d{1,2}\.\d{4})", text[:3000])
     )
-    meta["versnr"] = _find1(r"Versicherten(?:nummer|-?Nr\.?)?\s*[:\-]?\s*([A-Z]?\d[\dA-Z]{6,})", text)
+    # Versichertennummer: private Versicherer schreiben sie mit Schrägstrich und Buchstaben
+    # („VS-Nr. 123/456789-Z"); die alte Regel liess nur Ziffern und Grossbuchstaben zu.
+    meta["versnr"] = (
+        _find1(r"(?:VS-?Nr\.?|Versicherten(?:nummer|-?Nr\.?)|Versicherungs-?Nr\.?|Pflegeversicherung)\s*[:\-]?\s*([A-Z0-9][A-Z0-9/\-\.]{5,}[A-Z0-9])", text)
+        or _find1(r"Versicherten(?:nummer|-?Nr\.?)?\s*[:\-]?\s*([A-Z]?\d[\dA-Z]{6,})", text)
+    )
     # Kasse
     kasse = ""
     for k in KASSEN:
@@ -541,9 +728,14 @@ def extract_meta(text):
         if m:
             kasse = re.sub(r"\s+", " ", m.group(0)).strip()[:55]
             break
+    if not kasse:
+        # Private Krankenversicherungen gibt es rund vierzig; sie alle aufzulisten wäre
+        # Pflegeaufwand ohne Ende. Ihre Firmierung ist dafür gleichförmig genug.
+        kasse = _find1(r"([A-ZÄÖÜ][\wÄÖÜäöüß\-]{2,30}[\- ]Krankenversicherung(?:\s+(?:AG|a\.\s?G\.))?)", text)
     meta["kasse"] = kasse
-    # Gutachtenorganisation (konkreter MD inkl. Region)
-    if re.search(r"MEDICPROOF|Medicproof", text, re.IGNORECASE):
+    # Gutachtenorganisation (konkreter MD inkl. Region). Medicproof wird ZUERST geprüft:
+    # sonst gewinnt das „der medizinische Dienst überprüfte …" aus dem Kassenschreiben.
+    if mp:
         meta["organisation"] = "Medicproof GmbH"
     else:
         region = r"(?:Baden-?\s*W[uü]rttemberg|Bayern|Nord(?:rhein)?|Westfalen-?Lippe|Rheinland-?Pfalz|Hessen|Niedersachsen|Bremen|Hamburg|Schleswig-?Holstein|Sachsen-?Anhalt|Sachsen|Th[uü]ringen|Berlin-?Brandenburg|Brandenburg|Mecklenburg-?Vorpommern|Saarland)"
@@ -555,8 +747,19 @@ def extract_meta(text):
             meta["organisation"] = org[:60]
         else:
             meta["organisation"] = ""
-    meta["pg"] = _find1(r"Pflegegrad(?:es)?\s+(\d)\b", text)
-    meta["pts"] = _find1(r"(\d{1,3}[,\.]\d{1,2})\s*(?:gewichtete\s*)?(?:Gesamt-?\s*)?[Pp]unkte", text).replace(".", ",")
+    meta["pg"] = (
+        _find1(r"Pflegebed[uü]rftigkeit\s+nach\s+Pflegegrad\s+(\d)\b", text)
+        or _find1(r"Pflegegrad(?:es)?\s*:?\s*(\d)\b", text)
+    )
+    # Gesamtpunkte: Medicproof schreibt „Gesamtpunkte 65" in die Ergebnistabelle. Ohne
+    # diesen Anker gewann die letzte Modulzeile („… Alltagslebens 7,5") – 7,5 Punkte
+    # ergeben aber gar keinen Pflegegrad, und die App meldete zu Recht einen Widerspruch.
+    # „Gesamtpunkte unter 12,5" aus der Schwellentabelle darf nicht greifen: Es muss
+    # unmittelbar eine Zahl folgen.
+    meta["pts"] = (
+        _find1(r"Gesamtpunkte\s*:?\s*(\d{1,3}(?:[,\.]\d{1,2})?)\b", text)
+        or _find1(r"(\d{1,3}[,\.]\d{1,2})\s*(?:gewichtete\s*)?(?:Gesamt-?\s*)?[Pp]unkte", text)
+    ).replace(".", ",")
     # Diagnosen (robust)
     meta["diagnoses"] = extract_diagnoses(text)
     # Anamnese / Befund – vollständig (über Seitenumbrüche hinweg)
