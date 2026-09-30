@@ -58,6 +58,26 @@ function namensteile(name) {
     return String(name || '').replace(/^\s*(Herr|Frau)\s+/i, '').split(/\s+/).filter(t => t.length > 2);
 }
 
+/* WÖRTER, DIE KEIN NAME SIND.
+   Gemeldet: Aus dem zweispaltigen Briefkopf einer privaten Krankenversicherung wurde
+   „Herr Serviceteam Leistung"; die Falldatei hieß danach „Serviceteam, Leistung,
+   Widerspruch.json". In einem anderen Fall stand „Telefon" als Vorname. Der lokale
+   Leser weist solche Namen inzwischen ab (pflege_server.py, NICHT_NAME) – die KI und
+   alte Fälle können sie trotzdem liefern. Deshalb prüft die App den Namen ein zweites
+   Mal, dort wo er sichtbar wird: in der Prüfansicht und beim Speichern. */
+const NAME_UNPLAUSIBEL = [
+    'serviceteam', 'leistung', 'leistungen', 'service', 'team', 'abteilung', 'postfach',
+    'zentrale', 'telefon', 'telefax', 'kundenservice', 'sachbearbeitung', 'sachbearbeiter',
+    'pflegekasse', 'pflegeversicherung', 'krankenversicherung', 'krankenkasse', 'kasse',
+    'gutachter', 'gutachterin', 'vorstand', 'geschäftsführer', 'widerspruchsstelle',
+    'stellungnahme', 'gutachten', 'muster', 'unbekannt'
+];
+
+// Bestandteile des Namens, die eher aus einem Briefkopf als von einem Menschen stammen.
+function nameUnplausibel(name) {
+    return namensteile(name).filter(t => NAME_UNPLAUSIBEL.indexOf(t.toLowerCase()) !== -1);
+}
+
 /* Prüft den vollständigen Namen. Liefert die Bestandteile, zu denen es eine abweichende
    Schreibweise im Dokument gibt. */
 function pruefeName(name, text) {
@@ -72,8 +92,15 @@ function nameHinweisAnzeigen() {
     const box = document.getElementById('rev-name-pruefung');
     if (!box || !reviewData) return;
     const funde = pruefeName(reviewData.stam.betreffend, reviewData.text || '');
-    if (!funde.length) { box.innerHTML = ''; return; }
-    box.innerHTML = funde.map(f => `<div class="hinweis-warnung">
+    const briefkopf = nameUnplausibel(reviewData.stam.betreffend);
+    const kopfHinweis = briefkopf.length ? `<div class="hinweis-warnung">
+        <b>Bitte prüfen – das sieht nicht nach einem Namen aus:</b>
+        ${briefkopf.map(w => `„${escapeHtml(w)}"`).join(' und ')} steht in vielen Bescheiden
+        im Briefkopf der Kasse, nicht in der Anschrift der versicherten Person. Der Name
+        wandert in jeden Schriftsatz und in den Dateinamen – bitte hier berichtigen.
+    </div>` : '';
+    if (!funde.length) { box.innerHTML = kopfHinweis; return; }
+    box.innerHTML = kopfHinweis + funde.map(f => `<div class="hinweis-warnung">
         <b>Bitte prüfen:</b> „${escapeHtml(f.wort)}" kommt im Gutachten so nicht vor.
         Dort steht ${f.alternativen.map(a => `„${escapeHtml(a)}"`).join(' oder ')}.
         Vermutlich ein Lesefehler bei ähnlichen Zeichen.

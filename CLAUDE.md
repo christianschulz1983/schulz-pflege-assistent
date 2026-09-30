@@ -724,6 +724,11 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Druckfensters). Eine Stelle, vier Ausgaben – wer eine neue Ausgabe baut, nimmt
    `ausgabeDateiname(endung)`. Der Selbsttest prüft nicht nur die Namensfunktion, sondern
    auch, dass jede Ausgabe sie tatsächlich aufruft.
+   **Der Dateiname ist der Name.** Steht im Feld „Betreffend" ein Wort aus dem Briefkopf
+   der Kasse („Serviceteam", „Telefon"), heisst die Falldatei so und der Fehler wandert in
+   jeden Schriftsatz. `nameUnplausibel()` (js/namenspruefung.js) prüft das an zwei Stellen:
+   in der Prüfansicht neben dem Namen und beim Speichern als Hinweis. Gespeichert wird
+   trotzdem – die Entscheidung bleibt beim Berater.
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -777,7 +782,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1559 Pruefungen.
+Der Selbsttest umfasst 1563 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

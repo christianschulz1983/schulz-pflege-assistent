@@ -595,6 +595,17 @@ async function selbsttest() {
                     pruefeWahr('PDF mit Anlagen benutzt den einheitlichen Namen',
                         fuegePdfZusammen.toString().includes("ausgabeDateiname(', mit Anlagen.pdf')"));
                 }
+
+                /* Briefkopf statt Name: Aus dem zweispaltigen Kopf einer privaten Kasse
+                   wurde „Herr Serviceteam Leistung", die Falldatei hiess entsprechend. */
+                pruefe('Briefkopfwort wird erkannt',
+                    nameUnplausibel('Herr Serviceteam Leistung'), ['Serviceteam', 'Leistung']);
+                pruefe('Auch „Telefon" ist kein Vorname',
+                    nameUnplausibel('Telefon Michael'), ['Telefon']);
+                pruefe('Ein echter Name bleibt unbeanstandet',
+                    nameUnplausibel('Herr Anton Beispiel'), []);
+                pruefeWahr('Beim Speichern wird darauf hingewiesen',
+                    saveCase.toString().includes('nameUnplausibel'));
             } finally {
                 document.getElementById('stam-betreffend').value = merkN;
                 appModus = merkMod;

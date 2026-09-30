@@ -336,7 +336,17 @@ function fallDaten() {
 async function saveCase() {
     const data = fallDaten();
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
-    const dateiname=fallDateiname(document.getElementById('stam-betreffend').value, appModus);
+    const betreffend = document.getElementById('stam-betreffend').value;
+    const dateiname=fallDateiname(betreffend, appModus);
+    /* Der Dateiname ist der Name. Steht dort ein Wort aus dem Briefkopf der Kasse
+       („Serviceteam", „Telefon"), heisst die Falldatei so – und der Fehler wandert in
+       jeden Schriftsatz. Gespeichert wird trotzdem; die Entscheidung bleibt beim Berater. */
+    const briefkopf = (typeof nameUnplausibel === 'function') ? nameUnplausibel(betreffend) : [];
+    if (briefkopf.length) {
+        showToast('Der Name enthält ' + briefkopf.map(w => '„' + w + '"').join(' und ')
+            + ' – das stammt vermutlich aus dem Briefkopf der Kasse. Die Datei heißt jetzt „'
+            + dateiname + '". Bitte das Feld „Betreffend" prüfen.', 'error');
+    }
     if (typeof speichereDatei === 'function') {
         // Eigene Kennung: der Ordner für Falldateien wird getrennt von dem der
         // Word-Dokumente gemerkt. Vorgabe ist der Download-Ordner – dort liegen die
