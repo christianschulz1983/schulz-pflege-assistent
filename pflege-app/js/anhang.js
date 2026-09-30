@@ -108,9 +108,12 @@ async function fuegePdfZusammen() {
     }
     hideOverlay();
     closeVorschlaege();
-    const name = (document.getElementById('stam-betreffend')?.value || '').trim() || 'Stellungnahme';
     const blob = new Blob([erg.bytes], { type: 'application/pdf' });
-    await speichereDatei(blob, 'Pflegefachliche Stellungnahme mit Anlagen - ' + name + '.pdf', 'pdf-mit-anlagen',
+    // Einheitlich „Nachname, Vorname, Vorgang" (js/auswertung.js) – die Anlagen stehen
+    // im Zusatz, damit die Datei neben der Stellungnahme ohne Anlagen einsortiert wird.
+    const dateiname = (typeof ausgabeDateiname === 'function')
+        ? ausgabeDateiname(', mit Anlagen.pdf') : 'Stellungnahme mit Anlagen.pdf';
+    await speichereDatei(blob, dateiname, 'pdf-mit-anlagen',
         'Die PDF enthält die Stellungnahme und ' + erg.angehaengt + ' Anlage(n).');
     if (erg.fehler.length) showToast('Nicht angehängt: ' + erg.fehler.join(' | '), 'error');
 }

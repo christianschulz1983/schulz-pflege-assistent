@@ -716,6 +716,15 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    ausgewiesenen „Summe der Einzelpunkte" entsprechen. Für das gemeldete Gutachten: 64 von 64
    Kriterien, 63 davon sicher, alle sechs Modulsummen exakt.
 
+51. **Der Name jeder gespeicherten Datei** (`fallBasisname`, `ausgabeDateiname` in
+   `js/auswertung.js`). Vorgabe des Verfassers: **„Nachname, Vorname, Vorgang"** – der
+   Nachname steht vorn, damit die Dateien eines Menschen im Ordner nebeneinander stehen.
+   Das gilt für **alle** Ausgaben: Falldatei (.json), Word-Dokument (.doc), PDF mit Anlagen
+   (Zusatz „, mit Anlagen.pdf") und den Vorschlag des Druckdialogs (er nimmt den Titel des
+   Druckfensters). Eine Stelle, vier Ausgaben – wer eine neue Ausgabe baut, nimmt
+   `ausgabeDateiname(endung)`. Der Selbsttest prüft nicht nur die Namensfunktion, sondern
+   auch, dass jede Ausgabe sie tatsächlich aufruft.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -768,7 +777,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1551 Pruefungen.
+Der Selbsttest umfasst 1559 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

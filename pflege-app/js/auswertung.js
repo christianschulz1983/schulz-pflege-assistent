@@ -274,13 +274,28 @@ function dateinameSicher(s) {
     return String(s == null ? '' : s).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-function fallDateiname(betreffend, modus) {
+/* NAME JEDER GESPEICHERTEN DATEI: „Nachname, Vorname, Vorgang".
+   Vorgabe des Verfassers. Der Nachname steht vorn, weil die Fälle im Ordner danach
+   sortiert werden – mit dem Vornamen zuerst stand ein Fall nie neben dem anderen
+   desselben Menschen. EINE Stelle für alle Ausgaben: Falldatei, Word, PDF und Druck. */
+function fallBasisname(betreffend, modus) {
     const n = fallNamensteile(betreffend);
     const bez = VORGANG_BEZEICHNUNG[modus] || VORGANG_BEZEICHNUNG.widerspruch;
-    const teile = [n.vorname, n.nachname, bez].map(dateinameSicher).filter(Boolean);
+    const teile = [n.nachname, n.vorname, bez].map(dateinameSicher).filter(Boolean);
     // Ohne Namen bleibt wenigstens die Vorgangsart übrig – nie eine namenlose Datei.
     if (teile.length === 1) teile.unshift('Fall');
-    return teile.join(', ') + '.json';
+    return teile.join(', ');
+}
+
+function fallDateiname(betreffend, modus) {
+    return fallBasisname(betreffend, modus) + '.json';
+}
+
+// Der Name, den Word-Datei, PDF und Druckfenster tragen – aus den Feldern der Oberfläche.
+function ausgabeDateiname(endung) {
+    const name = (document.getElementById('stam-betreffend')?.value || '').trim();
+    const modus = (typeof appModus !== 'undefined') ? appModus : 'widerspruch';
+    return fallBasisname(name, modus) + (endung || '');
 }
 
 // Speichert den Fall. Wie beim Word-Dokument über einen „Speichern unter"-Dialog, damit

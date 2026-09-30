@@ -789,8 +789,10 @@ function exportAppealWord() {
     const kopie = docEl.cloneNode(true);
     kopie.querySelectorAll('.zitat-warnung').forEach(el => el.remove());
 
-    const name = (document.getElementById('stam-betreffend')?.value || 'Stellungnahme').trim();
-    const dateiname = 'Pflegefachliche Stellungnahme - ' + name.replace(/[\\/:*?"<>|]/g, '') + '.doc';
+    // Einheitlich „Nachname, Vorname, Vorgang" – wie die Falldatei (js/auswertung.js).
+    const dateiname = (typeof ausgabeDateiname === 'function')
+        ? ausgabeDateiname('.doc')
+        : 'Pflegefachliche Stellungnahme.doc';
 
     // Word-eigene Formatvorlagen: Seitenränder, Fußzeile mit Seitenzahl, Calibri als Standard
     const wordCss = `
@@ -920,7 +922,10 @@ function druckeStellungnahme() {
         showToast("Druckfenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.", "error");
         return;
     }
-    const title = escapeHtml(document.getElementById('stam-betreffend').value || 'Stellungnahme');
+    // Der Titel des Druckfensters ist der Dateiname, den „Als PDF speichern" vorschlägt –
+    // deshalb dieselbe Form wie bei Falldatei und Word: „Nachname, Vorname, Vorgang".
+    const title = escapeHtml((typeof ausgabeDateiname === 'function')
+        ? ausgabeDateiname('') : (document.getElementById('stam-betreffend').value || 'Stellungnahme'));
     const kopie = docEl.cloneNode(true);
     kopie.querySelectorAll('.zitat-warnung').forEach(el => el.remove());
     /* KEINE BROWSER-KOPFZEILE IM PDF.
@@ -931,7 +936,7 @@ function druckeStellungnahme() {
        am Text leistet das nicht (er greift oben nur auf Seite 1). Eine Tabelle mit
        thead/tfoot leistet es: Der Browser wiederholt beide auf jeder gedruckten Seite,
        und die leeren Zeilen darin wirken als oberer und unterer Rand. */
-    printWindow.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Pflegefachliche Stellungnahme - ${title}</title><style>${STELLUNGNAHME_CSS}
+    printWindow.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>${title}</title><style>${STELLUNGNAHME_CSS}
 ${DRUCK_CSS}
     </style></head><body>
       <div id="mess">${kopie.innerHTML}</div>

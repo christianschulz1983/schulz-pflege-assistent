@@ -528,41 +528,77 @@ async function selbsttest() {
         }
 
         // ---------- 9m. Name der Falldatei ----------
-        // Vorgabe: „Vorname, Nachname, Bezeichnung.json" statt
-        // „Frau_Sabine_Musterfrau_Pflegegradassistent.json".
+        // Vorgabe: „Nachname, Vorname, Vorgang" – der Nachname steht vorn, damit die Fälle
+        // eines Menschen im Ordner nebeneinander stehen. Gilt für JEDE gespeicherte Datei:
+        // Falldatei, Word-Dokument, PDF und den Vorschlag des Druckdialogs.
         if (typeof fallDateiname === 'function') {
             pruefe('Falldatei: Anrede fällt weg',
-                fallDateiname('Frau Sabine Musterfrau', 'widerspruch'), 'Sabine, Musterfrau, Widerspruch.json');
+                fallDateiname('Frau Sabine Musterfrau', 'widerspruch'), 'Musterfrau, Sabine, Widerspruch.json');
             pruefe('Falldatei: Höherstufung',
-                fallDateiname('Herr Peter Muster', 'hoeherstufung'), 'Peter, Muster, Höherstufung.json');
+                fallDateiname('Herr Peter Muster', 'hoeherstufung'), 'Muster, Peter, Höherstufung.json');
             pruefe('Falldatei: Erstantrag',
-                fallDateiname('Frau Greta Testfrau', 'erstantrag'), 'Greta, Testfrau, Erstantrag.json');
+                fallDateiname('Frau Greta Testfrau', 'erstantrag'), 'Testfrau, Greta, Erstantrag.json');
             pruefe('Falldatei: Anhörung heißt Anhörungsschreiben',
-                fallDateiname('Herr Fritz Beispielmann', 'anhoerung'), 'Fritz, Beispielmann, Anhörungsschreiben.json');
+                fallDateiname('Herr Fritz Beispielmann', 'anhoerung'), 'Beispielmann, Fritz, Anhörungsschreiben.json');
 
             // Namensformen, die in den vorhandenen Dateien tatsächlich vorkommen
             pruefe('Falldatei: mehrere Vornamen',
                 fallDateiname('Herr Karl Otto Emil Mustermann', 'widerspruch'),
-                'Karl Otto Emil, Mustermann, Widerspruch.json');
+                'Mustermann, Karl Otto Emil, Widerspruch.json');
             pruefe('Falldatei: Doppelvorname mit Bindestrich',
                 fallDateiname('Herr Hans-Peter Muster', 'widerspruch'),
-                'Hans-Peter, Muster, Widerspruch.json');
+                'Muster, Hans-Peter, Widerspruch.json');
             pruefe('Falldatei: Form „Nachname, Vorname"',
-                fallDateiname('Musterfrau, Sabine', 'widerspruch'), 'Sabine, Musterfrau, Widerspruch.json');
+                fallDateiname('Musterfrau, Sabine', 'widerspruch'), 'Musterfrau, Sabine, Widerspruch.json');
             pruefe('Falldatei: ohne Anrede',
-                fallDateiname('Sabine Musterfrau', 'widerspruch'), 'Sabine, Musterfrau, Widerspruch.json');
+                fallDateiname('Sabine Musterfrau', 'widerspruch'), 'Musterfrau, Sabine, Widerspruch.json');
             pruefe('Falldatei: Namenszusatz bleibt beim Nachnamen',
                 fallDateiname('Frau Lena von der Linde', 'widerspruch'),
-                'Lena, von der Linde, Widerspruch.json');
+                'von der Linde, Lena, Widerspruch.json');
 
             // Randfälle: nie eine unbrauchbare Datei erzeugen
             pruefe('Falldatei: nur ein Name', fallDateiname('Musterfrau', 'widerspruch'),
                 'Musterfrau, Widerspruch.json');
             pruefe('Falldatei: ohne Namen', fallDateiname('', 'widerspruch'), 'Fall, Widerspruch.json');
             pruefe('Falldatei: ohne Vorgangsart bleibt Widerspruch',
-                fallDateiname('Sabine Musterfrau', undefined), 'Sabine, Musterfrau, Widerspruch.json');
+                fallDateiname('Sabine Musterfrau', undefined), 'Musterfrau, Sabine, Widerspruch.json');
             pruefe('Falldatei: unzulässige Zeichen entfallen',
-                fallDateiname('Frau A/B C:D', 'widerspruch'), 'AB, CD, Widerspruch.json');
+                fallDateiname('Frau A/B C:D', 'widerspruch'), 'CD, AB, Widerspruch.json');
+
+            /* Derselbe Name für ALLE Ausgaben. Gemeldet: Das Word-Dokument hiess
+               „Pflegefachliche Stellungnahme - Herr Max Mustermann.doc" und liess sich
+               neben der Falldatei nicht wiederfinden. */
+            const merkN = document.getElementById('stam-betreffend').value;
+            const merkMod = appModus;
+            try {
+                document.getElementById('stam-betreffend').value = 'Herr Max Mustermann';
+                appModus = 'widerspruch';
+                pruefe('Word-Datei trägt denselben Namen',
+                    ausgabeDateiname('.doc'), 'Mustermann, Max, Widerspruch.doc');
+                pruefe('PDF mit Anlagen trägt denselben Namen',
+                    ausgabeDateiname(', mit Anlagen.pdf'), 'Mustermann, Max, Widerspruch, mit Anlagen.pdf');
+                pruefe('Druckfenster schlägt denselben Namen vor',
+                    ausgabeDateiname(''), 'Mustermann, Max, Widerspruch');
+                appModus = 'anhoerung';
+                pruefe('Vorgangsart steht im Namen',
+                    ausgabeDateiname('.doc'), 'Mustermann, Max, Anhörungsschreiben.doc');
+                pruefeWahr('Kein alter Name mehr im Word-Export',
+                    !exportAppealWord.toString().includes('Pflegefachliche Stellungnahme - '));
+                // Es genügt nicht, dass die Namensfunktion stimmt – jede Ausgabe muss sie
+                // auch benutzen. Sonst bleibt der alte Name an der Datei, die der Berater
+                // verschickt, und nur der Selbsttest ist zufrieden.
+                pruefeWahr('Word-Export benutzt den einheitlichen Namen',
+                    exportAppealWord.toString().includes("ausgabeDateiname('.doc')"));
+                pruefeWahr('Druckfenster benutzt den einheitlichen Namen',
+                    druckeStellungnahme.toString().includes("ausgabeDateiname('')"));
+                if (typeof fuegePdfZusammen === 'function') {
+                    pruefeWahr('PDF mit Anlagen benutzt den einheitlichen Namen',
+                        fuegePdfZusammen.toString().includes("ausgabeDateiname(', mit Anlagen.pdf')"));
+                }
+            } finally {
+                document.getElementById('stam-betreffend').value = merkN;
+                appModus = merkMod;
+            }
 
             // Zerlegung getrennt geprüft
             pruefe('Namensteile: Anrede und Nachname',
@@ -3573,16 +3609,16 @@ async function selbsttest() {
                 window.Blob = eBlob; URL.createObjectURL = eUrl; HTMLAnchorElement.prototype.click = eClick;
                 if (eDialog) window.showSaveFilePicker = eDialog; else delete window.showSaveFilePicker;
             }
-            // Name nach der Vorgabe des Verfassers: „Vorname, Nachname, Bezeichnung.json"
+            // Name nach der Vorgabe des Verfassers: „Nachname, Vorname, Vorgang.json"
             pruefe('Fall speichern: Dateiname wird vorgeschlagen', dialogName,
-                'Speicher, Test, Widerspruch.json');
+                'Test, Speicher, Widerspruch.json');
             pruefeWahr('Fall speichern nutzt den Speichern-unter-Dialog',
                 saveCase.toString().includes('speichereDatei'));
             pruefe('Fall speichern: Dialog beginnt im Download-Ordner', dialogStart, 'downloads');
             pruefeWahr('Speichern wird nachgewiesen',
-                leseSpeicherungen().some(e => e.name === 'Speicher, Test, Widerspruch.json'));
+                leseSpeicherungen().some(e => e.name === 'Test, Speicher, Widerspruch.json'));
             pruefeWahr('Nachweis erscheint in der Auswertung',
-                speicherungenHtml().includes('Speicher, Test, Widerspruch.json'));
+                speicherungenHtml().includes('Test, Speicher, Widerspruch.json'));
             pruefeWahr('Word-Dokument behält den Dokumentenordner',
                 exportAppealWord.toString().indexOf("'downloads'") === -1);
             const d = json ? JSON.parse(json) : {};
