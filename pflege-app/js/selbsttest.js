@@ -6062,6 +6062,108 @@ async function selbsttest() {
             }
         }
 
+
+        /* 38. Auftragsbogen S1/A1 einlesen (js/auftrag.js) – nur im Erstantrag.
+           Beim Erstantrag gibt es kein Gutachten; die Kundendaten stehen im
+           unterschriebenen Auftragsbogen und wurden bisher abgetippt.
+           Der Text hier ist erfunden – im Selbsttest stehen keine echten Kundendaten. */
+        if (typeof auftragFelderLesen === 'function') {
+            const bogen38 = [
+                'AUFTRAGGEBER(IN) KUNDEN-NR.123456 Si',
+                'Pflegebedürftige(r) Bitte handschriftliche Ergänzungen in Druckbuchstaben',
+                'Frau & Herr Vorname: Erika Name: Musterfrau',
+                'Straße/Nr.: Musterweg 12 PLZ/Ort: 12345 Musterstadt',
+                'Telefon Festnetz: 030123456 Telefon Mobil: 0170123456',
+                'E-Mail: erika.musterfrau@example.de Geburtsdatum: 06.01.1955',
+                'Kontaktperson 1:',
+                'Vorname:',
+                'Straße/Nr.:',
+                'Ausgangssituation',
+                'Versicherung: Musterkasse classic Versicherten-Nr.: T999000111',
+                'Aktueller Pflegegrad: kein 01 02 030405',
+                'Auftrag: EA1',
+                'Kundenberater(in): Max Muster Pflegeberater(in): Christian Beispiel'
+            ].join('\n');
+            const roh38 = auftragFelderLesen(bogen38);
+            pruefe('Auftragsbogen: Kundennummer', roh38.kundennummer, '123456');
+            pruefe('Auftragsbogen: Vorname', roh38.vorname, 'Erika');
+            pruefe('Auftragsbogen: Nachname', roh38.nachname, 'Musterfrau');
+            pruefe('Auftragsbogen: Straße ohne die nächste Spalte', roh38.strasse, 'Musterweg 12');
+            pruefe('Auftragsbogen: PLZ', roh38.plz, '12345');
+            pruefe('Auftragsbogen: Ort', roh38.ort, 'Musterstadt');
+            pruefe('Auftragsbogen: Festnetz', roh38.festnetz, '030123456');
+            pruefe('Auftragsbogen: Mobil', roh38.mobil, '0170123456');
+            pruefe('Auftragsbogen: E-Mail', roh38.email, 'erika.musterfrau@example.de');
+            pruefe('Auftragsbogen: Geburtsdatum', roh38.geboren, '06.01.1955');
+            pruefe('Auftragsbogen: Kasse ohne die nächste Spalte', roh38.kasse, 'Musterkasse classic');
+            pruefe('Auftragsbogen: Versicherten-Nr.', roh38.versnr, 'T999000111');
+            pruefe('Auftragsbogen: Auftragsart', roh38.auftrag, 'EA1');
+
+            // Leere Kontaktpersonen-Blöcke dürfen den Namen nicht überschreiben
+            pruefeWahr('Auftragsbogen: leerer Kontaktblock stört nicht',
+                auftragFelderLesen(bogen38 + '\nVorname:\nName:').vorname === 'Erika');
+
+            const werte38 = auftragZuFeldern(roh38);
+            pruefe('Übernahme: Name zusammengesetzt', werte38['stam-betreffend'], 'Erika Musterfrau');
+            pruefe('Übernahme: Datum im Format des Eingabefeldes', werte38['stam-geboren'], '1955-01-06');
+            pruefe('Übernahme: Anschrift in einer Zeile', werte38['stam-anschrift'], 'Musterweg 12, 12345 Musterstadt');
+            pruefe('Übernahme: beide Rufnummern', werte38['stam-telefon'], '030123456 / 0170123456');
+            pruefe('Übernahme: Kasse', werte38['stam-kasse'], 'Musterkasse classic');
+            pruefe('Übernahme: Kundennummer', werte38['stam-kundennummer'], '123456');
+            pruefeWahr('Übernahme: nur bekannte Felder',
+                Object.keys(werte38).every(k => k.indexOf('stam-') === 0));
+
+            // Ein unbeschriebenes Blatt liefert nichts – und keine leeren Felder
+            pruefe('Leeres Blatt liefert nichts', Object.keys(auftragZuFeldern(auftragFelderLesen('nur Fließtext'))).length, 0);
+
+            // Der Bereich gehört zum Erstantrag und zu keinem anderen Vorgang
+            const merk38 = appModus;
+            try {
+                setzeModus('erstantrag');
+                pruefeWahr('Upload-Bereich im Erstantrag sichtbar',
+                    document.getElementById('auftrag-bereich').style.display !== 'none');
+                setzeModus('widerspruch');
+                pruefeWahr('Upload-Bereich im Widerspruch verborgen',
+                    document.getElementById('auftrag-bereich').style.display === 'none');
+                setzeModus('anhoerung');
+                pruefeWahr('Upload-Bereich in der Anhörung verborgen',
+                    document.getElementById('auftrag-bereich').style.display === 'none');
+                pruefeWahr('Kontaktfelder nur im Antrag',
+                    document.querySelector('.kontakt-feld').style.display === 'none');
+                setzeModus('erstantrag');
+                pruefeWahr('Kontaktfelder im Antrag sichtbar',
+                    document.querySelector('.kontakt-feld').style.display !== 'none');
+
+                // Die Angaben stehen im Antragsschriftstück
+                const setz38 = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+                const merkA = document.getElementById('stam-anschrift').value;
+                const merkT = document.getElementById('stam-telefon').value;
+                const merkE = document.getElementById('stam-email').value;
+                try {
+                    setz38('stam-anschrift', 'Musterweg 12, 12345 Musterstadt');
+                    setz38('stam-telefon', '030123456');
+                    setz38('stam-email', 'erika.musterfrau@example.de');
+                    const dok38 = buildHoeherstufung('', {}, '', '');
+                    pruefeWahr('Antrag nennt die Anschrift', dok38.includes('Musterweg 12, 12345 Musterstadt'));
+                    pruefeWahr('Antrag nennt Telefon und E-Mail',
+                        dok38.includes('030123456') && dok38.includes('erika.musterfrau@example.de'));
+                    setz38('stam-anschrift', ''); setz38('stam-telefon', ''); setz38('stam-email', '');
+                    const ohne38 = buildHoeherstufung('', {}, '', '');
+                    pruefeWahr('Leere Kontaktfelder erscheinen nicht im Antrag',
+                        !/Anschrift:|Telefon:|E-Mail:/.test(ohne38.replace(/Telefonat/g, '')));
+                } finally {
+                    setz38('stam-anschrift', merkA); setz38('stam-telefon', merkT); setz38('stam-email', merkE);
+                }
+            } finally { setzeModus(merk38); }
+
+            // Die Beschriftung ist die vom Verfasser vorgegebene
+            pruefeWahr('Knopf heißt „Upload A1 und S1"',
+                document.getElementById('auftrag-bereich').innerText.includes('Upload A1 und S1'));
+            pruefeWahr('Nichts wird ungefragt eingetragen',
+                leseAuftrag.toString().includes('zeigeAuftragPruefung')
+                && auftragUebernehmen.toString().includes('cb.checked'));
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

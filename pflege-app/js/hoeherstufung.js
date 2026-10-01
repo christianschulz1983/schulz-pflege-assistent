@@ -184,6 +184,13 @@ function buildDeckblatt() {
     <div class="data-block">
       ${dataRow('Versicherte Person', name)}
       ${dataRow('geboren am', formatDE(g('stam-geboren')))}
+      ${/* Anschrift, Telefon und E-Mail kommen aus dem Auftragsbogen (js/auftrag.js) und
+            stehen nur dann im Kopf, wenn sie ausgefüllt sind – ein leeres Feld „Telefon:"
+            sähe im Schriftstück nach Nachlässigkeit aus. */''}
+      ${g('stam-anschrift') ? dataRow('Anschrift', g('stam-anschrift')) : ''}
+      ${g('stam-telefon') ? dataRow('Telefon', g('stam-telefon')) : ''}
+      ${g('stam-email') ? dataRow('E-Mail', g('stam-email')) : ''}
+      ${g('stam-kasse') ? dataRow('Kasse', g('stam-kasse')) : ''}
       ${dataRow('Versicherungs-Nr.', g('stam-versnr'))}
       ${hoeher && pgAlt ? dataRow('Bisheriger Pflegegrad', pflegegradWort(pgAlt)) : ''}
     </div>
@@ -364,6 +371,10 @@ function buildHoeherstufung(notesOverride, begruendungen, allgemeinText, anamnes
     <div class="data-block" id="stmt-data">
       ${dataRow('Betreffend', name)}
       ${dataRow('geboren am', formatDE(g('stam-geboren')))}
+      ${/* Aus dem Auftragsbogen (js/auftrag.js); leere Felder bleiben weg. */''}
+      ${g('stam-anschrift') ? dataRow('Anschrift', g('stam-anschrift')) : ''}
+      ${g('stam-telefon') ? dataRow('Telefon', g('stam-telefon')) : ''}
+      ${g('stam-email') ? dataRow('E-Mail', g('stam-email')) : ''}
       ${dataRow('Kasse', g('stam-kasse'))}
       ${dataRow('Versicherungs-Nr.', g('stam-versnr'))}
       ${istHoeher ? dataRow('Gutachtenorganisation', org) : ''}

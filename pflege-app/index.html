@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pflegegradassistent für Berater v66.69</title>
+    <title>Pflegegradassistent für Berater v66.70</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
@@ -74,6 +74,23 @@
             </div>
         </div>
 
+        <!-- Nur im Erstantrag: der ausgefüllte Auftragsbogen (Blatt S1 und A1) liefert die
+             Kundendaten, die sonst von Hand abgetippt werden. Siehe js/auftrag.js. -->
+        <div class="card" id="auftrag-bereich" style="display:none; border:1px solid rgba(13,148,136,0.25)">
+            <div class="card-header"><div class="dot" style="background:var(--accent2)"></div>Upload A1 und S1</div>
+            <div style="padding:16px 20px">
+                <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+                    Der unterschriebene Auftragsbogen enthält die Kundendaten: Name, Geburtsdatum,
+                    Anschrift, Telefon, E-Mail, Kasse, Versicherungs-Nr. und Kunden-Nr. Laden Sie das
+                    Blatt hier hoch – die App liest die Angaben aus und zeigt sie zum Prüfen an.
+                    <b>Eingetragen wird nichts ungefragt</b>: Sie entscheiden Feld für Feld.
+                </p>
+                <button class="btn btn-primary" onclick="auftragWaehlen()">📄 Upload A1 und S1</button>
+                <input type="file" id="auftragFile" accept=".pdf,application/pdf" style="display:none"
+                       onchange="leseAuftrag(event)">
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-header"><div class="dot"></div>Begutachtungs-Informationen</div>
             <div style="padding:20px">
@@ -97,6 +114,19 @@
                     <div>
                         <label class="field-label">Versicherungs-Nr.</label>
                         <input type="text" id="stam-versnr" class="field-input">
+                    </div>
+                    <!-- Kontaktdaten aus dem Auftragsbogen (nur Erstantrag und Höherstufung) -->
+                    <div class="col-span-2 kontakt-feld" style="display:none">
+                        <label class="field-label">Anschrift</label>
+                        <input type="text" id="stam-anschrift" class="field-input" placeholder="Straße Nr., PLZ Ort">
+                    </div>
+                    <div class="kontakt-feld" style="display:none">
+                        <label class="field-label">Telefon</label>
+                        <input type="text" id="stam-telefon" class="field-input">
+                    </div>
+                    <div class="kontakt-feld" style="display:none">
+                        <label class="field-label">E-Mail</label>
+                        <input type="text" id="stam-email" class="field-input">
                     </div>
                     <div>
                         <label class="field-label">Bescheiddatum</label>
@@ -318,6 +348,7 @@ if (typeof pdfjsLib !== 'undefined') { try { pdfjsLib.GlobalWorkerOptions.worker
 <script src="js/namenspruefung.js"></script>
 <script src="js/arztberichte.js"></script>
 <script src="js/unterlagen.js"></script>
+<script src="js/auftrag.js"></script>
 <script src="js/modus.js"></script>
 <script src="js/auswertung.js"></script>
 <script src="js/selbsttest.js"></script>

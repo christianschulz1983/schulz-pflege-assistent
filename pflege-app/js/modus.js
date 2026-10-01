@@ -92,6 +92,14 @@ function setzeModus(key) {
     // Steht ein Reiter nicht zur Verfügung, nicht darauf stehen bleiben
     if (!mitBefund && document.getElementById('tab-befund')?.classList.contains('active')) switchTab(1);
     if (!istAnh && document.getElementById('tab-vergleich')?.classList.contains('active')) switchTab(1);
+    /* Auftragsbogen S1/A1: Nur beim Erstantrag gibt es ihn, und nur dort fehlt ein
+       Gutachten, aus dem die Stammdaten kommen könnten (js/auftrag.js). */
+    const auftrag = document.getElementById('auftrag-bereich');
+    if (auftrag) auftrag.style.display = (key === 'erstantrag') ? '' : 'none';
+    // Anschrift, Telefon und E-Mail stammen aus dem Auftragsbogen und stehen im Antrag.
+    document.querySelectorAll('.kontakt-feld').forEach(el => {
+        el.style.display = mitBefund ? '' : 'none';
+    });
     // Erweiterte Erfassung (Pflegepersonen, Aufenthalte, Versorgung) ebenfalls nur dort
     const erf = document.getElementById('erfassung-bereich');
     if (erf) {

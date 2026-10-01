@@ -44,6 +44,7 @@ pflege-app/
   js/hoeherstufung.js Dokumentvorlage der Anträge und Deckblatt
   js/arztberichte.js  Mehrfach-Upload ärztlicher Unterlagen in die Erfassungstabellen
   js/unterlagen.js    Unterlagen als dokumentierten Eintrag in die Notizen
+  js/auftrag.js       Auftragsbogen S1/A1 einlesen (nur Erstantrag)
   js/nummerierung.js  Nummerierung des Gutachtens (4.x.y bzw. 5.x.y bei Medicproof)
   js/selbsttest.js    Selbsttest (Knopf oben rechts)
   befund_katalog.js   Befundkatalog, acht Gruppen (nicht von Hand ändern)
@@ -730,6 +731,20 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    in der Prüfansicht neben dem Namen und beim Speichern als Hinweis. Gespeichert wird
    trotzdem – die Entscheidung bleibt beim Berater.
 
+52. **Auftragsbogen S1 und A1** (`js/auftrag.js`, nur Erstantrag). Beim Erstantrag gibt es
+   kein Gutachten, aus dem die Stammdaten kommen könnten – wohl aber den unterschriebenen
+   Auftragsbogen: Blatt S1 trägt die Kundendaten, Blatt A1 den Auftrag. Der Knopf heißt
+   **„Upload A1 und S1"** (Vorgabe des Verfassers) und steht nur im Erstantrag.
+   Gelesen wird über den **lokalen Server**, nicht im Browser: Die Bögen werden
+   unterschrieben, eingescannt und in Goodnotes abgelegt; aus dieser Textebene liest
+   pdf.js nichts (gemessen: zwei Seiten, ein Zeichen), PyMuPDF dagegen 4.500 Zeichen,
+   und bei reinen Bildseiten kommt die Schrifterkennung dazu. pdf.js bleibt Rückfall.
+   Übernommen werden Name, Geburtsdatum, Kundennummer, Kasse, Versicherungs-Nr.,
+   Anschrift, Telefon und E-Mail – die letzten drei sind neue Felder und stehen im
+   Antragsschriftstück nur, wenn sie ausgefüllt sind. Wie beim Gutachten gilt: **Die App
+   trägt nichts ungefragt ein**, jedes Feld wird einzeln angehakt, und was ein bereits
+   ausgefülltes Feld überschreiben würde, ist rot gekennzeichnet.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -782,7 +797,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1563 Pruefungen.
+Der Selbsttest umfasst 1595 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
