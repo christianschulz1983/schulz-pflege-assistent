@@ -718,13 +718,17 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Kriterien, 63 davon sicher, alle sechs Modulsummen exakt.
 
 51. **Der Name jeder gespeicherten Datei** (`fallBasisname`, `ausgabeDateiname` in
-   `js/auswertung.js`). Vorgabe des Verfassers: **„Nachname, Vorname, Vorgang"** – der
-   Nachname steht vorn, damit die Dateien eines Menschen im Ordner nebeneinander stehen.
-   Das gilt für **alle** Ausgaben: Falldatei (.json), Word-Dokument (.doc), PDF mit Anlagen
-   (Zusatz „, mit Anlagen.pdf") und den Vorschlag des Druckdialogs (er nimmt den Titel des
+   `js/auswertung.js`). Vorgabe des Verfassers: **„Kürzel_Kundennummer_Nachname"**.
+   Kürzel: **PS** Widerspruch · **PS Anhörungsschreiben** Anhörung · **EA** Erstantrag ·
+   **HA** Höherstufung. Die Form passt zu den übrigen Unterlagen des Falls (Gutachten
+   „BE_GA_<Datum>_<Kundennummer>_<Nachname>", Auftragsbogen „S1_A1_<Kundennummer>_<Nachname>");
+   die Kundennummer ist der verlässliche Teil, Namen gleichen sich und werden verschieden
+   geschrieben. Gilt für **alle** Ausgaben: Falldatei (.json), Word (.doc), PDF mit Anlagen
+   (Zusatz „_mit Anlagen.pdf") und den Vorschlag des Druckdialogs (er nimmt den Titel des
    Druckfensters). Eine Stelle, vier Ausgaben – wer eine neue Ausgabe baut, nimmt
-   `ausgabeDateiname(endung)`. Der Selbsttest prüft nicht nur die Namensfunktion, sondern
-   auch, dass jede Ausgabe sie tatsächlich aufruft.
+   `ausgabeDateiname(endung)`. Fehlt die Kundennummer oder der Name, entfällt nur dieser
+   Teil; fehlt beides, heisst die Datei „<Kürzel>_Fall". Der Selbsttest prüft nicht nur die
+   Namensfunktion, sondern auch, dass jede Ausgabe sie tatsächlich aufruft.
    **Der Dateiname ist der Name.** Steht im Feld „Betreffend" ein Wort aus dem Briefkopf
    der Kasse („Serviceteam", „Telefon"), heisst die Falldatei so und der Fehler wandert in
    jeden Schriftsatz. `nameUnplausibel()` (js/namenspruefung.js) prüft das an zwei Stellen:
@@ -797,7 +801,7 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1595 Pruefungen.
+Der Selbsttest umfasst 1596 Pruefungen.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus

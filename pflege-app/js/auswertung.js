@@ -274,28 +274,39 @@ function dateinameSicher(s) {
     return String(s == null ? '' : s).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-/* NAME JEDER GESPEICHERTEN DATEI: „Nachname, Vorname, Vorgang".
-   Vorgabe des Verfassers. Der Nachname steht vorn, weil die Fälle im Ordner danach
-   sortiert werden – mit dem Vornamen zuerst stand ein Fall nie neben dem anderen
-   desselben Menschen. EINE Stelle für alle Ausgaben: Falldatei, Word, PDF und Druck. */
-function fallBasisname(betreffend, modus) {
+/* NAME JEDER GESPEICHERTEN DATEI: „Kürzel_Kundennummer_Nachname".
+   Vorgabe des Verfassers, damit die Dateien zu den übrigen Unterlagen des Falls passen
+   (die Gutachten heissen „BE_GA_<Datum>_<Kundennummer>_<Nachname>", der Auftragsbogen
+   „S1_A1_<Kundennummer>_<Nachname>"). Die Kundennummer ist der verlässliche Teil: Sie
+   ist eindeutig, während Namen sich gleichen und verschieden geschrieben werden.
+   EINE Stelle für alle Ausgaben: Falldatei, Word, PDF und Druck. */
+const VORGANG_KUERZEL = {
+    widerspruch:   'PS',                       // pflegefachliche Stellungnahme
+    anhoerung:     'PS Anhörungsschreiben',
+    erstantrag:    'EA',
+    hoeherstufung: 'HA'
+};
+
+function fallBasisname(betreffend, modus, kundennummer) {
     const n = fallNamensteile(betreffend);
-    const bez = VORGANG_BEZEICHNUNG[modus] || VORGANG_BEZEICHNUNG.widerspruch;
-    const teile = [n.nachname, n.vorname, bez].map(dateinameSicher).filter(Boolean);
-    // Ohne Namen bleibt wenigstens die Vorgangsart übrig – nie eine namenlose Datei.
-    if (teile.length === 1) teile.unshift('Fall');
-    return teile.join(', ');
+    const kuerzel = VORGANG_KUERZEL[modus] || VORGANG_KUERZEL.widerspruch;
+    const nr = dateinameSicher(kundennummer).replace(/_/g, '');
+    const teile = [kuerzel, nr, dateinameSicher(n.nachname)].filter(Boolean);
+    // Fehlt beides, bliebe nur das Kürzel übrig – dann wäre jede Datei gleich benannt.
+    if (teile.length === 1) teile.push('Fall');
+    return teile.join('_');
 }
 
-function fallDateiname(betreffend, modus) {
-    return fallBasisname(betreffend, modus) + '.json';
+function fallDateiname(betreffend, modus, kundennummer) {
+    return fallBasisname(betreffend, modus, kundennummer) + '.json';
 }
 
 // Der Name, den Word-Datei, PDF und Druckfenster tragen – aus den Feldern der Oberfläche.
 function ausgabeDateiname(endung) {
     const name = (document.getElementById('stam-betreffend')?.value || '').trim();
+    const nr = (document.getElementById('stam-kundennummer')?.value || '').trim();
     const modus = (typeof appModus !== 'undefined') ? appModus : 'widerspruch';
-    return fallBasisname(name, modus) + (endung || '');
+    return fallBasisname(name, modus, nr) + (endung || '');
 }
 
 // Speichert den Fall. Wie beim Word-Dokument über einen „Speichern unter"-Dialog, damit
@@ -337,7 +348,8 @@ async function saveCase() {
     const data = fallDaten();
     const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
     const betreffend = document.getElementById('stam-betreffend').value;
-    const dateiname=fallDateiname(betreffend, appModus);
+    const dateiname=fallDateiname(betreffend, appModus,
+        document.getElementById('stam-kundennummer')?.value || '');
     /* Der Dateiname ist der Name. Steht dort ein Wort aus dem Briefkopf der Kasse
        („Serviceteam", „Telefon"), heisst die Falldatei so – und der Fehler wandert in
        jeden Schriftsatz. Gespeichert wird trotzdem; die Entscheidung bleibt beim Berater. */

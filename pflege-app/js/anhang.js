@@ -112,7 +112,7 @@ async function fuegePdfZusammen() {
     // Einheitlich „Nachname, Vorname, Vorgang" (js/auswertung.js) – die Anlagen stehen
     // im Zusatz, damit die Datei neben der Stellungnahme ohne Anlagen einsortiert wird.
     const dateiname = (typeof ausgabeDateiname === 'function')
-        ? ausgabeDateiname(', mit Anlagen.pdf') : 'Stellungnahme mit Anlagen.pdf';
+        ? ausgabeDateiname('_mit Anlagen.pdf') : 'Stellungnahme mit Anlagen.pdf';
     await speichereDatei(blob, dateiname, 'pdf-mit-anlagen',
         'Die PDF enthält die Stellungnahme und ' + erg.angehaengt + ' Anlage(n).');
     if (erg.fehler.length) showToast('Nicht angehängt: ' + erg.fehler.join(' | '), 'error');
