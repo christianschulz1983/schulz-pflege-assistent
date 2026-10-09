@@ -6171,6 +6171,23 @@ async function selbsttest() {
                 && auftragUebernehmen.toString().includes('cb.checked'));
         }
 
+        // GOLDEN MASTER – die ganze Rechenkette an vier vollständigen Fällen.
+        // Die Sollwerte stehen von Hand gerechnet in js/goldmaster.js, samt Herleitung
+        // aus den Tabellen der BRi. Angelegt vor dem Einbau der Kinderbegutachtung:
+        // Diese vier Fälle sind Erwachsenenfälle und müssen unverändert bleiben.
+        {
+            goldMasterPruefen().forEach(e => {
+                pruefungen.push({ name: 'Golden Master – ' + e.name, ok: e.ok, ist: e.ist, soll: e.soll });
+            });
+
+            // Die Kriterienliste der eigenen Einschätzung: 64 Zeilen, alle bedienbar.
+            // Die Kinderbegutachtung wird hier Zeilen sperren – für Erwachsene nie.
+            const gm = goldOberflaeche();
+            pruefe('Golden Master – Kriterienzeilen der eigenen Einschätzung', gm.zeilen, 64);
+            pruefe('Golden Master – bedienbare Regler', gm.regler, 64);
+            pruefe('Golden Master – kein Regler gesperrt (Erwachsener)', gm.gesperrt, 0);
+        }
+
     } catch (e) {
         pruefungen.push({ name: 'Testlauf abgebrochen', ok: false, ist: e.message, soll: 'ohne Fehler' });
     } finally {

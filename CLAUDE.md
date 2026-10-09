@@ -46,6 +46,7 @@ pflege-app/
   js/unterlagen.js    Unterlagen als dokumentierten Eintrag in die Notizen
   js/auftrag.js       Auftragsbogen S1/A1 einlesen (nur Erstantrag)
   js/nummerierung.js  Nummerierung des Gutachtens (4.x.y bzw. 5.x.y bei Medicproof)
+  js/goldmaster.js    Golden Master: sechs vollstaendige Faelle mit handgerechnetem Soll
   js/selbsttest.js    Selbsttest (Knopf oben rechts)
   befund_katalog.js   Befundkatalog, acht Gruppen (nicht von Hand ändern)
   bri_texte.js        BRi-Originaltexte, 65 Kriterien + 6 Moduleinleitungen (Regel 34)
@@ -749,6 +750,30 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    trägt nichts ungefragt ein**, jedes Feld wird einzeln angehakt, und was ein bereits
    ausgefülltes Feld überschreiben würde, ist rot gekennzeichnet.
 
+53. **Golden Master: die ganze Rechenkette an vollständigen Fällen** (`js/goldmaster.js`).
+   Angelegt als Messlatte vor dem Einbau der Kinderbegutachtung. Die übrigen Prüfungen
+   prüfen Bausteine; hier laufen sechs vollständige Fälle von den 65 Kriterien über die
+   vier Modul-5-Gruppen und die Inkontinenzbedingung bis zu Gesamtpunkten und Pflegegrad.
+   **Die Sollwerte sind von Hand aus den Tabellen der BRi gerechnet**, nicht aufgezeichnet,
+   und die Herleitung steht je Fall im Quelltext. Ein aufgezeichneter Sollwert bestätigt nur,
+   dass das Programm tut, was es gestern tat – auch wenn es gestern schon falsch rechnete.
+   Fälle: A mittlere Einschränkung (PG 2) · B schwerste mit zählender Inkontinenz (PG 5) ·
+   C dieselbe Lage, Inkontinenz zählt NICHT (Prüfstein für `zaehltMit`) · D besondere
+   Bedarfskonstellation · E Rundung in Gruppe C · F Modul 3 höher als Modul 2.
+   **E und F entstanden erst durch die Gegenprobe** und sind der Grund, warum es diese
+   Regel gibt:
+   - Der erste Versuch, den historischen Rundungsfehler zurückzubauen, schlug NICHT an.
+     Zwei Ursachen: `2 × 4,3` ist binär exakt 8,6 (Verdoppeln erhöht nur den Exponenten),
+     erst `3 × 4,3` zeigt den Fehler – und die Summe der Gruppe C wird **zweimal** gerundet,
+     je Kriterium und noch einmal am Ende. Eine Gegenprobe muss beide entfernen.
+   - In den Fällen A bis D war Modul 2 immer ≥ Modul 3. Ein Programm, das statt des höheren
+     Wertes schlicht Modul 2 nähme, hätte alle bestanden.
+   Wer einen Fall ergänzt, prüft zuerst, ob die Gegenprobe ohne ihn durchkäme. Ein Fall,
+   der nichts fangen kann, ist kein Prüfstein, sondern eine Zeile mehr.
+   `goldOberflaeche()` hält zusätzlich die Kriterienliste fest: 64 Zeilen, 64 bedienbare
+   Regler, **kein** gesperrter. Die Kinderbegutachtung wird Zeilen sperren – für Erwachsene
+   muss diese Messung unverändert bleiben.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -801,7 +826,17 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1596 Pruefungen.
+Der Selbsttest umfasst 1683 Pruefungen (1596 Bestand + 87 Golden Master).
+
+**Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
+dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle ·
+2 Geburtsdatum und Alter anzeigen, ohne Wirkung · 3 Alterstabelle als Daten in Tagen ·
+4 Kriterien sperren statt ausblenden · 5 Differenzrechnung samt Kipp-Analyse ·
+6 die 18-Monats-Welt · 7 Kriterium 4.5.K Fruehfoerderung · 8 alle vier Vorgaenge ·
+9 Dokumentinhalte · 10 Import des Kinderformulars.
+**Bestandsregel fuer dieses Vorhaben: keine bestehende Pruefung wird veraendert.**
+Muesste eine angepasst werden, ist das ein Konstruktionsfehler, kein Testproblem.
+Ohne Geburtsdatum oder ab elf Jahren rechnet und schreibt die App zeichengleich wie bisher.
 
 Wichtige Grundsätze, die beim Weiterbauen gelten:
 - Abgeleitete Werte bleiben immer von Hand überschreibbar (Beispiel: Ernährungszustand aus
