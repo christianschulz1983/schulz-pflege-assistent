@@ -15,14 +15,15 @@
 //       anerkannt? Die KI nutzt das längst, der Berater sah es bisher nicht.
 //   Alle – Tragfähigkeit: Modul 3 ohne fachärztliche Diagnose, Modul 5 ohne Nachweis.
 
-const PG_SCHWELLEN = [12.5, 27, 47.5, 70, 90];
-
-// Nächste Schwelle oberhalb eines Punktwerts – null, wenn schon über der letzten.
+/* Nächste Schwelle oberhalb eines Punktwerts – null, wenn schon über der letzten.
+   Die Schwellen selbst stehen in PG_SCHWELLEN (js/basis.js). Die Toleranz von 0,001
+   gehört zu dieser Ansicht: Ohne sie zeigte die Prognose bei einem Punktwert, der
+   durch die Binärrechnung um Bruchteile unter einer Schwelle liegt, „es fehlen
+   0,00 Punkte" an. */
 function naechsteSchwelle(total) {
-    const s = PG_SCHWELLEN.find(x => x > Number(total) + 0.001);
-    if (s === undefined) return null;
-    // 12,5 -> Pflegegrad 1, 27 -> 2, 47,5 -> 3, 70 -> 4, 90 -> 5
-    return { schwelle: s, fehlend: Math.round((s - total) * 100) / 100, pg: PG_SCHWELLEN.indexOf(s) + 1 };
+    const s = naechstePgSchwelle(total, 0.001);
+    if (!s) return null;
+    return { schwelle: s.schwelle, fehlend: Math.round((s.schwelle - total) * 100) / 100, pg: s.pg };
 }
 
 // Ein Stand mit genau einem geänderten Kriterium – Grundlage der Kipp-Rechnung.

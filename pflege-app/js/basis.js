@@ -24,6 +24,46 @@ const BRI_GRUNDLAGE_SATZ =
     + 'Begutachtungsinstruments nach § 17 Absatz 1 SGB XI vom ' + BRI_FASSUNG.erlassen
     + ', in Kraft getreten am ' + BRI_FASSUNG.inkraft;
 
+/* DIE SCHWELLEN DES PFLEGEGRADS – EINE STELLE, FÜNF NUTZER.
+   § 15 Absatz 3 SGB XI: ab 12,5 Punkten Pflegegrad 1, ab 27 Pflegegrad 2, ab 47,5
+   Pflegegrad 3, ab 70 Pflegegrad 4, ab 90 Pflegegrad 5.
+
+   Diese fünf Zahlen standen ausgeschrieben an fünf Stellen: in der Berechnung
+   (`calculateInternal`), in der Fußzeile der Modultabelle, in der Prognose, in der
+   Schwellenanalyse der Anhörung und in der Gegenprobe beim Einlesen. Für Erwachsene
+   war das folgenlos – die Werte ändern sich nie. Für Kinder bis zu 18 Monaten gelten
+   nach § 15 Absatz 7 SGB XI andere Grenzen; dann müsste man alle fünf Stellen finden,
+   und die übersehene rechnete stillschweigend weiter mit den Erwachsenenwerten. Genau
+   so entsteht der Widerspruch zwischen Ergebnistabelle und Auswertung, den es hier
+   schon einmal gab (Regel 48). Deshalb: nur noch hier.
+
+   Die Reihenfolge der Liste ist die Bedeutung – Index 0 ist Pflegegrad 1. */
+const PG_SCHWELLEN = [12.5, 27, 47.5, 70, 90];
+
+function pflegegradAus(punkte) {
+    const p = Number(punkte);
+    if (!isFinite(p)) return 0;
+    for (let i = PG_SCHWELLEN.length - 1; i >= 0; i--) {
+        if (p >= PG_SCHWELLEN[i]) return i + 1;
+    }
+    return 0;
+}
+
+/* Die nächste erreichbare Schwelle oberhalb eines Punktwerts; null, wenn der Wert
+   bereits über der letzten liegt.
+
+   `toleranz` ist nicht Zierde: Die Prognose sucht mit 0,001 Abstand, damit bei einem
+   Punktwert, der durch die Binärrechnung knapp unter einer Schwelle liegt, nicht
+   „es fehlen 0,00 Punkte" angezeigt wird. Die Modultabelle und die Schwellenanalyse
+   der Anhörung rechnen ohne diesen Abstand. Beide Verhalten bestanden vorher
+   nebeneinander und bleiben erhalten – der Aufrufer sagt, was er braucht. */
+function naechstePgSchwelle(punkte, toleranz) {
+    const p = Number(punkte) + (Number(toleranz) || 0);
+    const s = PG_SCHWELLEN.find(x => x > p);
+    if (s === undefined) return null;
+    return { schwelle: s, pg: PG_SCHWELLEN.indexOf(s) + 1 };
+}
+
 /* PFLEGEGRAD VERGLEICHEN – für das Fazit.
    Der Pflegegrad liegt in verschiedenen Schreibweisen vor: als Zahl aus der Berechnung,
    als Eingabe „3", als „Pflegegrad 3", leer oder „kein Pflegegrad". Ein Pflegegrad 0 gibt

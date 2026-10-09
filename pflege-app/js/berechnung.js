@@ -257,7 +257,7 @@ function calculateInternal(pref) {
     let w6=gewichtetePunkte(6,s6);
     let wm23=Math.max(p2,p3);
     let total=st.special==1?100:(w1+wm23+w4+w5+w6);
-    let pg=total>=90?5:total>=70?4:total>=47.5?3:total>=27?2:total>=12.5?1:0;
+    let pg=pflegegradAus(total);   // Schwellen: PG_SCHWELLEN in js/basis.js
     return {raws:[s1,s2,s3,s4,ptsM5,s6], weights:[w1,p2,p3,w4,w5,w6], total, pg};
 }
 
@@ -355,14 +355,13 @@ function calculate(pref) {
         }
     }
 
-    const nextT=[12.5,27,47.5,70,90].find(t=>t>total);
+    const next=naechstePgSchwelle(total);   // ohne Toleranz, wie bisher an dieser Stelle
     const footEl=document.getElementById('gap-footer-'+pref);
     if(footEl){
         footEl.style.display='block';
-        if(nextT){
+        if(next){
             footEl.className='gap-footer danger';
-            const pgNext=[1,2,3,4,5][[12.5,27,47.5,70,90].indexOf(nextT)];
-            footEl.innerText=`Noch ${(nextT-total).toFixed(2).replace('.',',')} Pkt. bis Pflegegrad ${pgNext}`;
+            footEl.innerText=`Noch ${(next.schwelle-total).toFixed(2).replace('.',',')} Pkt. bis Pflegegrad ${next.pg}`;
         } else {
             footEl.className='gap-footer success';
             footEl.innerText='✓ Maximaler Pflegegrad erreicht';

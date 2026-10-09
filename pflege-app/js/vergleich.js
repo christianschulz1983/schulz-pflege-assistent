@@ -110,7 +110,9 @@ function schwellenAnalyse() {
     const angezeigt = calculateInternal('zweit');
     const abweichung = Math.abs(angezeigt.total - basis.total) > 0.01 || angezeigt.pg !== basis.pg;
 
-    const naechste = [12.5, 27, 47.5, 70, 90].find(t => t > basis.total);
+    // Schwellen aus PG_SCHWELLEN (js/basis.js); ohne Toleranz, wie bisher hier.
+    const naechsteStufe = naechstePgSchwelle(basis.total);
+    const naechste = naechsteStufe === null ? undefined : naechsteStufe.schwelle;
     return {
         basis: basis,
         angezeigt: angezeigt,

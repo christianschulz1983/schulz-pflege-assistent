@@ -711,10 +711,9 @@ function rvExtract(kind, idx, v) {
 }
 
 /* Warnt, wenn der angegebene Pflegegrad nicht zu den angegebenen Punkten passt.
-   Schwellen nach SGB XI: 12,5 / 27 / 47,5 / 70 / 90. */
+   Die Schwellen stehen in PG_SCHWELLEN (js/basis.js) – nicht hier noch einmal. */
 function pgAusPunkten(punkte) {
-    const p = rvZahl(punkte);
-    return p >= 90 ? 5 : p >= 70 ? 4 : p >= 47.5 ? 3 : p >= 27 ? 2 : p >= 12.5 ? 1 : 0;
+    return pflegegradAus(rvZahl(punkte));
 }
 
 /* Modulweise Gegenprobe: Beide Gutachtenarten weisen je Modul die Summe der Einzelpunkte

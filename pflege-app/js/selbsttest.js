@@ -6171,6 +6171,57 @@ async function selbsttest() {
                 && auftragUebernehmen.toString().includes('cb.checked'));
         }
 
+        // PFLEGEGRAD-SCHWELLEN AN EINER STELLE (PG_SCHWELLEN, js/basis.js).
+        // Die Sollwerte stehen hier bewusst noch einmal ausgeschrieben – wie bei
+        // MODUL_SPANNEN. Eine Prüfung, die ihren Sollwert aus der geprüften Tabelle
+        // holt, bestätigt nur sich selbst.
+        {
+            pruefe('Schwellen nach § 15 Abs. 3 SGB XI', PG_SCHWELLEN, [12.5, 27, 47.5, 70, 90]);
+
+            // Jede Grenze von beiden Seiten: knapp darunter und genau darauf.
+            const grenzfaelle = [
+                [0, 0], [12.49, 0], [12.5, 1], [26.99, 1], [27, 2], [47.49, 2],
+                [47.5, 3], [69.99, 3], [70, 4], [89.99, 4], [90, 5], [100, 5]
+            ];
+            grenzfaelle.forEach(([pkt, soll]) => {
+                pruefe(`${String(pkt).replace('.', ',')} Punkte ergeben Pflegegrad ${soll}`,
+                    pflegegradAus(pkt), soll);
+            });
+            pruefe('Unsinnige Eingabe ergibt keinen Pflegegrad', pflegegradAus('abc'), 0);
+
+            // Nächste Schwelle
+            pruefe('Von 0 ist die nächste Schwelle 12,5 (Pflegegrad 1)',
+                naechstePgSchwelle(0), { schwelle: 12.5, pg: 1 });
+            pruefe('Genau auf einer Schwelle zeigt die nächste',
+                naechstePgSchwelle(12.5), { schwelle: 27, pg: 2 });
+            pruefe('Über der letzten Schwelle gibt es keine weitere',
+                naechstePgSchwelle(95), null);
+
+            // Die Toleranz der Prognose – sie unterscheidet die beiden Verhalten,
+            // die vorher nebeneinander bestanden. Ohne sie stünde in der Prognose
+            // „es fehlen 0,00 Punkte".
+            pruefe('Ohne Toleranz zählt die knapp verfehlte Schwelle noch',
+                naechstePgSchwelle(26.9995).schwelle, 27);
+            pruefe('Mit Toleranz 0,001 wird sie übersprungen',
+                naechstePgSchwelle(26.9995, 0.001).schwelle, 47.5);
+            pruefe('Die Prognose nutzt die Toleranz', naechsteSchwelle(26.9995).schwelle, 47.5);
+
+            // Die fünf Fundstellen rufen tatsächlich die eine Stelle auf. Ohne diese
+            // Prüfung könnte eine davon später wieder eigene Zahlen bekommen, ohne
+            // dass es auffällt – für Kinder bis 18 Monate wäre das ein falscher
+            // Pflegegrad in genau einer Ansicht.
+            pruefeWahr('Die Berechnung nutzt pflegegradAus',
+                calculateInternal.toString().includes('pflegegradAus('));
+            pruefeWahr('Die Modultabelle nutzt naechstePgSchwelle',
+                calculate.toString().includes('naechstePgSchwelle('));
+            pruefeWahr('Die Gegenprobe beim Einlesen nutzt pflegegradAus',
+                pgAusPunkten.toString().includes('pflegegradAus('));
+            pruefeWahr('Die Prognose nutzt naechstePgSchwelle',
+                naechsteSchwelle.toString().includes('naechstePgSchwelle('));
+            pruefeWahr('Die Schwellenanalyse der Anhörung nutzt naechstePgSchwelle',
+                schwellenAnalyse.toString().includes('naechstePgSchwelle('));
+        }
+
         // GOLDEN MASTER – die ganze Rechenkette an vier vollständigen Fällen.
         // Die Sollwerte stehen von Hand gerechnet in js/goldmaster.js, samt Herleitung
         // aus den Tabellen der BRi. Angelegt vor dem Einbau der Kinderbegutachtung:

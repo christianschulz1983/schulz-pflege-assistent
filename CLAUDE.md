@@ -781,6 +781,18 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
 - Kognitiv bedingter Anleitungsbedarf bei Alltagshandlungen gehört zu 4.2.5.
 - Modul 3 setzt eine fachärztliche Diagnose mit mindestens sechs Monaten Behandlung voraus.
 - Modul 5 setzt in der Regel ärztliche Verordnung und sechs Monate Dauerhaftigkeit voraus.
+- **Die Schwellen des Pflegegrads stehen in `PG_SCHWELLEN`** (`js/basis.js`) und nirgends
+  sonst. 12,5 / 27 / 47,5 / 70 / 90 nach § 15 Absatz 3 SGB XI. Sie standen ausgeschrieben
+  an fünf Stellen: Berechnung, Fußzeile der Modultabelle, Prognose, Schwellenanalyse der
+  Anhörung und Gegenprobe beim Einlesen. Für Erwachsene folgenlos – für Kinder bis zu
+  18 Monaten gelten nach § 15 Absatz 7 andere Grenzen, und die übersehene Stelle rechnete
+  stillschweigend weiter mit den Erwachsenenwerten. Genutzt wird `pflegegradAus(punkte)`
+  und `naechstePgSchwelle(punkte, toleranz)`. **Die Toleranz ist kein Beiwerk:** Die
+  Prognose sucht mit 0,001 Abstand, damit bei einem binär knapp verfehlten Wert nicht
+  „es fehlen 0,00 Punkte" steht; Modultabelle und Schwellenanalyse rechnen ohne. Beide
+  Verhalten bestanden vorher nebeneinander und bleiben erhalten – der Aufrufer sagt, was
+  er braucht. Der Selbsttest prüft jede Grenze von beiden Seiten gegen eine getrennt
+  ausgeschriebene Solltabelle **und** dass alle fünf Stellen die eine Funktion aufrufen.
 - **Die Umrechnungstabellen aller sechs Module stehen in `MODUL_SPANNEN`** (`js/berechnung.js`)
   und nirgends sonst. Eine falsche Grenze bleibt sonst jahrelang unbemerkt: In Modul 1 stand
   die Grenze zu 7,5 gewichteten Punkten bei 7 statt bei 6 – wer genau 6 Einzelpunkte hatte,
@@ -826,11 +838,11 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1683 Pruefungen (1596 Bestand + 87 Golden Master).
+Der Selbsttest umfasst 1708 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
-dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle ·
-2 Geburtsdatum und Alter anzeigen, ohne Wirkung · 3 Alterstabelle als Daten in Tagen ·
+dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle
+(erledigt) · 2 Geburtsdatum und Alter anzeigen, ohne Wirkung · 3 Alterstabelle in Tagen ·
 4 Kriterien sperren statt ausblenden · 5 Differenzrechnung samt Kipp-Analyse ·
 6 die 18-Monats-Welt · 7 Kriterium 4.5.K Fruehfoerderung · 8 alle vier Vorgaenge ·
 9 Dokumentinhalte · 10 Import des Kinderformulars.
