@@ -6171,6 +6171,121 @@ async function selbsttest() {
                 && auftragUebernehmen.toString().includes('cb.checked'));
         }
 
+        // ALTERSTABELLE DER BRi (js/kinder_bri.js), Seiten 146–149.
+        // 35 Kriterien mal drei Grenzen – 105 Zahlen, abgeschrieben aus einer
+        // gedruckten Tabelle. Noch ohne jede Wirkung auf die Rechnung.
+        {
+            const nrn = Object.keys(KINDER_ALTERSNORM);
+
+            // Vollständigkeit: genau die Kriterien der Module 1, 2, 4 und 6.
+            // Module 3 und 5 und die besondere Bedarfskonstellation haben nach der
+            // BRi (Seite 143) ausdrücklich KEINE Altersgrenzen.
+            const sollNrn = ITEMS.filter(i => [1, 2, 4, 6].includes(i.m)).map(i => i.nr);
+            pruefe('Alle Kriterien der Module 1, 2, 4 und 6 haben eine Altersnorm',
+                sollNrn.filter(nr => !altersabhaengig(nr)), []);
+            pruefe('Kein anderes Kriterium hat eine Altersnorm',
+                nrn.filter(nr => !sollNrn.includes(nr)), []);
+            pruefe('Die Tabelle hat 35 Zeilen', nrn.length, 35);
+            pruefeWahr('Modul 3 ist altersunabhängig',
+                ITEMS.filter(i => i.m === 3).every(i => !altersabhaengig(i.nr)));
+            pruefeWahr('Modul 5 ist altersunabhängig',
+                ITEMS.filter(i => i.m === 5).every(i => !altersabhaengig(i.nr)));
+            pruefeWahr('Die besondere Bedarfskonstellation ist altersunabhängig',
+                !altersabhaengig('F 4.1.B') && !altersabhaengig('4.1.B'));
+
+            // Form: drei Grenzen je Kriterium, aufsteigend, jede in Monaten oder Wochen.
+            const inMonaten = g => (g.w !== undefined) ? (g.w * 7) / 30.4 : g.m;
+            nrn.forEach(nr => {
+                const g = KINDER_ALTERSNORM[nr];
+                pruefeWahr(`${nr}: drei Grenzen`, Array.isArray(g) && g.length === 3);
+                pruefeWahr(`${nr}: Grenzen steigen nicht ab`,
+                    inMonaten(g[0]) <= inMonaten(g[1]) && inMonaten(g[1]) <= inMonaten(g[2]));
+                pruefeWahr(`${nr}: jede Grenze ist Monat oder Woche`,
+                    g.every(x => (x.m !== undefined) !== (x.w !== undefined)));
+            });
+
+            // Die drei Kriterien mit zusammengefasster Zelle in der gedruckten Tabelle.
+            // Vier Stufen statt zwei würden hier Punkte verschenken.
+            ['4.4.11', '4.4.12', '4.4.13'].forEach(nr => {
+                const g = KINDER_ALTERSNORM[nr];
+                pruefeWahr(`${nr}: nur zwei Spannen, keine Zwischenstufen`,
+                    JSON.stringify(g[0]) === JSON.stringify(g[1])
+                    && JSON.stringify(g[1]) === JSON.stringify(g[2]));
+            });
+
+            // DIE EIGENTLICHE PRÜFUNG DER ABSCHRIFT: Die BRi zählt auf Seite 201 selbst
+            // auf, welche Kriterien erst ab einem bestimmten Alter beurteilt werden.
+            // Diese Liste wird hier aus der Tabelle HERGELEITET und mit der Abschrift
+            // der Richtlinie verglichen. Ein Zahlendreher in einer der ersten Grenzen
+            // fällt damit auf, ohne dass ich ihn selbst suchen müsste.
+            // Die Aufzählung beginnt bei zwei Jahren: Unter 18 Monaten werden die
+            // Module 1, 2, 4 und 6 ohnehin nicht bewertet (BRi Seite 200).
+            const hergeleitet = {};
+            nrn.forEach(nr => {
+                const ab = altersnormBeurteiltAb(nr);
+                if (ab.w !== undefined || ab.m <= 18) return;
+                const schluessel = ab.m;
+                (hergeleitet[schluessel] = hergeleitet[schluessel] || []).push(nr);
+            });
+            const abschrift = {};
+            KINDER_BEURTEILUNG_AB.forEach(e => { abschrift[e.ab.m] = e.kriterien.slice().sort(); });
+            Object.keys(hergeleitet).forEach(k => hergeleitet[k].sort());
+            pruefe('Die Tabelle ergibt genau die Liste der BRi von Seite 201',
+                hergeleitet, abschrift);
+            pruefe('Es sind elf Kriterien',
+                Object.values(abschrift).reduce((n, l) => n + l.length, 0), 11);
+
+            // Die obere Grenze der Tabelle ist die, die die BRi selbst nennt:
+            // „Die Tabelle endet mit vollendetem 11. Lebensjahr" (Seite 146).
+            const hoechste = Math.max(...nrn.map(nr => KINDER_ALTERSNORM[nr][2].m || 0));
+            pruefe('Die späteste Grenze liegt bei elf Jahren', hoechste, 132);
+            pruefeWahr('Und sie gehört zu „Ruhen und Schlafen"',
+                KINDER_ALTERSNORM['4.6.2'][2].m === 132);
+
+            // Die Stufe am Stichtag – an den Grenzen von beiden Seiten.
+            const d = s => alterDatum(s);
+            const geb = d('2020-01-15');
+            const stufe = (nr, tag) => altersnormStufe(nr, geb, d(tag));
+            // 4.1.1: unter 1 Monat / 1–3 / 3–9 / ab 9 Monaten
+            pruefe('4.1.1 am Geburtstag: unselbständig', stufe('4.1.1', '2020-01-15'), 3);
+            pruefe('4.1.1 mit 1 Monat: überwiegend unselbständig', stufe('4.1.1', '2020-02-15'), 2);
+            pruefe('4.1.1 mit 3 Monaten: überwiegend selbständig', stufe('4.1.1', '2020-04-15'), 1);
+            pruefe('4.1.1 einen Tag vor 9 Monaten: noch überwiegend selbständig',
+                stufe('4.1.1', '2020-10-14'), 1);
+            pruefe('4.1.1 mit 9 Monaten: selbständig', stufe('4.1.1', '2020-10-15'), 0);
+            // 4.2.1 beginnt bei sechs Wochen – die einzige Wochengrenze neben 4.6.5
+            pruefe('4.2.1 mit 5 Wochen: Fähigkeit nicht vorhanden', stufe('4.2.1', '2020-02-18'), 3);
+            pruefe('4.2.1 mit 6 Wochen: in geringem Maße vorhanden', stufe('4.2.1', '2020-02-26'), 2);
+            // 4.4.11: springt von unselbständig unmittelbar auf selbständig
+            pruefe('4.4.11 kurz vor 5 Jahren: unselbständig', stufe('4.4.11', '2025-01-14'), 3);
+            pruefe('4.4.11 mit 5 Jahren: selbständig', stufe('4.4.11', '2025-01-15'), 0);
+            // Ein Kriterium ohne Altersnorm
+            pruefe('Modul 3 hat keine Altersnorm', altersnormStufe('4.3.1', geb, d('2025-01-15')), null);
+            pruefe('Ohne Datum keine Stufe', altersnormStufe('4.1.1', null, d('2025-01-15')), null);
+
+            // Textform der Grenzen – sie steht ab Stufe 4 in der gesperrten Zeile
+            pruefe('Wochengrenze als Text', altersGrenzeText({ w: 6 }), '6 Wochen');
+            pruefe('Ein Monat', altersGrenzeText({ m: 1 }), '1 Monat');
+            pruefe('18 Monate', altersGrenzeText({ m: 18 }), '18 Monaten');
+            pruefe('Zwei Jahre und sechs Monate', altersGrenzeText({ m: 30 }), '2 Jahren und 6 Monaten');
+            pruefe('Volle Jahre ohne Zusatz', altersGrenzeText({ m: 60 }), '5 Jahren');
+
+            // Benennung der Stufen: Modul 2 spricht von Fähigkeiten, die übrigen von
+            // Selbständigkeit – so steht es in der BRi und in ITEMS.
+            pruefe('Modul 4 benennt Selbständigkeit',
+                altersnormBezeichnung('4.4.1', 1), 'überwiegend selbständig');
+            pruefe('Modul 2 benennt Fähigkeiten',
+                altersnormBezeichnung('4.2.1', 1), 'größtenteils vorhanden');
+            pruefe('Stufe 3 in Modul 2', altersnormBezeichnung('4.2.1', 3), 'nicht vorhanden');
+
+            // Stufe 3 ändert NICHTS. Die Rechnung kennt die Tabelle nicht.
+            pruefeWahr('Die Berechnung kennt die Alterstabelle nicht',
+                !calculateInternal.toString().includes('altersnorm')
+                && !calculateInternal.toString().includes('KINDER_ALTERSNORM'));
+            pruefeWahr('Die Kriterienliste kennt die Alterstabelle noch nicht',
+                !renderRow.toString().includes('altersnorm'));
+        }
+
         // ALTER AM TAG DER BEGUTACHTUNG (js/alter.js).
         // Grundlage der Kinderbegutachtung. Gerechnet wird in Kalendermonaten nach
         // §§ 187, 188 BGB – nicht in Tagen. Noch ohne jede Wirkung auf die Rechnung.

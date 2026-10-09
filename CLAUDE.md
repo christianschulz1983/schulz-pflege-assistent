@@ -47,6 +47,8 @@ pflege-app/
   js/auftrag.js       Auftragsbogen S1/A1 einlesen (nur Erstantrag)
   js/nummerierung.js  Nummerierung des Gutachtens (4.x.y bzw. 5.x.y bei Medicproof)
   js/alter.js         Alter am Begutachtungstag, drei Altersklassen (Kinderbegutachtung)
+  js/kinder_bri.js    Alterstabelle der BRi S. 146-149, 35 Kriterien x 3 Grenzen (Regel 55)
+werkzeuge/kinder_abgleich.py  Prueft kinder_bri.js gegen die Tabellen der PDF (Regel 55)
   js/goldmaster.js    Golden Master: sechs vollstaendige Faelle mit handgerechnetem Soll
   js/selbsttest.js    Selbsttest (Knopf oben rechts)
   befund_katalog.js   Befundkatalog, acht Gruppen (nicht von Hand ändern)
@@ -799,6 +801,33 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
      erfassung (Regel 17). Der Hinweis wird nach Import, Fall laden, Korrektur und
      Auftragsbogen nachgezogen, weil `.value = …` kein `onchange` auslöst.
 
+55. **Die Alterstabelle der BRi ist doppelt gesichert** (`js/kinder_bri.js`,
+   `werkzeuge/kinder_abgleich.py`). `KINDER_ALTERSNORM` sind **105 Zahlen**, aus vier
+   gedruckten Tabellenseiten abgeschrieben (BRi Seiten 146–149). Ein Zahlendreher darin
+   ergibt einen falschen altersentsprechenden Grad, eine falsche Punktzahl und damit
+   einen falschen Pflegegrad für ein Kind. Zwei unabhängige Sicherungen:
+   - **Im Browser** leitet der Selbsttest aus der Tabelle die Liste her, die die BRi
+     auf **Seite 201** selbst aufzählt („erst ab zwei Jahren zu beurteilen …"), und
+     vergleicht sie mit einer getrennt ausgeschriebenen Abschrift. Elf Kriterien.
+     Das greift auch online, ohne PDF – deckt aber nur die ERSTE Grenze dieser elf ab.
+   - **`python werkzeuge/kinder_abgleich.py`** liest die Tabellen unmittelbar aus der
+     PDF und vergleicht alle 105 Zahlen. Nach jeder Änderung an `kinder_bri.js`
+     ausführen (Rückgabe 0), wie `bri_abgleich.py` bei `bri_texte.js` (Regel 34).
+   - **Beim ersten Lauf meldete das Werkzeug 17 Abweichungen – und lag selbst falsch.**
+     Alle 17 waren genau sechs Monate groß. Ursache: In der Alternative
+     `Jahr|Jahre|Jahren` greift bei „2 Jahren und 6 Monate" schon `Jahr`, danach passt
+     das `und` nicht mehr und der Zusatz fällt still weg. **Längste Form zuerst.**
+     Die Abschrift war richtig. Wer hier etwas ändert: erst prüfen, ob das Werkzeug
+     oder die Tabelle irrt – 17 gleich große Abweichungen sind ein Werkzeugfehler.
+   - **Stufenzählung umgekehrt zur gedruckten Tabelle:** 0 ist „selbständig", 3 ist
+     „unselbständig" (wie in ITEMS); die BRi-Tabelle läuft andersherum. Häufigste
+     Fehlerquelle beim Übertragen.
+   - **Drei Kriterien haben nur zwei Spannen:** Bei 4.4.11, 4.4.12 und 4.4.13 ist die
+     Zelle zusammengefasst. Alle drei Grenzen liegen auf demselben Alter, die Stufe
+     springt von 3 unmittelbar auf 0. Vier Stufen würden dort Punkte verschenken.
+   - Module 3 und 5 und die besondere Bedarfskonstellation haben **keine** Altersnorm
+     (BRi Seite 143) – das ist keine Lücke, sondern die Regel.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -863,12 +892,12 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1750 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter).
+Der Selbsttest umfasst 1889 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle
-(erledigt) · 2 Geburtsdatum und Alter anzeigen (erledigt) · 3 Alterstabelle als Daten ·
+(erledigt) · 2 Geburtsdatum und Alter anzeigen (erledigt) · 3 Alterstabelle (erledigt) ·
 4 Kriterien sperren statt ausblenden · 5 Differenzrechnung samt Kipp-Analyse ·
 6 die 18-Monats-Welt · 7 Kriterium 4.5.K Fruehfoerderung · 8 alle vier Vorgaenge ·
 9 Dokumentinhalte · 10 Import des Kinderformulars.
