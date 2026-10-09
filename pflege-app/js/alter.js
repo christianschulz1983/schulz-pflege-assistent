@@ -117,32 +117,47 @@ function altersklasseAm(geburt, stichtag) {
    Vorgabe des Verfassers: lieber sichtbar nachfragen. Ein Kind, das heute acht Jahre
    alt ist, war bei einer Begutachtung vor zwei Jahren sechs – und sechs Jahre ist bei
    der Hälfte der Kriterien des Moduls 4 die Grenze.                                  */
+/* Zwischenspeicher. Ab Stufe 5 hängt die Rechnung an dieser Funktion, und die
+   Kipp-Analyse rechnet für jedes abweichende Kriterium den ganzen Fall neu durch –
+   das sind schnell einige tausend Aufrufe. Der Schlüssel sind die beiden Feldinhalte
+   selbst, der Speicher wird dadurch ungültig, sobald sich eines ändert. */
+let kinderLageSpeicher = null;
+
 function kinderLage() {
     const wert = id => { const el = document.getElementById(id); return el ? el.value : ''; };
-    const geburt = alterDatum(wert('stam-geboren'));
-    const stichtag = alterDatum(wert('stam-begutachtung'));
+    const rohG = wert('stam-geboren'), rohB = wert('stam-begutachtung');
+    const schluessel = rohG + '|' + rohB;
+    if (kinderLageSpeicher && kinderLageSpeicher.schluessel === schluessel) {
+        return kinderLageSpeicher.lage;
+    }
+    const merken = lage => {
+        kinderLageSpeicher = { schluessel: schluessel, lage: lage };
+        return lage;
+    };
+    const geburt = alterDatum(rohG);
+    const stichtag = alterDatum(rohB);
 
     if (!geburt) {
-        return { klasse: null, geburt: null, stichtag: stichtag, text: '',
-                 grund: 'kein Geburtsdatum' };
+        return merken({ klasse: null, geburt: null, stichtag: stichtag, text: '',
+                        grund: 'kein Geburtsdatum' });
     }
     if (!stichtag) {
-        return { klasse: null, geburt: geburt, stichtag: null, text: '',
-                 grund: 'kein Begutachtungsdatum' };
+        return merken({ klasse: null, geburt: geburt, stichtag: null, text: '',
+                        grund: 'kein Begutachtungsdatum' });
     }
     const klasse = altersklasseAm(geburt, stichtag);
     if (!klasse) {
-        return { klasse: null, geburt: geburt, stichtag: stichtag, text: '',
-                 grund: 'Begutachtungsdatum liegt vor der Geburt' };
+        return merken({ klasse: null, geburt: geburt, stichtag: stichtag, text: '',
+                        grund: 'Begutachtungsdatum liegt vor der Geburt' });
     }
-    return {
+    return merken({
         klasse: klasse,
         geburt: geburt,
         stichtag: stichtag,
         monate: alterInMonaten(geburt, stichtag),
         text: alterText(geburt, stichtag),
         grund: ''
-    };
+    });
 }
 
 /* Gilt für diesen Fall die Kinderbegutachtung?

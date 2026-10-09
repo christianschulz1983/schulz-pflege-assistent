@@ -6171,6 +6171,163 @@ async function selbsttest() {
                 && auftragUebernehmen.toString().includes('cb.checked'));
         }
 
+        // DIFFERENZRECHNUNG BEI KINDERN (wirksameStufe, js/berechnung.js).
+        // BRi Seite 150: Gewertet wird nicht, wie unselbständig das Kind ist, sondern
+        // um wie viele Stufen es von einem altersentsprechend entwickelten Kind
+        // abweicht. Punkte = Stufe des Kindes − Stufe der Altersnorm, nie unter null.
+        {
+            const merkG5 = document.getElementById('stam-geboren').value;
+            const merkB5 = document.getElementById('stam-begutachtung').value;
+            const merkEig = JSON.parse(JSON.stringify(stateEigene));
+            const setzAlter = (g, b) => {
+                document.getElementById('stam-geboren').value = g;
+                document.getElementById('stam-begutachtung').value = b;
+            };
+            const nr2id = nr => ITEMS.find(x => x.nr === nr).id;
+            // Ein Stand, in dem nur EIN Kriterium gesetzt ist – so misst die Prüfung
+            // genau dieses Kriterium und nicht die Summe des Moduls.
+            const nurEines = (nr, stufe) => {
+                const st = goldZustand(GOLD_FAELLE[3]);   // alles auf null, special zurücksetzen
+                st.special = 0;
+                st.values[nr2id(nr)] = stufe;
+                return st;
+            };
+            const punkteVon = (nr, stufe) => nbaEinzelpunkte(nurEines(nr, stufe), nr2id(nr));
+
+            try {
+                // ---- DIE VIER RECHENBEISPIELE DER BRi, SEITE 151 --------------------
+                // Sie sind der Maßstab: Prüft die Richtlinie, nicht meine eigene Lesart.
+
+                // 1. „Wenn das zu beurteilende Kind bei einem zu beurteilenden Kriterium
+                //    ‚unselbständig‘ ist, bei dem altersentsprechend entwickelte Kinder
+                //    ‚überwiegend selbständig‘ sind, resultieren zwei Punkte."
+                //    4.4.1 ist von 4 bis unter 6 Jahren „überwiegend selbständig".
+                setzAlter('2020-01-15', '2025-01-15');   // genau 5 Jahre
+                pruefe('BRi-Beispiel 1: Altersnorm ist überwiegend selbständig',
+                    kinderKriteriumLage('4.4.1').normStufe, 1);
+                pruefe('BRi-Beispiel 1: unselbständig ergibt zwei Punkte',
+                    punkteVon('4.4.1', 3), 2);
+
+                // 2. „Wenn das Kind bei dem Kriterium Essen (KF 4.4.8) ‚unselbständig‘
+                //    ist, bei dem altersentsprechend entwickelte Kinder ‚überwiegend
+                //    selbständig‘ sind, resultieren sechs Punkte (Dreifachbewertung)."
+                //    4.4.8 ist von 20 Monaten bis unter 2;6 „überwiegend selbständig".
+                setzAlter('2023-01-15', '2025-01-15');   // genau 2 Jahre = 24 Monate
+                pruefe('BRi-Beispiel 2: Altersnorm bei Essen ist überwiegend selbständig',
+                    kinderKriteriumLage('4.4.8').normStufe, 1);
+                pruefe('BRi-Beispiel 2: Essen unselbständig ergibt sechs Punkte',
+                    punkteVon('4.4.8', 3), 6);
+
+                // 3. „Wenn das Kind bei dem Kriterium ‚Benutzen einer Toilette‘
+                //    (KF 4.4.10) ‚überwiegend unselbständig‘ ist, bei dem
+                //    altersentsprechend entwickelte Kinder ‚selbständig‘ sind,
+                //    resultieren vier Punkte (Doppelbewertung)."
+                //    4.4.10 ist ab 6 Jahren „selbständig".
+                setzAlter('2019-01-15', '2025-01-15');   // genau 6 Jahre
+                pruefe('BRi-Beispiel 3: Altersnorm bei der Toilette ist selbständig',
+                    kinderKriteriumLage('4.4.10').normStufe, 0);
+                pruefe('BRi-Beispiel 3: überwiegend unselbständig ergibt vier Punkte',
+                    punkteVon('4.4.10', 2), 4);
+
+                // 4. „Wenn das Kind bei einem Kriterium ‚überwiegend unselbständig‘ ist,
+                //    bei dem altersentsprechend entwickelte Kinder auch ‚überwiegend
+                //    unselbständig‘ sind, resultieren null Punkte."
+                //    4.4.1 ist von 2 bis unter 4 Jahren „überwiegend unselbständig".
+                setzAlter('2022-01-15', '2025-01-15');   // genau 3 Jahre
+                pruefe('BRi-Beispiel 4: Altersnorm ist überwiegend unselbständig',
+                    kinderKriteriumLage('4.4.1').normStufe, 2);
+                pruefe('BRi-Beispiel 4: gleiche Stufe ergibt null Punkte',
+                    punkteVon('4.4.1', 2), 0);
+
+                // 5. Das Modul-2-Beispiel: „Fähigkeit in geringem Maße vorhanden" bei
+                //    einer Altersnorm „größtenteils vorhanden" ergibt einen Punkt.
+                //    4.2.4 ist von 3 Jahren bis unter 5;6 „größtenteils vorhanden".
+                setzAlter('2021-01-15', '2025-01-15');   // genau 4 Jahre
+                pruefe('BRi-Beispiel 5: Altersnorm ist größtenteils vorhanden',
+                    kinderKriteriumLage('4.2.4').normStufe, 1);
+                pruefe('BRi-Beispiel 5: gering vorhanden ergibt einen Punkt',
+                    punkteVon('4.2.4', 2), 1);
+
+                // ---- Nie unter null -------------------------------------------------
+                // Ein Kind, das SELBSTÄNDIGER ist als altersentsprechend, bekommt keine
+                // Minuspunkte – das würde sonst Punkte anderer Kriterien auffressen.
+                setzAlter('2022-01-15', '2025-01-15');   // 3 Jahre, Norm bei 4.4.1 ist 2
+                pruefe('Besser als die Altersnorm ergibt null, nicht weniger',
+                    punkteVon('4.4.1', 0), 0);
+                pruefe('Eine Stufe über der Norm ergibt einen Punkt', punkteVon('4.4.1', 3), 1);
+
+                // ---- Ein gesperrtes Kriterium bringt nichts -------------------------
+                // Das ist die Probe auf Regel 56: Die Sperre und die Rechnung sagen
+                // dasselbe. 4.2.7 wird erst ab vier Jahren beurteilt.
+                pruefeWahr('4.2.7 ist mit drei Jahren gesperrt', kinderKriteriumLage('4.2.7').gesperrt);
+                pruefe('Ein gesperrtes Kriterium ergibt auch auf Stufe 3 null Punkte',
+                    punkteVon('4.2.7', 3), 0);
+
+                // ---- Modul 3 und 5 bleiben altersunabhängig -------------------------
+                pruefe('Modul 3 rechnet unverändert', punkteVon('4.3.1', 3), 5);
+                pruefe('Modul 5 Diät rechnet unverändert', punkteVon('4.5.16', 2), 2);
+
+                // ---- Die Mehrfachwertungen gelten analog (BRi Seite 149) ------------
+                setzAlter('2019-01-15', '2025-01-15');   // 6 Jahre: 4.4.9 Norm selbständig
+                pruefe('Trinken doppelt gewertet', punkteVon('4.4.9', 3), 6);
+                pruefe('Essen dreifach gewertet', punkteVon('4.4.8', 3), 9);
+
+                // ---- Ein vollständiger Fall: Erwachsener gegen Kind -----------------
+                // Fall A des Golden Masters, gerechnet für ein Kind von genau vier
+                // Jahren (48 Monate). Von Hand nach der BRi, Kriterium für Kriterium –
+                // „Stufe des Kindes − Altersnorm":
+                //   Modul 1  4.1.3 1−0=1 · 4.1.4 1−0=1 · 4.1.5 2−0=2          -> 4
+                //            (alle drei Normen sind mit vier Jahren „selbständig")
+                //   Modul 2  4.2.2 1−1=0 · 4.2.3 1−2=0 · 4.2.4 1−1=0
+                //            4.2.8 1−2=0                                       -> 0
+                //   Modul 4  4.4.1 1−1=0 · 4.4.2 1−1=0 · 4.4.3 1−1=0
+                //            4.4.4 2−1=1 · 4.4.5 1−1=0 · 4.4.6 1−1=0
+                //            4.4.10 1−1=0 (Doppelwertung von null ist null)     -> 1
+                //   Modul 5  altersunabhängig, unverändert                      -> 1
+                //   Modul 6  4.6.1 1−2=0 · 4.6.3 1−1=0 · 4.6.4 1−1=0            -> 0
+                // Gewichtet: Modul 1 -> 5,00 · Modul 4 (1 Punkt, Spanne 0–2) -> 0,00 ·
+                // Modul 5 -> 5,00 · Module 2, 3 und 6 -> 0,00.
+                // Zusammen 10,00 Punkte, also KEIN Pflegegrad – gegenüber 37,50 und
+                // Pflegegrad 2 bei derselben Bepunktung eines Erwachsenen. Genau das
+                // ist der Sinn der Vorschrift: Was ein vierjähriges Kind ohnehin nicht
+                // kann, begründet keine Pflegebedürftigkeit.
+                stateEigene = goldZustand(GOLD_FAELLE[0]);
+                setzAlter('1950-01-01', '2025-01-15');
+                const erw = calculateInternal('own');
+                setzAlter('2021-01-15', '2025-01-15');   // genau 4 Jahre
+                const kind = calculateInternal('own');
+                pruefe('Erwachsener: Fall A unverändert',
+                    [erw.raws, erw.weights, erw.total, erw.pg],
+                    [[4, 4, 0, 9, 1, 3], [5, 3.75, 0, 20, 5, 3.75], 37.5, 2]);
+                pruefe('Kind mit vier Jahren: Einzelpunkte je Modul',
+                    kind.raws, [4, 0, 0, 1, 1, 0]);
+                pruefe('Kind mit vier Jahren: gewichtete Punkte',
+                    kind.weights, [5, 0, 0, 0, 5, 0]);
+                pruefe('Kind mit vier Jahren: Gesamtpunkte und Pflegegrad',
+                    [kind.total, kind.pg], [10, 0]);
+                pruefeWahr('Das Kind kommt niedriger heraus als der Erwachsene',
+                    kind.total < erw.total);
+
+                // ---- Die Kipp-Analyse zieht mit -------------------------------------
+                // Sie darf keinen Punktgewinn vorschlagen, den es nicht geben kann.
+                const basis = goldZustand(GOLD_FAELLE[3]); basis.special = 0;
+                const ziel = goldZustand(GOLD_FAELLE[3]); ziel.special = 0;
+                ziel.values[nr2id('4.2.7')] = 3;          // gesperrt mit vier Jahren
+                const kipp = kippAnalyse(basis, ziel);
+                const eintrag = kipp.abweichend.find(a => a.nr === '4.2.7');
+                pruefeWahr('Die Kipp-Analyse sieht die Abweichung', !!eintrag);
+                pruefe('Aber sie verspricht keinen Punktgewinn',
+                    eintrag ? eintrag.punkteMit : -1, kipp.basis.total);
+                pruefeWahr('Und sie behauptet nicht, das Kriterium kippe den Pflegegrad',
+                    eintrag && !eintrag.kipptAllein);
+            } finally {
+                stateEigene = merkEig;
+                document.getElementById('stam-geboren').value = merkG5;
+                document.getElementById('stam-begutachtung').value = merkB5;
+                kinderAnsichtAktualisieren();
+            }
+        }
+
         // KRITERIENLISTE NACH DEM ALTER (js/kinder.js, renderRow in js/oberflaeche.js).
         // Vorgabe des Verfassers: nicht beurteilbare Kriterien bleiben STEHEN und werden
         // gesperrt, mit Begründung – nicht ausgeblendet. Stufe 4 ist Ansicht; die
@@ -6266,11 +6423,14 @@ async function selbsttest() {
                 kinderAnsichtAktualisieren();
             }
 
-            // Stufe 4 ist ANSICHT. Die Berechnung weiß davon nichts – das ist die
-            // Zusage dieser Stufe und wird hier gemessen.
-            pruefeWahr('Die Berechnung kennt die Kinderlage nicht',
+            // Seit Stufe 5 rechnet die App mit dem Alter – aber an genau EINER
+            // Stelle. calculateInternal fragt das Alter nicht selbst ab, sondern geht
+            // wie bisher über nbaEinzelpunkte. Ein zweiter Weg dorthin waere der
+            // Anfang widerspruechlicher Anzeigen (Regel 48).
+            pruefeWahr('Die Berechnung fragt das Alter nicht selbst ab',
                 !calculateInternal.toString().includes('kinderKriteriumLage')
-                && !calculateInternal.toString().includes('altersnormStufe'));
+                && !calculateInternal.toString().includes('kinderLage')
+                && !calculateInternal.toString().includes('KINDER_ALTERSNORM'));
         }
 
         // ALTERSTABELLE DER BRi (js/kinder_bri.js), Seiten 146–149.
@@ -6380,10 +6540,11 @@ async function selbsttest() {
                 altersnormBezeichnung('4.2.1', 1), 'größtenteils vorhanden');
             pruefe('Stufe 3 in Modul 2', altersnormBezeichnung('4.2.1', 3), 'nicht vorhanden');
 
-            // Stufe 3 ändert NICHTS. Die Rechnung kennt die Tabelle nicht.
-            pruefeWahr('Die Berechnung kennt die Alterstabelle nicht',
-                !calculateInternal.toString().includes('altersnorm')
-                && !calculateInternal.toString().includes('KINDER_ALTERSNORM'));
+            // Die Alterstabelle wird ausschliesslich ueber kinderKriteriumLage
+            // gelesen - nicht unmittelbar aus der Rechnung heraus.
+            pruefeWahr('Nur kinderKriteriumLage liest die Alterstabelle',
+                !wirksameStufe.toString().includes('KINDER_ALTERSNORM')
+                && wirksameStufe.toString().includes('kinderKriteriumLage'));
             // Stufe 4 hat die Kriterienliste angeschlossen. Sie fragt die Lage an EINER
             // Stelle ab (kinderKriteriumLage) und greift nicht selbst in die Tabelle –
             // sonst entstünde ein zweiter Weg zu derselben Frage.
@@ -6510,12 +6671,11 @@ async function selbsttest() {
                 alterHinweisZeigen();
             }
 
-            // Stufe 2 ändert NICHTS an der Rechnung. Das ist die Zusage, und sie wird
-            // hier gemessen: Die Berechnung kennt das Alter nicht.
-            pruefeWahr('Die Berechnung kennt das Alter noch nicht',
-                !calculateInternal.toString().includes('kinderLage')
-                && !calculateInternal.toString().includes('istKinderfall')
-                && !calculateInternal.toString().includes('ALTERSKLASSE'));
+            // Das Alter geht ueber genau eine Funktion in die Rechnung ein.
+            // Wer eine zweite baut, bricht diese Pruefung.
+            pruefeWahr('Nur nbaEinzelpunkte wendet die Differenzrechnung an',
+                nbaEinzelpunkte.toString().includes('wirksameStufe')
+                && !m5Gruppen.toString().includes('wirksameStufe'));
         }
 
         // PFLEGEGRAD-SCHWELLEN AN EINER STELLE (PG_SCHWELLEN, js/basis.js).

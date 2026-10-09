@@ -854,6 +854,42 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
      (`kinderAnsichtAktualisieren`). Beide sind Datumsfelder mit `onchange`, die beim
      Verlassen feuern – Regel 23 (beim Tippen nie neu zeichnen) bleibt gewahrt.
 
+57. **Bei Kindern wird die DIFFERENZ gewertet, nicht die Stufe** (`wirksameStufe` in
+   `js/berechnung.js`). BRi Seite 150: Gewertet wird nicht, wie unselbständig das Kind
+   ist, sondern um wie viele Stufen es von einem altersentsprechend entwickelten Kind
+   abweicht. **Punkte = Stufe des Kindes − Stufe der Altersnorm, nie unter null.**
+   - **Die vier Rechenbeispiele der BRi auf Seite 151 sind die Prüffälle** im
+     Selbsttest, dazu das Modul-2-Beispiel. Maßstab ist die Richtlinie, nicht die
+     eigene Lesart.
+   - **Mehrfachwertungen gelten analog** (BRi Seite 149). Deshalb wird die Differenz in
+     den **Stufenindex** gelegt und erst danach über `item.val` umgerechnet: Essen
+     [0,3,6,9] und Trinken/Toilette [0,2,4,6] sind Vielfache, das trifft zu. 4.4.13 hat
+     mit [0,6,3] eine nicht lineare Tabelle, ist aber nie betroffen – seine Altersnorm
+     ist entweder „unselbständig" (dann wird es nicht beurteilt) oder „selbständig"
+     (dann ist die Differenz die Stufe selbst).
+   - **Nie unter null.** Ein Kind, das selbständiger ist als altersentsprechend, bekommt
+     keine Minuspunkte – die würden sonst Punkte anderer Kriterien auffressen. Die
+     Gegenprobe ohne diese Grenze ergab Modulsummen von −5 und −4.
+   - **Gilt für alle drei Spalten**, auch für das Gutachten: Die eingelesenen Kreuze sind
+     der Selbständigkeitsgrad des Kindes, die ausgewiesenen Einzelpunkte sind bereits die
+     Differenz. Ohne die Umrechnung käme `modulGegenprobe()` bei jedem Kindergutachten
+     auf andere Summen als das Gutachten selbst.
+   - **EINE Stelle.** `nbaEinzelpunkte` wendet `wirksameStufe` an, sonst niemand;
+     `calculateInternal` fragt das Alter nicht selbst ab. Auch die Module 1, 2 und 6
+     rechnen seit Stufe 5 über `getV` statt über `st.values[...]` – vorher wäre die
+     Differenz an vier Stellen zu pflegen gewesen. Der Selbsttest prüft beides.
+   - **Schwellen-, Kipp- und Rückstufungsanalyse ziehen von selbst mit**, weil sie über
+     `calculateInternal` rechnen. Geprüft wird ausdrücklich, dass ein gesperrtes
+     Kriterium in der Kipp-Analyse **keinen** Punktgewinn verspricht – sonst stünde in
+     der Prognose ein Vorschlag, der rechnerisch nichts bringen kann.
+   - `kinderLage()` hat seit Stufe 5 einen Zwischenspeicher (Schlüssel: die beiden
+     Feldinhalte). Die Kipp-Analyse rechnet den ganzen Fall je abweichendem Kriterium
+     neu – das sind schnell einige tausend Aufrufe auf zwei Datumsfelder.
+   - **Stufenmarkierungen im Selbsttest.** Prüfungen der Art „Stufe N ändert noch nichts"
+     sind Gerüst und werden ersetzt, sobald ihre Stufe endet – sonst geben sie falsche
+     Sicherheit. Das betrifft NUR selbst gesetzte Markierungen; die 1596
+     Bestandsprüfungen bleiben unverändert.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -918,13 +954,13 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1911 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste).
+Der Selbsttest umfasst 1937 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle
 (erledigt) · 2 Geburtsdatum und Alter anzeigen (erledigt) · 3 Alterstabelle (erledigt) ·
-4 Kriterien sperren (erledigt) · 5 Differenzrechnung samt Kipp-Analyse ·
+4 Kriterien sperren (erledigt) · 5 Differenzrechnung (erledigt) ·
 6 die 18-Monats-Welt · 7 Kriterium 4.5.K Fruehfoerderung · 8 alle vier Vorgaenge ·
 9 Dokumentinhalte · 10 Import des Kinderformulars.
 **Bestandsregel fuer dieses Vorhaben: keine bestehende Pruefung wird veraendert.**

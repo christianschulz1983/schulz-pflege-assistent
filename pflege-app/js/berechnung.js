@@ -7,9 +7,49 @@ function nbaEinzelpunkte(st, id) {
     const item = ITEMS.find(it => it.id === id);
     const v = st.values[id];
     if (typeof v !== 'number' || !item) return 0;
-    if (!item.val) return Number.isFinite(v) ? v : 0;
-    const p = item.val[v];
+    const stufe = wirksameStufe(item, v);
+    if (!item.val) return Number.isFinite(stufe) ? stufe : 0;
+    const p = item.val[stufe];
     return Number.isFinite(p) ? p : 0;
+}
+
+/* DIE WIRKSAME STUFE – bei Erwachsenen die eingetragene, bei Kindern die DIFFERENZ.
+   ------------------------------------------------------------------------------
+   BRi vom 21.08.2024, Seite 150, „Tabelle zur Berechnungssystematik der Punkte bei
+   Kindern unter elf Jahren im Vergleich zu altersentsprechend entwickelten Kindern":
+   Gewertet wird nicht, wie unselbständig das Kind ist, sondern um wie viele Stufen es
+   von einem altersentsprechend entwickelten Kind abweicht.
+
+       Punkte = Stufe des Kindes − Stufe der Altersnorm, nie unter null
+
+   Die vier Rechenbeispiele der Richtlinie auf Seite 151 prüfen genau das; sie stehen
+   als Prüffälle im Selbsttest. Zwei davon:
+     • Kind „unselbständig" (3), altersentsprechend „überwiegend selbständig" (1)
+       -> 3 − 1 = 2 Punkte.
+     • Kriterium Essen, dieselbe Lage -> 2, mal Dreifachwertung = 6 Punkte.
+
+   DIE MEHRFACHWERTUNGEN GELTEN UNVERÄNDERT. Die BRi, Seite 149: „Wird in der Systematik
+   der Erwachsenen eine Doppelwertung (F 4.4.9 und F 4.4.10), eine Dreifachwertung
+   (F 4.4.8) oder eine andere Bewertung (F 4.4.13) vorgenommen, so gilt dies für Kinder
+   analog." Deshalb wird die Differenz in den Stufenindex gelegt und danach wie bisher
+   über `item.val` umgerechnet – die Tabellen [0,3,6,9] und [0,2,4,6] sind Vielfache,
+   also trifft das zu. 4.4.13 hat eine nicht lineare Tabelle [0,6,3], ist aber nie
+   betroffen: Seine Altersnorm ist entweder „unselbständig" (dann wird es gar nicht
+   beurteilt) oder „selbständig" (dann ist die Differenz die Stufe selbst).
+
+   GILT FÜR ALLE DREI SPALTEN. Auch das Gutachten rechnet so – die eingelesenen Kreuze
+   sind der Selbständigkeitsgrad des Kindes, die ausgewiesenen Einzelpunkte sind bereits
+   die Differenz. Ohne diese Umrechnung käme `modulGegenprobe()` bei jedem
+   Kindergutachten auf andere Summen als das Gutachten selbst.
+
+   Für Erwachsene, ohne Geburtsdatum und ab elf Jahren ist `lage.aktiv` falsch und diese
+   Funktion gibt die Stufe unverändert zurück.                                          */
+function wirksameStufe(item, stufe) {
+    if (typeof kinderKriteriumLage !== 'function' || !item) return stufe;
+    const lage = kinderKriteriumLage(item.nr);
+    if (!lage.aktiv) return stufe;
+    const diff = stufe - lage.normStufe;
+    return diff > 0 ? diff : 0;
 }
 
 /* MODUL 4, KRITERIEN 4.4.11 UND 4.4.12 – die Inkontinenzbedingung der BRi.
@@ -239,12 +279,15 @@ function calculateInternal(pref) {
     }
 
     const getV = (id) => nbaEinzelpunkte(st, id);
-    let s1=ITEMS.filter(i=>i.m===1).reduce((s,i)=>s+(Number(st.values[i.id])||0),0);
-    let s2=ITEMS.filter(i=>i.m===2).reduce((s,i)=>s+(Number(st.values[i.id])||0),0);
+    // Module 1, 2 und 6 haben keine eigene Punkteskala – dort IST die Stufe der
+    // Punktwert. Gerechnet wird trotzdem über getV, damit die Differenzrechnung bei
+    // Kindern an EINER Stelle sitzt (nbaEinzelpunkte) und nicht an vier.
+    let s1=ITEMS.filter(i=>i.m===1).reduce((s,i)=>s+getV(i.id),0);
+    let s2=ITEMS.filter(i=>i.m===2).reduce((s,i)=>s+getV(i.id),0);
     let s3=ITEMS.filter(i=>i.m===3).reduce((s,i)=>s+getV(i.id),0);
     // 4.4.11 und 4.4.12 zählen nur bei entsprechender Kontinenzlage mit (siehe zaehltMit).
     let s4=ITEMS.filter(i=>i.m===4).reduce((s,i)=>s+(zaehltMit(st,i)?getV(i.id):0),0);
-    let s6=ITEMS.filter(i=>i.m===6).reduce((s,i)=>s+(Number(st.values[i.id])||0),0);
+    let s6=ITEMS.filter(i=>i.m===6).reduce((s,i)=>s+getV(i.id),0);
     // Modul 5 nach BRi: je Gruppe summieren, dann der GRUPPE EINEN Punktwert zuordnen.
     // Gerechnet wird in m5Gruppen() – der einzigen Stelle für diese Logik.
     const ptsM5 = m5Gruppen(st).gesamt;
