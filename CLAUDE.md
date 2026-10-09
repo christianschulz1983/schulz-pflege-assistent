@@ -46,6 +46,7 @@ pflege-app/
   js/unterlagen.js    Unterlagen als dokumentierten Eintrag in die Notizen
   js/auftrag.js       Auftragsbogen S1/A1 einlesen (nur Erstantrag)
   js/nummerierung.js  Nummerierung des Gutachtens (4.x.y bzw. 5.x.y bei Medicproof)
+  js/alter.js         Alter am Begutachtungstag, drei Altersklassen (Kinderbegutachtung)
   js/goldmaster.js    Golden Master: sechs vollstaendige Faelle mit handgerechnetem Soll
   js/selbsttest.js    Selbsttest (Knopf oben rechts)
   befund_katalog.js   Befundkatalog, acht Gruppen (nicht von Hand ändern)
@@ -774,6 +775,30 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Regler, **kein** gesperrter. Die Kinderbegutachtung wird Zeilen sperren – für Erwachsene
    muss diese Messung unverändert bleiben.
 
+54. **Das Alter wird am Begutachtungstag gerechnet, in Kalendermonaten** (`js/alter.js`).
+   BRi Seite 146: „Es gilt das Alter am Tag der Begutachtung." Nicht heute, nicht das
+   Antragsdatum. Bei einem Kind kurz vor einer Altersgrenze entscheidet ein Monat über
+   Punkte – dasselbe Kind, zwei Jahre später begutachtet, fiele unter den
+   Erwachsenenmaßstab.
+   - **Kalendermonate, keine Tage.** Die Grenzen der BRi lauten „ab 18 Monaten", „ab
+     2 Jahren und 6 Monaten", bei 4.2.1 und 4.6.5 „ab 6 Wochen". Ein Monat hat keine
+     feste Zahl von Tagen; 18 Monate als 540 Tage zu rechnen liegt je nach Geburtsdatum
+     um mehrere Tage daneben. Eine Grenze ist deshalb `{ m: Monate }` oder `{ w: Wochen }`.
+   - **§§ 187, 188 BGB**, auf die die BRi auf Seite 144 ausdrücklich verweist: Der
+     Geburtstag zählt mit; fehlt der Tag im Zielmonat (31. August plus 18 Monate), gilt
+     dessen letzter Tag (§ 188 Absatz 3).
+   - **Kein stillschweigendes heutiges Datum.** Fehlt das Begutachtungsdatum, sagt die
+     App das sichtbar und gibt keine Altersklasse aus. Vorgabe des Verfassers.
+   - **Datumsfelder örtlich lesen** (`alterDatum`). `new Date('2019-03-15')` ist
+     UTC-Mitternacht und westlich von Greenwich örtlich der Vortag – bei einer
+     Altersgrenze ein Tag zu früh.
+   - Drei Klassen in `ALTERSKLASSE`: `saeugling` bis 18 Monate · `kind` 18 Monate bis
+     unter 11 Jahre · `erwachsen` ab 11 Jahren. `istKinderfall()` ist die EINE Stelle,
+     die beantwortet, ob die Kinderlogik greift.
+   - `stam-geboren` gibt es seit jeher; ein zweites Geburtsdatumsfeld wäre Doppel-
+     erfassung (Regel 17). Der Hinweis wird nach Import, Fall laden, Korrektur und
+     Auftragsbogen nachgezogen, weil `.value = …` kein `onchange` auslöst.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -838,11 +863,12 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1708 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen).
+Der Selbsttest umfasst 1750 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle
-(erledigt) · 2 Geburtsdatum und Alter anzeigen, ohne Wirkung · 3 Alterstabelle in Tagen ·
+(erledigt) · 2 Geburtsdatum und Alter anzeigen (erledigt) · 3 Alterstabelle als Daten ·
 4 Kriterien sperren statt ausblenden · 5 Differenzrechnung samt Kipp-Analyse ·
 6 die 18-Monats-Welt · 7 Kriterium 4.5.K Fruehfoerderung · 8 alle vier Vorgaenge ·
 9 Dokumentinhalte · 10 Import des Kinderformulars.

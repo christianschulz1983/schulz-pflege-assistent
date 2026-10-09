@@ -698,7 +698,22 @@
         .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .col-span-2 { grid-column: span 2; }
+        .col-span-4 { grid-column: 1 / -1; }
         .space-y-6 > * + * { margin-top: 24px; }
+
+        /* ALTERSKLASSE NACH DER BRi (Kapitel 5) – reine Anzeige unter den Stammdaten.
+           Drei Lagen: Kind (es gelten die Kindermaßstäbe), Erwachsenenmaßstab ab elf
+           Jahren, und die offene Angabe, wenn das Begutachtungsdatum fehlt. Letztere
+           wird bewusst auffällig gesetzt: Maßgeblich ist das Alter am Begutachtungstag,
+           und ein stillschweigend eingesetztes heutiges Datum wäre ein Rechenfehler. */
+        #alter-hinweis { font-size: 13px; line-height: 1.5; margin-top: 4px; }
+        #alter-hinweis span { display: block; padding: 10px 12px; border-radius: 6px; }
+        .alter-kind  { background: var(--accent2-dim); color: var(--accent2);
+                       border-left: 3px solid var(--accent2); font-weight: 600; }
+        .alter-info  { background: var(--bg-card2); color: var(--text-secondary);
+                       border-left: 3px solid var(--border-bright); }
+        .alter-offen { background: var(--yellow-dim); color: var(--yellow);
+                       border-left: 3px solid var(--yellow); font-weight: 600; }
         .space-y-4 > * + * { margin-top: 16px; }
 
         /* RESPONSIVE */

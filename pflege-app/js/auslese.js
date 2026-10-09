@@ -1006,6 +1006,8 @@ function applyImportedData(rev) {
     setVal('stam-pts-manual', rev.stam.pts);
     setVal('stam-anamnese', rev.anamnese);
     setVal('stam-befund', rev.befund);
+    // Geburts- und Begutachtungsdatum stehen jetzt fest – Altersklasse nachziehen.
+    if (typeof alterHinweisZeigen === 'function') alterHinweisZeigen();
     // Tabelle auf die Anzahl der eingelesenen Diagnosen erweitern und alle übernehmen
     ensureDiagRows((rev.diagnoses || []).length);
     (rev.diagnoses || []).forEach((d, idx) => { setVal(`diag-icd-${idx + 1}`, d.icd); setVal(`diag-txt-${idx + 1}`, d.text); });

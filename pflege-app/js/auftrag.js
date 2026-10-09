@@ -189,6 +189,8 @@ function auftragUebernehmen() {
         n++;
     });
     closeVorschlaege();
+    // Der Bogen bringt das Geburtsdatum mit – die Altersanzeige muss nachziehen.
+    if (typeof alterHinweisZeigen === 'function') alterHinweisZeigen();
     if (typeof markiereStellungnahmeVeraltet === 'function' && n) markiereStellungnahmeVeraltet('Stammdaten');
     showToast(n ? n + ' Angabe(n) aus dem Auftragsbogen übernommen.' : 'Nichts übernommen.',
               n ? 'success' : 'error');

@@ -190,6 +190,9 @@ function uebernehmeKorrektur() {
     setzeFeld('stam-pts-manual', rev.stam.pts);
     setzeFeld('stam-anamnese', rev.anamnese);
     setzeFeld('stam-befund', rev.befund);
+    // Geburts- oder Begutachtungsdatum können korrigiert worden sein – und damit
+    // die Altersklasse. Reine Anzeige, aber sie muss stimmen.
+    if (typeof alterHinweisZeigen === 'function') alterHinweisZeigen();
     ensureDiagRows((rev.diagnoses || []).length);
     (rev.diagnoses || []).forEach((d, i) => {
         setzeFeld('diag-icd-' + (i + 1), d.icd);

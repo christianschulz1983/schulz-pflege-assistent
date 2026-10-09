@@ -6171,6 +6171,132 @@ async function selbsttest() {
                 && auftragUebernehmen.toString().includes('cb.checked'));
         }
 
+        // ALTER AM TAG DER BEGUTACHTUNG (js/alter.js).
+        // Grundlage der Kinderbegutachtung. Gerechnet wird in Kalendermonaten nach
+        // §§ 187, 188 BGB – nicht in Tagen. Noch ohne jede Wirkung auf die Rechnung.
+        {
+            const d = s => alterDatum(s);
+
+            // Datumsfelder lesen, ohne Zeitzonenfalle
+            pruefe('Datum wird örtlich gelesen, nicht als UTC',
+                [d('2019-03-15').getFullYear(), d('2019-03-15').getMonth(), d('2019-03-15').getDate()],
+                [2019, 2, 15]);
+            pruefe('Unvollständiges Datum ergibt nichts', d('2019-05'), null);
+            pruefe('Leeres Feld ergibt nichts', d(''), null);
+            // Der 31. Februar: Der Browser schiebt ihn still auf den 3. März.
+            pruefe('Den 31. Februar gibt es nicht', d('2025-02-31'), null);
+
+            // Kalendermonate statt 30-Tage-Monate
+            const plus = (von, m) => {
+                const x = alterPlusMonate(d(von), m);
+                const z = n => (n < 10 ? '0' : '') + n;
+                return x.getFullYear() + '-' + z(x.getMonth() + 1) + '-' + z(x.getDate());
+            };
+            pruefe('18 Monate nach dem 15.01.2025 ist der 15.07.2026', plus('2025-01-15', 18), '2026-07-15');
+            // § 188 Absatz 3 BGB: Fehlt der Tag im Zielmonat, gilt dessen letzter.
+            pruefe('31. August plus 18 Monate ist der 28. Februar', plus('2024-08-31', 18), '2026-02-28');
+            pruefe('31. Dezember plus 2 Monate ist der 28. Februar (kein Schaltjahr)',
+                plus('2024-12-31', 2), '2025-02-28');
+            pruefe('31. Dezember plus 2 Monate ist der 29. Februar (Schaltjahr)',
+                plus('2023-12-31', 2), '2024-02-29');
+            pruefe('Ein am 29. Februar geborenes Kind wird am 28. Februar ein Jahr alt',
+                plus('2024-02-29', 12), '2025-02-28');
+
+            // Die 18-Monats-Grenze – der Tag davor, der Tag selbst, der Tag danach
+            const geb = d('2025-01-15');
+            pruefe('Am Vortag ist das Kind noch keine 18 Monate alt',
+                alterErreicht(geb, d('2026-07-14'), { m: 18 }), false);
+            pruefe('Am Tag selbst sind es 18 Monate',
+                alterErreicht(geb, d('2026-07-15'), { m: 18 }), true);
+
+            // Wochengrenze: zwei Kriterien der BRi beginnen bei sechs Wochen
+            pruefe('Sechs Wochen nach dem 01.01.2025 ist der 12.02.2025',
+                alterErreicht(d('2025-01-01'), d('2025-02-12'), { w: 6 }), true);
+            pruefe('Einen Tag davor noch nicht',
+                alterErreicht(d('2025-01-01'), d('2025-02-11'), { w: 6 }), false);
+
+            // Vollendete Lebensmonate
+            pruefe('Am Geburtstag sind es null Monate', alterInMonaten(geb, d('2025-01-15')), 0);
+            pruefe('Einen Tag vor dem Monatstag ist es noch der Vormonat',
+                alterInMonaten(geb, d('2026-07-14')), 17);
+            pruefe('Am Monatstag ist es der volle Monat', alterInMonaten(geb, d('2026-07-15')), 18);
+
+            pruefe('Anzeige unter zwei Jahren in Monaten', alterText(geb, d('2026-07-15')), '18 Monate');
+            pruefe('Anzeige ab zwei Jahren in Jahren und Monaten',
+                alterText(geb, d('2030-03-15')), '5 Jahre und 2 Monate');
+            pruefe('Volle Jahre ohne Monatszusatz', alterText(geb, d('2030-01-15')), '5 Jahre');
+
+            // Die drei Altersklassen und ihre beiden Grenzen
+            const kl = (gebS, tagS) => altersklasseAm(d(gebS), d(tagS));
+            pruefe('Säugling einen Tag vor 18 Monaten',
+                kl('2025-01-15', '2026-07-14'), ALTERSKLASSE.SAEUGLING);
+            pruefe('Kind genau mit 18 Monaten', kl('2025-01-15', '2026-07-15'), ALTERSKLASSE.KIND);
+            pruefe('Kind einen Tag vor dem 11. Geburtstag',
+                kl('2015-01-15', '2026-01-14'), ALTERSKLASSE.KIND);
+            pruefe('Erwachsenenmaßstab am 11. Geburtstag',
+                kl('2015-01-15', '2026-01-15'), ALTERSKLASSE.ERWACHSEN);
+            pruefe('Erwachsener bleibt Erwachsener', kl('1950-01-01', '2026-01-15'), ALTERSKLASSE.ERWACHSEN);
+            pruefe('Begutachtung vor der Geburt ergibt keine Klasse',
+                kl('2026-05-01', '2026-01-15'), null);
+
+            // Die Lage aus den Feldern – und was sie meldet, wenn etwas fehlt
+            const merkG = document.getElementById('stam-geboren').value;
+            const merkB = document.getElementById('stam-begutachtung').value;
+            try {
+                const setz = (id, v) => { document.getElementById(id).value = v; };
+                setz('stam-geboren', ''); setz('stam-begutachtung', '2026-01-15');
+                pruefe('Ohne Geburtsdatum keine Altersklasse', kinderLage().klasse, null);
+                pruefeWahr('Ohne Geburtsdatum steht auch kein Hinweis', alterHinweisHtml() === '');
+                pruefeWahr('Ohne Geburtsdatum ist es kein Kinderfall', !istKinderfall());
+
+                // Der Fall, den der Verfasser ausdrücklich nicht stillschweigend
+                // geraten haben will: Geburtsdatum da, Begutachtungsdatum fehlt.
+                setz('stam-geboren', '2019-03-15'); setz('stam-begutachtung', '');
+                pruefe('Ohne Begutachtungsdatum keine Altersklasse', kinderLage().klasse, null);
+                pruefe('Der Grund wird benannt', kinderLage().grund, 'kein Begutachtungsdatum');
+                pruefeWahr('Es wird sichtbar nachgefragt, nicht heute eingesetzt',
+                    alterHinweisHtml().includes('alter-offen')
+                    && alterHinweisHtml().includes('nicht heute'));
+                pruefeWahr('Ohne Begutachtungsdatum ist es kein Kinderfall', !istKinderfall());
+
+                // Vollständig: ein sechsjähriges Kind
+                setz('stam-begutachtung', '2025-06-15');
+                pruefe('Altersklasse Kind', kinderLage().klasse, ALTERSKLASSE.KIND);
+                pruefe('Alter bei der Begutachtung', kinderLage().text, '6 Jahre und 3 Monate');
+                pruefeWahr('Der Hinweis nennt das Alter',
+                    alterHinweisHtml().includes('6 Jahre und 3 Monate'));
+                pruefeWahr('Es ist ein Kinderfall', istKinderfall());
+
+                // Dasselbe Kind, heute begutachtet: Erwachsenenmaßstab wäre falsch,
+                // aber genau das käme heraus, wenn die App das heutige Datum nähme.
+                setz('stam-begutachtung', '2031-06-01');
+                pruefe('Dasselbe Kind, später begutachtet, ist Erwachsenenmaßstab',
+                    kinderLage().klasse, ALTERSKLASSE.ERWACHSEN);
+                pruefeWahr('Dann ist es kein Kinderfall mehr', !istKinderfall());
+
+                // Der Hinweis landet im dafür vorgesehenen Kasten
+                setz('stam-begutachtung', '2025-06-15');
+                alterHinweisZeigen();
+                const kasten = document.getElementById('alter-hinweis');
+                pruefeWahr('Der Hinweis steht in der Karte', kasten.innerHTML.includes('alter-kind'));
+                pruefeWahr('Der Kasten ist sichtbar', kasten.style.display === 'block');
+                setz('stam-geboren', ''); alterHinweisZeigen();
+                pruefeWahr('Ohne Geburtsdatum verschwindet der Kasten wieder',
+                    kasten.style.display === 'none' && kasten.innerHTML === '');
+            } finally {
+                document.getElementById('stam-geboren').value = merkG;
+                document.getElementById('stam-begutachtung').value = merkB;
+                alterHinweisZeigen();
+            }
+
+            // Stufe 2 ändert NICHTS an der Rechnung. Das ist die Zusage, und sie wird
+            // hier gemessen: Die Berechnung kennt das Alter nicht.
+            pruefeWahr('Die Berechnung kennt das Alter noch nicht',
+                !calculateInternal.toString().includes('kinderLage')
+                && !calculateInternal.toString().includes('istKinderfall')
+                && !calculateInternal.toString().includes('ALTERSKLASSE'));
+        }
+
         // PFLEGEGRAD-SCHWELLEN AN EINER STELLE (PG_SCHWELLEN, js/basis.js).
         // Die Sollwerte stehen hier bewusst noch einmal ausgeschrieben – wie bei
         // MODUL_SPANNEN. Eine Prüfung, die ihren Sollwert aus der geprüften Tabelle

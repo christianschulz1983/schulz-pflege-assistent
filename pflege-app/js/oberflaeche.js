@@ -194,6 +194,8 @@ function init() {
     fillTable('own');
     calculate('own');
     syncSpecialUI();
+    // Altersklasse nach der BRi anzeigen (js/alter.js). Reine Anzeige.
+    if (typeof alterHinweisZeigen === 'function') alterHinweisZeigen();
 }
 
 function fillTable(pref) {
