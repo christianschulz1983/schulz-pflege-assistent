@@ -441,7 +441,7 @@ function loadCase(e) {
                 autoResize(document.getElementById('stam-anamnese'));
                 autoResize(document.getElementById('stam-befund'));
                 // Die Stammfelder stehen erst jetzt – init() lief vor dem Zurückschreiben.
-                if (typeof alterHinweisZeigen === 'function') alterHinweisZeigen();
+                if (typeof kinderAnsichtAktualisieren === 'function') kinderAnsichtAktualisieren();
             }, 100);
             showToast('Fall erfolgreich geladen!', 'success');
         } catch(err) {

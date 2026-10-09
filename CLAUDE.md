@@ -48,6 +48,7 @@ pflege-app/
   js/nummerierung.js  Nummerierung des Gutachtens (4.x.y bzw. 5.x.y bei Medicproof)
   js/alter.js         Alter am Begutachtungstag, drei Altersklassen (Kinderbegutachtung)
   js/kinder_bri.js    Alterstabelle der BRi S. 146-149, 35 Kriterien x 3 Grenzen (Regel 55)
+  js/kinder.js        Lage je Kriterium: gesperrt oder Altersnorm (Regel 56)
 werkzeuge/kinder_abgleich.py  Prueft kinder_bri.js gegen die Tabellen der PDF (Regel 55)
   js/goldmaster.js    Golden Master: sechs vollstaendige Faelle mit handgerechnetem Soll
   js/selbsttest.js    Selbsttest (Knopf oben rechts)
@@ -828,6 +829,31 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    - Module 3 und 5 und die besondere Bedarfskonstellation haben **keine** Altersnorm
      (BRi Seite 143) – das ist keine Lücke, sondern die Regel.
 
+56. **Nicht beurteilbare Kriterien werden GESPERRT, nicht ausgeblendet** (`js/kinder.js`,
+   `renderRow` in `js/oberflaeche.js`). Vorgabe des Verfassers wörtlich: „Bei den anderen
+   müsste lediglich nicht bearbeitbar aufgrund Alter so und so stehen. Nicht verschwinden
+   oder ausblenden. Aber nicht bearbeitbar."
+   - **Warum stehen bleiben:** Eine gesperrte Zeile mit Begründung zeigt dem
+     Sachbearbeiter der Kasse, dass das Kriterium geprüft und bewusst nicht bewertet
+     wurde. Eine fehlende Zeile sieht aus wie ein Versäumnis.
+   - **Gesperrt wird genau dann, wenn der altersentsprechende Grad „unselbständig" ist**
+     (Stufe 3). BRi Seite 143: Solche Kriterien „müssen nicht beurteilt werden".
+     Die Bedingung ist aus der Tabelle abgeleitet, nicht zweitgepflegt.
+   - **`kinderKriteriumLage(nr)` ist die EINE Stelle**, die beantwortet, was das Alter
+     für ein Kriterium bedeutet. `renderRow` fragt dort und greift nicht selbst in
+     `KINDER_ALTERSNORM` – sonst entstünde ein zweiter Weg zu derselben Frage.
+   - **Bearbeitbare Zeilen eines Kinderfalls zeigen die Altersnorm.** Ohne sie wäre ab
+     Stufe 5 nicht nachvollziehbar, warum „unselbständig" nur zwei statt drei Punkte gibt.
+   - **Deckkraft wirkt auf den ganzen Teilbaum.** Gedämpft wird nur `.slider-wrapper`,
+     nicht die ganze `.own-box`: Läge der Grundtext in einem Element mit `opacity: 0.5`,
+     könnte er selbst nicht deckender werden. Er gehört zur Begründung und bleibt voll
+     lesbar.
+   - **Das Feld „berichtigen" am Vorgutachten bleibt offen**, auch in einer gesperrten
+     Zeile. Es betrifft das Lesen des Gutachtens, nicht das Bewerten.
+   - Die Liste wird neu aufgebaut, wenn sich Geburts- oder Begutachtungsdatum ändert
+     (`kinderAnsichtAktualisieren`). Beide sind Datumsfelder mit `onchange`, die beim
+     Verlassen feuern – Regel 23 (beim Tippen nie neu zeichnen) bleibt gewahrt.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -892,13 +918,13 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1889 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle).
+Der Selbsttest umfasst 1911 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle
 (erledigt) · 2 Geburtsdatum und Alter anzeigen (erledigt) · 3 Alterstabelle (erledigt) ·
-4 Kriterien sperren statt ausblenden · 5 Differenzrechnung samt Kipp-Analyse ·
+4 Kriterien sperren (erledigt) · 5 Differenzrechnung samt Kipp-Analyse ·
 6 die 18-Monats-Welt · 7 Kriterium 4.5.K Fruehfoerderung · 8 alle vier Vorgaenge ·
 9 Dokumentinhalte · 10 Import des Kinderformulars.
 **Bestandsregel fuer dieses Vorhaben: keine bestehende Pruefung wird veraendert.**

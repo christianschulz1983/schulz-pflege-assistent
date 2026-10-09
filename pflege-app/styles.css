@@ -706,6 +706,26 @@
            Jahren, und die offene Angabe, wenn das Begutachtungsdatum fehlt. Letztere
            wird bewusst auffällig gesetzt: Maßgeblich ist das Alter am Begutachtungstag,
            und ein stillschweigend eingesetztes heutiges Datum wäre ein Rechenfehler. */
+        /* KINDERBEGUTACHTUNG IN DER KRITERIENLISTE.
+           Eine in diesem Alter nicht zu beurteilende Zeile BLEIBT STEHEN und wird
+           gesperrt – sie darf nicht verschwinden. Gedämpft, aber lesbar: Der Grund
+           ist Teil der Begründung gegenüber der Kasse, kein Hinweis am Rand. */
+        /* Nur der Regler wird gedämpft, nicht der ganze Kasten: Läge der Grundtext in
+           einem Element mit opacity 0.55, könnte er selbst nicht deckender werden –
+           Deckkraft wirkt auf den ganzen Teilbaum. Der Grund soll aber voll lesbar
+           bleiben, er gehört zur Begründung gegenüber der Kasse. */
+        .nba-row.alters-gesperrt .slider-wrapper { opacity: 0.5; }
+        .nba-row.alters-gesperrt .slider-wrapper input[type=range] { cursor: not-allowed; }
+        .nba-row.alters-gesperrt .own-label,
+        .nba-row.alters-gesperrt .title,
+        .nba-row.alters-gesperrt .nr { color: var(--text-muted); }
+        .alters-grund { margin-top: 8px; font-size: 12px; line-height: 1.45;
+                        color: var(--yellow); background: var(--yellow-dim);
+                        border-left: 3px solid var(--yellow); padding: 7px 10px;
+                        border-radius: 5px; }
+        .alters-norm  { margin-top: 8px; font-size: 12px; color: var(--accent2);
+                        font-family: var(--font-mono); letter-spacing: 0.02em; }
+
         #alter-hinweis { font-size: 13px; line-height: 1.5; margin-top: 4px; }
         #alter-hinweis span { display: block; padding: 10px 12px; border-radius: 6px; }
         .alter-kind  { background: var(--accent2-dim); color: var(--accent2);

@@ -302,7 +302,20 @@ function renderRow(i, pref) {
         </tr>`;
     }
     const curIdx = st.values[i.id] || 0;
-    return `<tr id="row-${pref}-${i.id}" class="nba-row">
+
+    /* KINDERBEGUTACHTUNG: Zeilen, die in diesem Alter nicht zu beurteilen sind, bleiben
+       stehen und werden gesperrt (js/kinder.js). Nicht ausblenden – eine gesperrte Zeile
+       mit Begründung zeigt, dass das Kriterium geprüft wurde; eine fehlende sieht aus
+       wie ein Versäumnis. Für Erwachsene ist `kLage.aktiv` immer falsch und unten ändert
+       sich nichts. */
+    const kLage = (typeof kinderKriteriumLage === 'function') ? kinderKriteriumLage(i.nr)
+                                                              : { aktiv: false, gesperrt: false };
+    const gesperrt = !!kLage.gesperrt;
+    const kinderZusatz = gesperrt
+        ? `<div class="alters-grund">${escapeHtml(kinderSperrText(i.nr))}</div>`
+        : (kLage.aktiv ? `<div class="alters-norm">${escapeHtml(kinderNormText(i.nr))}</div>` : '');
+
+    return `<tr id="row-${pref}-${i.id}" class="nba-row${gesperrt ? ' alters-gesperrt' : ''}">
         <td class="nr">${i.nr}</td>
         <td class="title">${i.title}</td>
         <td class="slider-cell">
@@ -310,9 +323,10 @@ function renderRow(i, pref) {
             <div class="own-box">
                 <div class="own-label">Eigene Einschätzung</div>
                 <div class="slider-wrapper">
-                    <input type="range" min="0" max="${i.opts.length-1}" step="1" value="${curIdx}" oninput="updateValue('${pref}',${i.id},this.value)">
+                    <input type="range" min="0" max="${i.opts.length-1}" step="1" value="${curIdx}"${gesperrt ? ' disabled' : ''} oninput="updateValue('${pref}',${i.id},this.value)">
                     <span class="slider-label" id="label-${pref}-${i.id}">${i.opts[curIdx]}</span>
                 </div>
+                ${kinderZusatz}
             </div>
         </td>
         <td class="pts" id="pts-${pref}-${i.id}">0</td>

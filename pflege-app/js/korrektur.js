@@ -192,7 +192,7 @@ function uebernehmeKorrektur() {
     setzeFeld('stam-befund', rev.befund);
     // Geburts- oder Begutachtungsdatum können korrigiert worden sein – und damit
     // die Altersklasse. Reine Anzeige, aber sie muss stimmen.
-    if (typeof alterHinweisZeigen === 'function') alterHinweisZeigen();
+    if (typeof kinderAnsichtAktualisieren === 'function') kinderAnsichtAktualisieren();
     ensureDiagRows((rev.diagnoses || []).length);
     (rev.diagnoses || []).forEach((d, i) => {
         setzeFeld('diag-icd-' + (i + 1), d.icd);

@@ -6171,6 +6171,108 @@ async function selbsttest() {
                 && auftragUebernehmen.toString().includes('cb.checked'));
         }
 
+        // KRITERIENLISTE NACH DEM ALTER (js/kinder.js, renderRow in js/oberflaeche.js).
+        // Vorgabe des Verfassers: nicht beurteilbare Kriterien bleiben STEHEN und werden
+        // gesperrt, mit Begründung – nicht ausgeblendet. Stufe 4 ist Ansicht; die
+        // Berechnung bleibt unverändert.
+        {
+            const merkG4 = document.getElementById('stam-geboren').value;
+            const merkB4 = document.getElementById('stam-begutachtung').value;
+            const setz4 = (g, b) => {
+                document.getElementById('stam-geboren').value = g;
+                document.getElementById('stam-begutachtung').value = b;
+                kinderAnsichtAktualisieren();
+            };
+            const zeilen = () => [...document.querySelectorAll('tr.nba-row')]
+                .filter(tr => tr.id.indexOf('row-own-') === 0);
+            const regler = () => zeilen().map(tr => tr.querySelector('input[type=range]')).filter(Boolean);
+            const zeileVon = nr => {
+                const it = ITEMS.find(x => x.nr === nr);
+                return document.getElementById('row-own-' + it.id);
+            };
+            try {
+                // --- Erwachsener: nichts ändert sich ---------------------------------
+                setz4('1950-01-01', '2026-01-15');
+                pruefe('Erwachsener: kein Regler gesperrt', regler().filter(r => r.disabled).length, 0);
+                pruefe('Erwachsener: keine gesperrte Zeile',
+                    document.querySelectorAll('tr.alters-gesperrt').length, 0);
+                pruefeWahr('Erwachsener: kein Altershinweis in der Liste',
+                    document.querySelectorAll('.alters-norm, .alters-grund').length === 0);
+
+                // --- Kind von genau zwei Jahren --------------------------------------
+                // Nach der BRi (Seite 201) werden ab zwei Jahren 4.4.1, 4.4.3 und 4.4.7
+                // beurteilt; 4.4.4 (ab 3;6) und 4.2.7 (ab 4) noch nicht.
+                setz4('2024-01-15', '2026-01-15');
+                pruefeWahr('Kind: die Liste hat weiterhin 64 Zeilen', zeilen().length === 64);
+                pruefeWahr('4.4.1 ist mit zwei Jahren bearbeitbar',
+                    !zeileVon('4.4.1').querySelector('input[type=range]').disabled);
+                pruefeWahr('4.4.4 ist mit zwei Jahren gesperrt',
+                    zeileVon('4.4.4').querySelector('input[type=range]').disabled);
+                pruefeWahr('4.2.7 ist mit zwei Jahren gesperrt',
+                    zeileVon('4.2.7').querySelector('input[type=range]').disabled);
+                pruefeWahr('Die gesperrte Zeile verschwindet NICHT',
+                    zeileVon('4.4.4').offsetParent !== null
+                    || zeileVon('4.4.4').style.display !== 'none');
+                pruefeWahr('Die gesperrte Zeile nennt das Alter',
+                    zeileVon('4.4.4').innerText.includes('erst ab 3 Jahren und 6 Monaten'));
+                pruefeWahr('Die gesperrte Zeile nennt den Grund',
+                    zeileVon('4.4.4').innerText.includes('altersentsprechend entwickeltes Kind')
+                    && zeileVon('4.4.4').innerText.includes('unselbständig'));
+                pruefeWahr('Modul 2 wird als Fähigkeit benannt, nicht als Selbständigkeit',
+                    zeileVon('4.2.7').innerText.includes('Fähigkeit')
+                    && zeileVon('4.2.7').innerText.includes('nicht vorhanden'));
+
+                // Bearbeitbare Zeilen zeigen die Altersnorm – sonst wäre später nicht
+                // nachvollziehbar, warum „unselbständig" nicht die volle Punktzahl gibt.
+                pruefeWahr('Bearbeitbare Zeile nennt die Altersnorm',
+                    zeileVon('4.4.1').innerText.includes('Altersentsprechend'));
+                pruefe('4.4.1 mit zwei Jahren: überwiegend unselbständig',
+                    kinderKriteriumLage('4.4.1').normText, 'überwiegend unselbständig');
+
+                // Module 3 und 5 sind altersunabhängig – dort nie ein Hinweis
+                pruefeWahr('Modul 3 bleibt unberührt',
+                    ITEMS.filter(i => i.m === 3).every(i =>
+                        !document.getElementById('row-own-' + i.id).querySelector('input[type=range]').disabled
+                        && !document.getElementById('row-own-' + i.id).innerText.includes('Altersentsprechend')));
+                pruefeWahr('Modul 5 bleibt unberührt',
+                    ITEMS.filter(i => i.m === 5).every(i =>
+                        !document.getElementById('row-own-' + i.id).innerText.includes('Altersentsprechend')));
+
+                // --- Dasselbe Kind, vier Jahre später --------------------------------
+                // 4.4.4 und 4.2.7 sind jetzt zu beurteilen. Die Tabelle baut sich also
+                // wirklich nach dem erfassten Alter auf.
+                setz4('2024-01-15', '2030-01-15');
+                pruefeWahr('Mit sechs Jahren ist 4.4.4 bearbeitbar',
+                    !zeileVon('4.4.4').querySelector('input[type=range]').disabled);
+                pruefeWahr('Mit sechs Jahren ist 4.2.7 bearbeitbar',
+                    !zeileVon('4.2.7').querySelector('input[type=range]').disabled);
+                pruefe('Mit sechs Jahren ist keine Zeile mehr gesperrt',
+                    regler().filter(r => r.disabled).length, 0);
+
+                // --- Zurück zum Erwachsenen: alles wieder offen ----------------------
+                setz4('1950-01-01', '2026-01-15');
+                pruefe('Nach dem Wechsel ist wieder kein Regler gesperrt',
+                    regler().filter(r => r.disabled).length, 0);
+                pruefe('Und kein Altershinweis bleibt stehen',
+                    document.querySelectorAll('.alters-norm, .alters-grund').length, 0);
+
+                // --- Ohne Geburtsdatum: unverändert wie bisher -----------------------
+                setz4('', '2026-01-15');
+                pruefe('Ohne Geburtsdatum kein gesperrter Regler',
+                    regler().filter(r => r.disabled).length, 0);
+            } finally {
+                document.getElementById('stam-geboren').value = merkG4;
+                document.getElementById('stam-begutachtung').value = merkB4;
+                kinderAnsichtAktualisieren();
+            }
+
+            // Stufe 4 ist ANSICHT. Die Berechnung weiß davon nichts – das ist die
+            // Zusage dieser Stufe und wird hier gemessen.
+            pruefeWahr('Die Berechnung kennt die Kinderlage nicht',
+                !calculateInternal.toString().includes('kinderKriteriumLage')
+                && !calculateInternal.toString().includes('altersnormStufe'));
+        }
+
         // ALTERSTABELLE DER BRi (js/kinder_bri.js), Seiten 146–149.
         // 35 Kriterien mal drei Grenzen – 105 Zahlen, abgeschrieben aus einer
         // gedruckten Tabelle. Noch ohne jede Wirkung auf die Rechnung.
@@ -6282,8 +6384,12 @@ async function selbsttest() {
             pruefeWahr('Die Berechnung kennt die Alterstabelle nicht',
                 !calculateInternal.toString().includes('altersnorm')
                 && !calculateInternal.toString().includes('KINDER_ALTERSNORM'));
-            pruefeWahr('Die Kriterienliste kennt die Alterstabelle noch nicht',
-                !renderRow.toString().includes('altersnorm'));
+            // Stufe 4 hat die Kriterienliste angeschlossen. Sie fragt die Lage an EINER
+            // Stelle ab (kinderKriteriumLage) und greift nicht selbst in die Tabelle –
+            // sonst entstünde ein zweiter Weg zu derselben Frage.
+            pruefeWahr('Die Kriterienliste fragt über kinderKriteriumLage',
+                renderRow.toString().includes('kinderKriteriumLage')
+                && !renderRow.toString().includes('KINDER_ALTERSNORM'));
         }
 
         // ALTER AM TAG DER BEGUTACHTUNG (js/alter.js).
