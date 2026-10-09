@@ -40,11 +40,38 @@ const BRI_GRUNDLAGE_SATZ =
    Die Reihenfolge der Liste ist die Bedeutung – Index 0 ist Pflegegrad 1. */
 const PG_SCHWELLEN = [12.5, 27, 47.5, 70, 90];
 
-function pflegegradAus(punkte) {
+/* KINDER BIS ZU 18 MONATEN – § 15 Absatz 7 SGB XI, BRi Seite 202.
+   Dieselben Punktwerte, aber jeweils ein Pflegegrad höher: ab 12,5 Pflegegrad 2,
+   ab 27 Pflegegrad 3, ab 47,5 Pflegegrad 4, ab 70 Pflegegrad 5. Einen Pflegegrad 1
+   gibt es in dieser Altersgruppe nicht.
+
+   Der Grund steht in der BRi auf Seite 144: In diesem Alter werden nur die
+   altersunabhängigen Module 3 und 5 herangezogen, weil Kinder „von Natur aus in allen
+   Bereichen des Alltagslebens unselbständig sind". Ohne die Verschiebung könnten sie
+   „regelhaft keine oder nur niedrige Pflegegrade erreichen".
+
+   ACHTUNG, beratungsrelevant: Nach dem 18. Lebensmonat gilt wieder die reguläre
+   Einstufung, OHNE dass es einer erneuten Begutachtung bedarf (BRi Seite 145). Der
+   Pflegegrad fällt also von Gesetzes wegen um eine Stufe. */
+const PG_SCHWELLEN_BIS_18_MONATE = [12.5, 27, 47.5, 70];   // -> Pflegegrad 2, 3, 4, 5
+
+/* Welche Schwellentabelle gilt? Ohne ausdrückliche Angabe entscheidet das Alter des
+   offenen Falls. So bleiben alle bisherigen Aufrufe unverändert richtig. */
+function pgSchwellenFuer(klasse) {
+    const k = (klasse === undefined && typeof aktuelleAltersklasse === 'function')
+        ? aktuelleAltersklasse() : klasse;
+    const saeugling = (typeof ALTERSKLASSE !== 'undefined') && k === ALTERSKLASSE.SAEUGLING;
+    return saeugling
+        ? { werte: PG_SCHWELLEN_BIS_18_MONATE, ersterGrad: 2 }
+        : { werte: PG_SCHWELLEN, ersterGrad: 1 };
+}
+
+function pflegegradAus(punkte, klasse) {
     const p = Number(punkte);
     if (!isFinite(p)) return 0;
-    for (let i = PG_SCHWELLEN.length - 1; i >= 0; i--) {
-        if (p >= PG_SCHWELLEN[i]) return i + 1;
+    const t = pgSchwellenFuer(klasse);
+    for (let i = t.werte.length - 1; i >= 0; i--) {
+        if (p >= t.werte[i]) return i + t.ersterGrad;
     }
     return 0;
 }
@@ -57,11 +84,12 @@ function pflegegradAus(punkte) {
    „es fehlen 0,00 Punkte" angezeigt wird. Die Modultabelle und die Schwellenanalyse
    der Anhörung rechnen ohne diesen Abstand. Beide Verhalten bestanden vorher
    nebeneinander und bleiben erhalten – der Aufrufer sagt, was er braucht. */
-function naechstePgSchwelle(punkte, toleranz) {
+function naechstePgSchwelle(punkte, toleranz, klasse) {
     const p = Number(punkte) + (Number(toleranz) || 0);
-    const s = PG_SCHWELLEN.find(x => x > p);
-    if (s === undefined) return null;
-    return { schwelle: s, pg: PG_SCHWELLEN.indexOf(s) + 1 };
+    const t = pgSchwellenFuer(klasse);
+    const i = t.werte.findIndex(x => x > p);
+    if (i < 0) return null;
+    return { schwelle: t.werte[i], pg: i + t.ersterGrad };
 }
 
 /* PFLEGEGRAD VERGLEICHEN – für das Fazit.

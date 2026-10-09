@@ -6171,6 +6171,150 @@ async function selbsttest() {
                 && auftragUebernehmen.toString().includes('cb.checked'));
         }
 
+        // KINDER BIS ZU 18 MONATEN – die eigene Welt (§ 15 Abs. 7 SGB XI, BRi S. 144,
+        // 176, 200, 202, 258). Nur Module 3 und 5, dazu 4.1.B und die Frage KF 4.4.0;
+        // die Module 1, 2, 4 und 6 entfallen ganz, und es gelten verschobene Schwellen.
+        {
+            const merkG6 = document.getElementById('stam-geboren').value;
+            const merkB6 = document.getElementById('stam-begutachtung').value;
+            const merkEig6 = JSON.parse(JSON.stringify(stateEigene));
+            const setzAlter6 = (g, b) => {
+                document.getElementById('stam-geboren').value = g;
+                document.getElementById('stam-begutachtung').value = b;
+            };
+            const nrId = nr => ITEMS.find(x => x.nr === nr).id;
+            try {
+                // ---- Die verschobenen Schwellen --------------------------------------
+                pruefe('Schwellen bis 18 Monate nach § 15 Abs. 7 SGB XI',
+                    PG_SCHWELLEN_BIS_18_MONATE, [12.5, 27, 47.5, 70]);
+                const S = ALTERSKLASSE.SAEUGLING;
+                pruefe('12,4 Punkte: kein Pflegegrad', pflegegradAus(12.4, S), 0);
+                pruefe('12,5 Punkte: Pflegegrad 2 statt 1', pflegegradAus(12.5, S), 2);
+                pruefe('27 Punkte: Pflegegrad 3 statt 2', pflegegradAus(27, S), 3);
+                pruefe('47,5 Punkte: Pflegegrad 4 statt 3', pflegegradAus(47.5, S), 4);
+                pruefe('70 Punkte: Pflegegrad 5 statt 4', pflegegradAus(70, S), 5);
+                pruefe('90 Punkte bleiben Pflegegrad 5', pflegegradAus(90, S), 5);
+                pruefeWahr('Einen Pflegegrad 1 gibt es in dieser Gruppe nicht',
+                    [0, 5, 12.4, 12.5, 30, 60, 80, 100].every(p => pflegegradAus(p, S) !== 1));
+                pruefe('Die nächste Schwelle zählt ebenfalls verschoben',
+                    naechstePgSchwelle(0, 0, S), { schwelle: 12.5, pg: 2 });
+                pruefe('Erwachsene bleiben unberührt', pflegegradAus(12.5, ALTERSKLASSE.ERWACHSEN), 1);
+
+                // ---- Die Module 1, 2, 4 und 6 entfallen ------------------------------
+                setzAlter6('2025-01-15', '2026-07-14');   // 17 Monate, einen Tag vor der Grenze
+                pruefe('Das Kind ist noch Säugling', kinderLage().klasse, ALTERSKLASSE.SAEUGLING);
+                [1, 2, 4, 6].forEach(m => {
+                    pruefeWahr(`Modul ${m} ist ausgesetzt`, kinderModulAusgesetzt(m));
+                });
+                [3, 5].forEach(m => {
+                    pruefeWahr(`Modul ${m} bleibt bewertbar`, !kinderModulAusgesetzt(m));
+                });
+                pruefeWahr('Ein Kriterium aus Modul 1 ist gesperrt',
+                    kinderKriteriumLage('4.1.1').gesperrt && kinderKriteriumLage('4.1.1').ausgesetzt);
+                pruefeWahr('Die Begründung nennt das Modul und den Paragraphen',
+                    kinderSperrText('4.1.1').includes('Modul 1')
+                    && kinderSperrText('4.1.1').includes('§ 15 Absatz 7 SGB XI'));
+                pruefeWahr('Modul 3 ist nicht gesperrt', !kinderKriteriumLage('4.3.1').gesperrt);
+
+                // Ein Kriterium, dessen Altersnorm schon „selbständig" wäre, bleibt
+                // trotzdem ausgesetzt – das Modul entfällt, nicht nur das Kriterium.
+                // 4.1.1 ist ab 9 Monaten „selbständig", das Kind ist 17 Monate alt.
+                pruefe('Altersnorm allein würde hier nicht sperren',
+                    altersnormStufe('4.1.1', kinderLage().geburt, kinderLage().stichtag), 0);
+                pruefe('Das ausgesetzte Modul sperrt trotzdem',
+                    wirksameStufe(ITEMS.find(i => i.nr === '4.1.1'), 3), 0);
+
+                // DIE ANNAHME, AUF DER DIE AUSSETZUNG BERUHT. wirksameStufe hat dafür
+                // keine eigene Abfrage – es rechnet die Differenz zur gemeldeten
+                // Altersnorm. Deshalb MUSS ein ausgesetztes Modul „unselbständig"
+                // melden; stünde dort etwas anderes, rechnete die App bei Säuglingen
+                // Module mit, die die BRi ausschliesst. Eine Gegenprobe, die statt
+                // dessen eine zweite Abfrage in wirksameStufe entfernte, liess alle
+                // Prüfungen bestehen – sie war toter Code.
+                pruefe('Ein ausgesetztes Modul meldet die Altersnorm als unselbständig',
+                    kinderKriteriumLage('4.1.1').normStufe, 3);
+                pruefeWahr('Und das gilt für jedes Kriterium der vier Module',
+                    ITEMS.filter(i => [1, 2, 4, 6].includes(i.m))
+                         .every(i => kinderKriteriumLage(i.nr).normStufe === 3
+                                  && kinderKriteriumLage(i.nr).ausgesetzt));
+
+                // ---- Ein vollständiger Säuglingsfall --------------------------------
+                // Von Hand nach der BRi: Modul 3 mit 4.3.3 „täglich" (5) und 4.3.8
+                // „häufig" (3) = 8 Einzelpunkte -> Spanne 7–65 -> 15,00 gewichtet.
+                // Modul 5: Medikation 3x täglich = 3,0 -> 1 Punkt (Gruppe A) -> Spanne 1
+                // -> 5,00 gewichtet. Module 1, 2, 4 und 6 entfallen -> 0,00.
+                // Zusammen 20,00 Punkte. Als Erwachsener wäre das Pflegegrad 1
+                // (ab 12,5), als Säugling Pflegegrad 2.
+                stateEigene = goldZustand(GOLD_FAELLE[3]);
+                stateEigene.special = 0;
+                stateEigene.values[nrId('4.3.3')] = 3;
+                stateEigene.values[nrId('4.3.8')] = 2;
+                stateEigene.values[nrId('4.5.1')] = { count: 3, period: 'D' };
+                // Dazu Werte in ausgesetzten Modulen – sie dürfen NICHT zählen.
+                stateEigene.values[nrId('4.1.1')] = 3;
+                stateEigene.values[nrId('4.2.1')] = 3;
+                stateEigene.values[nrId('4.4.1')] = 3;
+                stateEigene.values[nrId('4.6.1')] = 3;
+                const saeug = calculateInternal('own');
+                pruefe('Säugling: nur Modul 3 und 5 tragen bei',
+                    saeug.raws, [0, 0, 8, 0, 1, 0]);
+                pruefe('Säugling: gewichtete Punkte', saeug.weights, [0, 0, 15, 0, 5, 0]);
+                pruefe('Säugling: 20 Punkte ergeben Pflegegrad 2',
+                    [saeug.total, saeug.pg], [20, 2]);
+                setzAlter6('2024-07-15', '2026-07-15');   // dasselbe Kind, 2 Jahre
+                const zwei = calculateInternal('own');
+                pruefeWahr('Dasselbe mit zwei Jahren ist kein Säuglingsfall mehr',
+                    kinderLage().klasse === ALTERSKLASSE.KIND);
+                pruefeWahr('Dann tragen auch die anderen Module wieder bei',
+                    zwei.raws[0] > 0 || zwei.raws[1] > 0 || zwei.raws[3] > 0 || zwei.raws[5] > 0);
+
+                // ---- KF 4.4.0 statt Modul 4 -----------------------------------------
+                setzAlter6('2025-01-15', '2026-07-14');
+                pruefeWahr('Die Frage KF 4.4.0 gilt nur hier', kinderNahrungGilt());
+                pruefe('Unbeantwortet sind es null Punkte', kinderNahrungPunkte(stateEigene), 0);
+                stateEigene.nahrung = true;
+                pruefe('Bejaht sind es 20 Einzelpunkte', kinderNahrungPunkte(stateEigene), 20);
+                const mitNahrung = calculateInternal('own');
+                pruefe('Modul 4 steht dann auf 20 Einzelpunkten', mitNahrung.raws[3], 20);
+                pruefe('Das sind 30 gewichtete Punkte (Spanne 19–36)', mitNahrung.weights[3], 30);
+                pruefe('Zusammen 50 Punkte und Pflegegrad 4',
+                    [mitNahrung.total, mitNahrung.pg], [50, 4]);
+                setzAlter6('2024-07-15', '2026-07-15');
+                pruefe('Ab 18 Monaten zählt die Frage nicht mehr',
+                    kinderNahrungPunkte(stateEigene), 0);
+                setzAlter6('1950-01-01', '2026-07-15');
+                pruefe('Und bei Erwachsenen erst recht nicht',
+                    kinderNahrungPunkte(stateEigene), 0);
+
+                // ---- Besondere Bedarfskonstellation: Pflegegrad 5 auch unter 70 ------
+                // BRi Seite 202: Kinder bis 18 Monate mit 4.1.B werden „ebenfalls, auch
+                // wenn ihre Gesamtpunkte unter 70 Punkten liegen, dem Pflegegrad 5
+                // zugeordnet". Die App setzt bei 4.1.B 100 Punkte – damit ist das
+                // erfüllt, aber es muss geprüft sein.
+                setzAlter6('2025-01-15', '2026-07-14');
+                stateEigene = goldZustand(GOLD_FAELLE[3]);   // special = 1, sonst leer
+                stateEigene.nahrung = false;
+                const bedarf = calculateInternal('own');
+                pruefe('Besondere Bedarfskonstellation ergibt Pflegegrad 5',
+                    [bedarf.total, bedarf.pg], [100, 5]);
+
+                // ---- Die Oberfläche zeigt die Frage nur hier ------------------------
+                kinderAnsichtAktualisieren();
+                const karte = document.getElementById('nahrung-card-own');
+                pruefeWahr('Die Karte zu KF 4.4.0 ist beim Säugling sichtbar',
+                    karte && karte.style.display !== 'none');
+                setzAlter6('1950-01-01', '2026-07-15');
+                kinderAnsichtAktualisieren();
+                pruefeWahr('Beim Erwachsenen ist sie ausgeblendet',
+                    karte && karte.style.display === 'none');
+            } finally {
+                stateEigene = merkEig6;
+                document.getElementById('stam-geboren').value = merkG6;
+                document.getElementById('stam-begutachtung').value = merkB6;
+                kinderAnsichtAktualisieren();
+            }
+        }
+
         // DIFFERENZRECHNUNG BEI KINDERN (wirksameStufe, js/berechnung.js).
         // BRi Seite 150: Gewertet wird nicht, wie unselbständig das Kind ist, sondern
         // um wie viele Stufen es von einem altersentsprechend entwickelten Kind

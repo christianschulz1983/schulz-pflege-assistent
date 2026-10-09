@@ -48,6 +48,13 @@ function wirksameStufe(item, stufe) {
     if (typeof kinderKriteriumLage !== 'function' || !item) return stufe;
     const lage = kinderKriteriumLage(item.nr);
     if (!lage.aktiv) return stufe;
+    /* Bis zu 18 Monaten entfallen die Module 1, 2, 4 und 6 ganz (BRi Seite 200).
+       Dafür steht hier bewusst KEINE eigene Abfrage: `kinderKriteriumLage` meldet für
+       ein ausgesetztes Modul die Altersnorm „unselbständig" (Stufe 3), womit die
+       Differenz nie über null kommt. Eine zweite Abfrage wäre toter Code – die
+       Gegenprobe, die sie entfernte, liess ausnahmslos alle Prüfungen bestehen.
+       Dass die Meldung „unselbständig" lautet, ist deshalb selbst eine geprüfte
+       Zusage und keine stillschweigende Annahme (siehe Selbsttest). */
     const diff = stufe - lage.normStufe;
     return diff > 0 ? diff : 0;
 }
@@ -287,6 +294,11 @@ function calculateInternal(pref) {
     let s3=ITEMS.filter(i=>i.m===3).reduce((s,i)=>s+getV(i.id),0);
     // 4.4.11 und 4.4.12 zählen nur bei entsprechender Kontinenzlage mit (siehe zaehltMit).
     let s4=ITEMS.filter(i=>i.m===4).reduce((s,i)=>s+(zaehltMit(st,i)?getV(i.id):0),0);
+    /* Bei Kindern bis zu 18 Monaten ersetzt die Frage KF 4.4.0 das ganze Modul 4
+       (BRi Seite 176). Die dreizehn Kriterien stehen dann über `wirksameStufe` bereits
+       auf null; bejaht ist die Frage 20 Einzelpunkte wert (BRi Seite 258). In jedem
+       anderen Fall liefert kinderNahrungPunkte() eine Null. */
+    if (typeof kinderNahrungPunkte === 'function') s4 += kinderNahrungPunkte(st);
     let s6=ITEMS.filter(i=>i.m===6).reduce((s,i)=>s+getV(i.id),0);
     // Modul 5 nach BRi: je Gruppe summieren, dann der GRUPPE EINEN Punktwert zuordnen.
     // Gerechnet wird in m5Gruppen() – der einzigen Stelle für diese Logik.

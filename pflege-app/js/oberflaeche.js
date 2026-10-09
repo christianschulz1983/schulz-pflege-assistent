@@ -44,6 +44,20 @@ function renderNBASection(prefix) {
                 </div>
             </div>
 
+            <!-- KF 4.4.0 – ersetzt bei Kindern bis zu 18 Monaten das ganze Modul 4
+                 (BRi Seite 176). Nur in dieser Altersgruppe sichtbar; bejaht sind es
+                 20 Einzelpunkte (BRi Seite 258). -->
+            <div class="special-card nahrung-card" id="nahrung-card-${prefix}" style="display:none">
+                <div class="special-header">🍼 Nahrungsaufnahme bei Kindern bis 18 Monate (KF 4.4.0)</div>
+                <div class="special-body">
+                    <span class="special-title">Bestehen gravierende Probleme bei der Nahrungsaufnahme, die einen außergewöhnlich pflegeintensiven Hilfebedarf im Bereich der Ernährung auslösen?</span>
+                    <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
+                        <input type="range" id="nahrung-${prefix}" min="0" max="1" step="1" value="0" oninput="updateNahrung('${prefix}',this.value)" style="width:100px">
+                        <span id="nahrung-label-${prefix}" style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--red);min-width:28px;text-align:right">Nein</span>
+                    </div>
+                </div>
+            </div>
+
             ${isEig ? `<div class="card" style="border:1px solid rgba(37,99,235,0.2)">
                 <div class="card-header"><div class="dot" style="background:var(--accent)"></div>Widerspruchspunkte finden (KI)</div>
                 <div style="padding:16px 20px">
@@ -124,11 +138,20 @@ function renderNBASection(prefix) {
 }
 
 function syncSpecialUI() {
+    const nahrungSichtbar = (typeof kinderNahrungGilt === 'function') && kinderNahrungGilt();
     [['orig', stateOrig], ['own', stateEigene]].forEach(([pref, st]) => {
         const slider = document.getElementById('special-' + pref);
         const label = document.getElementById('special-label-' + pref);
         if (slider) slider.value = st.special ? 1 : 0;
         if (label) label.innerText = st.special == 1 ? 'Ja' : 'Nein';
+        // KF 4.4.0 gibt es nur bei Kindern bis zu 18 Monaten – sonst bliebe eine Frage
+        // stehen, die für diesen Fall gar nicht gestellt wird.
+        const karte = document.getElementById('nahrung-card-' + pref);
+        if (karte) karte.style.display = nahrungSichtbar ? '' : 'none';
+        const nSlider = document.getElementById('nahrung-' + pref);
+        const nLabel = document.getElementById('nahrung-label-' + pref);
+        if (nSlider) nSlider.value = st.nahrung ? 1 : 0;
+        if (nLabel) nLabel.innerText = st.nahrung ? 'Ja' : 'Nein';
     });
 }
 
@@ -462,6 +485,24 @@ function updateSpecial(pref, val) {
     if (pref === 'orig' || pref === 'zweit') { delete zustandZu(pref).extracted; }
     st.special = parseInt(val);
     document.getElementById('special-label-'+pref).innerText = val==1 ? 'Ja' : 'Nein';
+    calculate(pref);
+    if(pref==='orig') calculate('own');
+}
+
+/* KF 4.4.0 – gravierende Probleme bei der Nahrungsaufnahme (Kinder bis 18 Monate).
+   Wie bei der besonderen Bedarfskonstellation eine Ja/Nein-Angabe am Zustand, nicht
+   in `values`: Es ist kein Kriterium des Begutachtungsinstruments, sondern tritt an
+   die Stelle eines ganzen Moduls. Dadurch wandert es mit `fallDaten()` von selbst in
+   die Falldatei. */
+function updateNahrung(pref, val) {
+    const st = zustandZu(pref);
+    if (pref === 'orig' || pref === 'zweit') { delete zustandZu(pref).extracted; }
+    st.nahrung = parseInt(val) === 1;
+    const label = document.getElementById('nahrung-label-'+pref);
+    if (label) label.innerText = st.nahrung ? 'Ja' : 'Nein';
+    if (typeof markiereStellungnahmeVeraltet === 'function') {
+        markiereStellungnahmeVeraltet('Nahrungsaufnahme (KF 4.4.0)');
+    }
     calculate(pref);
     if(pref==='orig') calculate('own');
 }

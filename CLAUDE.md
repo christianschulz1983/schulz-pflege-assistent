@@ -890,6 +890,37 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
      Sicherheit. Das betrifft NUR selbst gesetzte Markierungen; die 1596
      Bestandsprüfungen bleiben unverändert.
 
+58. **Kinder bis zu 18 Monaten sind eine eigene Welt** (§ 15 Absatz 7 SGB XI; BRi
+   Seiten 144, 176, 200, 202, 258). Nicht „wie Kinder, nur jünger" – andere Module,
+   eine andere Frage, andere Schwellen.
+   - **Nur Modul 3 und Modul 5 werden bewertet**, dazu die besondere Bedarfskonstellation
+     4.1.B. Die Module 1, 2, 4 und 6 entfallen **ganz**
+     (`KINDER_MODULE_BIS_18_MONATE_AUSGESETZT`, `js/kinder.js`). 4.1.B steht nicht in
+     `item.m`, sondern in `state.special`, und bleibt deshalb von selbst unberührt.
+   - **Modul 4 wird durch die Frage KF 4.4.0 ersetzt**: „Bestehen gravierende Probleme
+     bei der Nahrungsaufnahme …?" Bejaht sind es **20 Einzelpunkte** (BRi Seite 258),
+     in der Tabelle des Moduls 4 die Spanne 19–36 und damit **30 gewichtete Punkte**.
+     Gespeichert als `state.nahrung` – kein Kriterium des Instruments, sondern ein
+     Ersatz für ein ganzes Modul, deshalb am Zustand wie `special`. Wandert dadurch von
+     selbst in die Falldatei. Die Karte erscheint nur in dieser Altersgruppe.
+   - **Verschobene Schwellen** (`PG_SCHWELLEN_BIS_18_MONATE`, `js/basis.js`): ab 12,5
+     Pflegegrad 2, ab 27 Pflegegrad 3, ab 47,5 Pflegegrad 4, ab 70 Pflegegrad 5. Einen
+     **Pflegegrad 1 gibt es in dieser Gruppe nicht.** `pgSchwellenFuer()` wählt die
+     Tabelle; ohne ausdrückliche Angabe entscheidet das Alter des offenen Falls, damit
+     alle bisherigen Aufrufe unverändert richtig bleiben.
+   - **Die Aussetzung hat KEINE eigene Abfrage in `wirksameStufe`.**
+     `kinderKriteriumLage` meldet für ein ausgesetztes Modul die Altersnorm
+     „unselbständig" (Stufe 3), womit die Differenz nie über null kommt. Eine zweite
+     Abfrage dort war toter Code – die Gegenprobe, die sie entfernte, liess ausnahmslos
+     alle Prüfungen bestehen. **Dass die Meldung „unselbständig" lautet, ist deshalb
+     selbst eine geprüfte Zusage** und keine stillschweigende Annahme.
+   - Besondere Bedarfskonstellation ergibt auch hier Pflegegrad 5 (BRi Seite 202,
+     „auch wenn ihre Gesamtpunkte unter 70 Punkten liegen") – die App setzt bei 4.1.B
+     100 Punkte, damit ist es erfüllt; geprüft ist es trotzdem.
+   - **Beratungsrelevant:** Nach dem 18. Lebensmonat gilt wieder die reguläre
+     Einstufung, **ohne dass es einer erneuten Begutachtung bedarf** (BRi Seite 145).
+     Der Pflegegrad fällt also von Gesetzes wegen um eine Stufe.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -954,14 +985,14 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1937 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung).
+Der Selbsttest umfasst 1977 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle
 (erledigt) · 2 Geburtsdatum und Alter anzeigen (erledigt) · 3 Alterstabelle (erledigt) ·
 4 Kriterien sperren (erledigt) · 5 Differenzrechnung (erledigt) ·
-6 die 18-Monats-Welt · 7 Kriterium 4.5.K Fruehfoerderung · 8 alle vier Vorgaenge ·
+6 die 18-Monats-Welt (erledigt) · 7 Kriterium 4.5.K Fruehfoerderung · 8 alle vier Vorgaenge ·
 9 Dokumentinhalte · 10 Import des Kinderformulars.
 **Bestandsregel fuer dieses Vorhaben: keine bestehende Pruefung wird veraendert.**
 Muesste eine angepasst werden, ist das ein Konstruktionsfehler, kein Testproblem.

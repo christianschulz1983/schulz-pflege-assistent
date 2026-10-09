@@ -169,6 +169,13 @@ function istKinderfall() {
     return lage.klasse === ALTERSKLASSE.SAEUGLING || lage.klasse === ALTERSKLASSE.KIND;
 }
 
+/* Die Altersklasse des offenen Falls – null, wenn sie sich nicht bestimmen lässt.
+   Von hier holt sich `pgSchwellenFuer` (js/basis.js) die Tabelle, wenn der Aufrufer
+   keine nennt. */
+function aktuelleAltersklasse() {
+    return kinderLage().klasse;
+}
+
 /* Der Hinweistext unter dem Begutachtungsdatum. Reine Anzeige – er ändert nichts.  */
 function alterHinweisHtml() {
     const lage = kinderLage();
