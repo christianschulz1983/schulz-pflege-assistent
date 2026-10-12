@@ -48,7 +48,7 @@ pflege-app/
   js/nummerierung.js  Nummerierung des Gutachtens (4.x.y bzw. 5.x.y bei Medicproof)
   js/alter.js         Alter am Begutachtungstag, drei Altersklassen (Kinderbegutachtung)
   js/kinder_bri.js    Alterstabelle der BRi S. 146-149, 35 Kriterien x 3 Grenzen (Regel 55)
-  js/kinder.js        Lage je Kriterium: gesperrt oder Altersnorm (Regel 56)
+  js/kinder.js        Lage je Kriterium: gesperrt oder Altersnorm (Regeln 56-58)
 werkzeuge/kinder_abgleich.py  Prueft kinder_bri.js gegen die Tabellen der PDF (Regel 55)
   js/goldmaster.js    Golden Master: sechs vollstaendige Faelle mit handgerechnetem Soll
   js/selbsttest.js    Selbsttest (Knopf oben rechts)
@@ -921,6 +921,36 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
      Einstufung, **ohne dass es einer erneuten Begutachtung bedarf** (BRi Seite 145).
      Der Pflegegrad fällt also von Gesetzes wegen um eine Stufe.
 
+59. **Acht Kacheln in der Startauswahl – vier Vorgänge, je für Erwachsene und Kinder**
+   (`js/modus.js`, `appKindVorgang`). Gemeldet: „Warum sind hier die Tabs für Kinder
+   nicht? Das muss sein." Die Kindersystematik hing bis dahin allein am Geburtsdatum
+   und schaltete sich damit **still** zu – rechnerisch richtig, zu bedienen schlecht:
+   Beim Start war nicht zu sehen, dass es den Weg gibt, und wer das Geburtsdatum
+   vergaß, bekam ohne Warnung eine Rechnung nach dem Erwachsenenmaßstab.
+   - **Die Kachel entscheidet NICHT, wie gerechnet wird.** Das täte sonst ein Haken,
+     und ein Haken kann falsch gesetzt sein. Maßgeblich bleibt das Alter am
+     Begutachtungstag (BRi Seite 146). Die Kachel fordert die beiden Daten ein und
+     benennt, wenn Kachel und Alter auseinanderfallen – drei Fälle, alle geprüft:
+     Kindervorgang ohne Geburtsdatum · Kindervorgang bei einem über Elfjährigen ·
+     Erwachsenenvorgang bei einem Kind. Der Hinweis steht in `#alter-hinweis`.
+   - **Die Vorgangsart bleibt dieselbe.** Ein Widerspruch für ein Kind ist ein
+     Widerspruch: gleiche Vorlage, gleiche Reiter, **gleiche Dateinamen**
+     (PS_/HA_/EA_, Regel 51 – eigens geprüft).
+   - `setzeModus(key, kind)`: Das zweite Argument ist **dreiwertig**. Weggelassen bleibt
+     die bisherige Einstellung stehen – „Fall laden", Selbsttest und Wiederherstellung
+     rufen ohne es auf. `appKindVorgang` wandert mit `fallDaten()` in die Falldatei;
+     ältere Fälle sind Erwachsenenvorgänge.
+   - **Aus `setzeModus` NICHT `kinderAnsichtAktualisieren()` aufrufen.** Das zeichnet
+     die Kriterienliste neu und lässt die Analyse ein zweites Mal rechnen (`setzeModus`
+     ruft `renderAnalyseBereich` bereits selbst, und `calculate('own')` nochmals). Die
+     Analyse rechnet den ganzen Fall je abweichendem Kriterium neu – der Selbsttest lief
+     damit nicht mehr durch, und „Fall laden" verlor die Stammdaten, weil das
+     zeitversetzte Zurückschreiben gegen das Dauerneuzeichnen lief. Es genügt
+     `alterHinweisZeigen()`: Die Kachel ändert keine Sperre und keine Punktzahl.
+   - `itemZuNr()` statt `ITEMS.find` in `kinderKriteriumLage`: Die Funktion läuft bei
+     JEDER Punkteermittlung je Kriterium, und die Kipp-Analyse rechnet den Fall je
+     abweichendem Kriterium neu. Ein `find` darin macht daraus eine quadratische Suche.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -985,8 +1015,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1977 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate).
+Der Selbsttest umfasst 1993 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

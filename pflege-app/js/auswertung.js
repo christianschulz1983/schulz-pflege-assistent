@@ -326,6 +326,8 @@ function fallDaten() {
     const appealEl = document.getElementById('appeal-document');
     if (appealEl) appealDraft = appealEl.innerHTML;
     const data={stateOrig,stateEigene,stateZweit,stammdaten,erstgespraechNotes,appealDraft,appModus,
+                // Kindervorgang: die Wahl auf der Startseite, nicht die Rechnung (js/modus.js)
+                appKindVorgang: (typeof appKindVorgang !== 'undefined') ? appKindVorgang : false,
                 befund: (typeof befundSichern === 'function') ? befundSichern() : null,
                 erfassung: (typeof erfassungSichern === 'function') ? erfassungSichern() : null,
                 anlagen: (typeof anlagenSichern === 'function') ? anlagenSichern() : null,
@@ -417,7 +419,8 @@ function loadCase(e) {
                 if (data.stellungnahmeWiderspruch) widerspruchStellungnahme = String(data.stellungnahmeWiderspruch);
                 else merkeWiderspruchStellungnahme(data.appealDraft || '');
             }
-            setzeModus(data.appModus || 'widerspruch');   // ältere Fälle sind immer Widersprüche
+            // Ältere Fälle sind immer Widersprüche – und immer Erwachsenenvorgänge.
+            setzeModus(data.appModus || 'widerspruch', !!data.appKindVorgang);
             if (typeof befundLaden === 'function') befundLaden(data.befund);
             if (typeof erfassungLaden === 'function') erfassungLaden(data.erfassung);
             if (typeof anlagenLaden === 'function') anlagenLaden(data.anlagen);

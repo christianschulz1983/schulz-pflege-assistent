@@ -179,18 +179,41 @@ function aktuelleAltersklasse() {
 /* Der Hinweistext unter dem Begutachtungsdatum. Reine Anzeige – er ändert nichts.  */
 function alterHinweisHtml() {
     const lage = kinderLage();
+    // Wurde auf der Startseite ein Kindervorgang gewählt? Die Kachel entscheidet die
+    // Rechnung NICHT – aber wenn sie dem erfassten Alter widerspricht, muss das
+    // auffallen, statt dass die App stillschweigend anders rechnet als gewählt.
+    const kachelKind = (typeof appKindVorgang !== 'undefined') && appKindVorgang;
 
-    if (lage.grund === 'kein Geburtsdatum') return '';          // Normalfall, kein Lärm
+    if (lage.grund === 'kein Geburtsdatum') {
+        if (!kachelKind) return '';                             // Normalfall, kein Lärm
+        return '<span class="alter-offen">Kindervorgang gewählt – es fehlt das '
+             + 'Geburtsdatum. Ohne Geburts- und Begutachtungsdatum rechnet die App nach '
+             + 'dem Erwachsenenmaßstab.</span>';
+    }
     if (lage.grund === 'kein Begutachtungsdatum') {
         return '<span class="alter-offen">Für die Altersprüfung fehlt das '
-             + 'Begutachtungsdatum. Maßgeblich ist das Alter an diesem Tag, nicht heute.</span>';
+             + 'Begutachtungsdatum. Maßgeblich ist das Alter an diesem Tag, nicht heute.'
+             + (kachelKind ? ' Bis dahin rechnet die App nach dem Erwachsenenmaßstab.' : '')
+             + '</span>';
     }
     if (lage.grund) return '<span class="alter-offen">' + escapeHtml(lage.grund) + '</span>';
 
     const alter = escapeHtml(lage.text);
     if (lage.klasse === ALTERSKLASSE.ERWACHSEN) {
+        if (kachelKind) {
+            return '<span class="alter-offen">Kindervorgang gewählt, das erfasste Alter '
+                 + 'bei der Begutachtung ist aber ' + alter + '. Ab elf Jahren gilt der '
+                 + 'Erwachsenenmaßstab (BRi Seite 145) – die Kindersystematik greift hier '
+                 + 'nicht.</span>';
+        }
         return '<span class="alter-info">Alter bei der Begutachtung: ' + alter
              + ' – ab 11 Jahren gilt der Erwachsenenmaßstab.</span>';
+    }
+    // Kind nach dem Alter, aber auf der Startseite ein Erwachsenenvorgang gewählt.
+    if (!kachelKind) {
+        return '<span class="alter-offen">Das erfasste Alter bei der Begutachtung ist '
+             + alter + '. Die App rechnet deshalb nach den Maßstäben für Kinder, obwohl '
+             + 'kein Kindervorgang gewählt wurde.</span>';
     }
     if (lage.klasse === ALTERSKLASSE.SAEUGLING) {
         return '<span class="alter-kind">Kind, ' + alter + ' bei der Begutachtung – '

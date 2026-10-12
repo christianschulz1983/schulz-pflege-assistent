@@ -626,6 +626,15 @@
         .start-kachel:hover { border-color: var(--accent); box-shadow: 0 4px 16px var(--accent-glow); }
         .start-kachel.aktiv { border-color: var(--accent); background: var(--accent-dim); }
         .start-kachel.vorbereitung { opacity: 0.72; }
+        /* Kindervorgänge – dieselben vier Vorgänge, deutlich abgesetzt, damit beim
+           Start keine Verwechslung entsteht. */
+        .start-kachel.kind { border-left: 3px solid var(--accent2); }
+        .start-kachel.kind:hover { border-color: var(--accent2); box-shadow: 0 4px 16px var(--accent2-dim); }
+        .start-kachel.kind.aktiv { border-color: var(--accent2); background: var(--accent2-dim); }
+        .start-abschnitt-hinweis {
+            font-size: 12px; line-height: 1.6; color: var(--text-secondary);
+            margin: -4px 0 12px 0;
+        }
         .sk-kopf { display: flex; align-items: center; gap: 9px; }
         .sk-zeichen { font-size: 20px; line-height: 1; }
         .sk-titel { font-size: 14px; font-weight: 800; color: var(--text-primary); }

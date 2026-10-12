@@ -47,6 +47,20 @@ function kinderModulAusgesetzt(m) {
     return KINDER_MODULE_BIS_18_MONATE_AUSGESETZT.indexOf(Number(m)) >= 0;
 }
 
+/* Kriterium zur Nummer – einmal nachgeschlagen, dann gemerkt.
+   `kinderKriteriumLage` wird bei JEDER Punkteermittlung je Kriterium aufgerufen, und
+   die Kipp-Analyse rechnet den ganzen Fall je abweichendem Kriterium neu durch. Ein
+   `ITEMS.find` an dieser Stelle macht daraus eine quadratische Suche. */
+let itemNrSpeicher = null;
+
+function itemZuNr(nr) {
+    if (!itemNrSpeicher) {
+        itemNrSpeicher = {};
+        ITEMS.forEach(i => { itemNrSpeicher[i.nr] = i; });
+    }
+    return itemNrSpeicher[nr] || null;
+}
+
 function kinderKriteriumLage(nr) {
     const leer = { aktiv: false, gesperrt: false, ausgesetzt: false,
                    normStufe: null, normText: '', abText: '' };
@@ -57,7 +71,7 @@ function kinderKriteriumLage(nr) {
     if (lage.klasse !== ALTERSKLASSE.KIND && lage.klasse !== ALTERSKLASSE.SAEUGLING) return leer;
 
     // Bis zu 18 Monaten entfällt das ganze Modul – nicht nur einzelne Kriterien.
-    const item = ITEMS.find(i => i.nr === nr);
+    const item = itemZuNr(nr);
     if (item && kinderModulAusgesetzt(item.m)) {
         return { aktiv: true, gesperrt: true, ausgesetzt: true,
                  normStufe: 3, normText: altersnormBezeichnung(nr, 3), abText: '18 Monaten' };
@@ -103,7 +117,7 @@ function kinderSperrText(nr) {
     const l = kinderKriteriumLage(nr);
     if (!l.gesperrt) return '';
     if (l.ausgesetzt) {
-        const item = ITEMS.find(i => i.nr === nr);
+        const item = itemZuNr(nr);
         const m = item ? item.m : '';
         return 'Nicht bearbeitbar: Bei Kindern bis zu 18 Monaten wird Modul ' + m
              + ' nicht bewertet (§ 15 Absatz 7 SGB XI). Gewertet werden nur die Module 3 '

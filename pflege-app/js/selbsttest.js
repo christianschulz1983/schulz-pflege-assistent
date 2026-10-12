@@ -36,6 +36,7 @@ async function selbsttest() {
         befund: (typeof befundSichern === 'function') ? JSON.parse(JSON.stringify(befundSichern())) : null,
         erfassung: (typeof erfassungSichern === 'function') ? JSON.parse(JSON.stringify(erfassungSichern())) : null,
         modus: (typeof appModus !== 'undefined') ? appModus : null,
+        kindVorgang: (typeof appKindVorgang !== 'undefined') ? appKindVorgang : false,
         /* Stammdaten, Diagnosen und Anhörungsfelder – dieselben Felder, die „Fall speichern"
            sichert. Der Test ruft die Freigabe eines Imports auf; die leert diese Felder und baut
            die Diagnosezeilen neu. Ohne diese Sicherung verlor, wer mitten im Fall den Selbsttest
@@ -6171,6 +6172,107 @@ async function selbsttest() {
                 && auftragUebernehmen.toString().includes('cb.checked'));
         }
 
+        // KINDERVORGANG AUF DER STARTSEITE (js/modus.js).
+        // Vier zusätzliche Kacheln. Sie legen NICHT fest, wie gerechnet wird – das
+        // tut das Alter am Begutachtungstag. Sie fordern die beiden Daten ein und
+        // benennen, wenn Kachel und Alter auseinanderfallen.
+        {
+            const merkModus = appModus;
+            const merkKind = appKindVorgang;
+            const merkGK = document.getElementById('stam-geboren').value;
+            const merkBK = document.getElementById('stam-begutachtung').value;
+            const setzD = (g, b) => {
+                document.getElementById('stam-geboren').value = g;
+                document.getElementById('stam-begutachtung').value = b;
+            };
+            try {
+                // Acht Kacheln: vier Vorgänge, je einmal Erwachsene und Kinder
+                zeigeStart(true);
+                const erw = document.querySelectorAll('#start-modi .start-kachel');
+                const kin = document.querySelectorAll('#start-modi-kinder .start-kachel');
+                pruefe('Vier Kacheln für Erwachsene', erw.length, 4);
+                pruefe('Vier Kacheln für Kinder', kin.length, 4);
+                pruefeWahr('Alle vier Vorgänge gibt es auch für Kinder',
+                    ['Widerspruch', 'Erstantrag', 'Höherstufungsantrag', 'Anhörung'].every(t =>
+                        [...kin].some(b => b.innerText.includes(t + ' (Kind)'))));
+                pruefeWahr('Die Kinderkacheln sind abgesetzt',
+                    [...kin].every(b => b.classList.contains('kind'))
+                    && [...erw].every(b => !b.classList.contains('kind')));
+                schliesseStart();
+
+                // Die Wahl merkt sich die App und zeigt sie an
+                setzeModus('erstantrag', true);
+                pruefeWahr('Kindervorgang ist gesetzt', appKindVorgang === true);
+                // innerText gibt den GERENDERTEN Text zurueck, und die Anzeige wird per
+                // CSS in Grossbuchstaben gesetzt - deshalb ohne Ruecksicht auf Gross-
+                // und Kleinschreibung pruefen.
+                pruefeWahr('Die Anzeige nennt ihn',
+                    /kind/i.test(document.getElementById('modus-anzeige').innerText));
+                setzeModus('erstantrag', false);
+                pruefeWahr('Und wieder abwählbar', appKindVorgang === false
+                    && !/kind/i.test(document.getElementById('modus-anzeige').innerText));
+
+                // Ohne dritten Parameter bleibt die Einstellung stehen – „Fall laden",
+                // Selbsttest und Wiederherstellung rufen setzeModus ohne sie auf.
+                setzeModus('widerspruch', true);
+                setzeModus('anhoerung');
+                pruefeWahr('Ein Aufruf ohne Angabe lässt den Kindervorgang stehen',
+                    appKindVorgang === true);
+
+                // ---- Kachel und Alter widersprechen sich: es wird gesagt ------------
+                setzeModus('widerspruch', true);
+                setzD('', '2026-01-15');
+                pruefeWahr('Kindervorgang ohne Geburtsdatum wird angemahnt',
+                    alterHinweisHtml().includes('alter-offen')
+                    && alterHinweisHtml().includes('fehlt das Geburtsdatum'));
+                pruefeWahr('Und es steht da, wie dann gerechnet wird',
+                    alterHinweisHtml().includes('Erwachsenenmaßstab'));
+
+                setzD('2010-01-15', '2026-01-15');   // 16 Jahre
+                pruefeWahr('Kindervorgang mit 16 Jahren wird benannt',
+                    alterHinweisHtml().includes('alter-offen')
+                    && alterHinweisHtml().includes('greift hier nicht'));
+
+                setzeModus('widerspruch', false);
+                setzD('2023-01-15', '2026-01-15');   // 3 Jahre, aber Erwachsenenkachel
+                pruefeWahr('Erwachsenenvorgang mit vierjährigem Kind wird benannt',
+                    alterHinweisHtml().includes('alter-offen')
+                    && alterHinweisHtml().includes('obwohl'));
+                // Und die Rechnung folgt trotzdem dem Alter, nicht der Kachel.
+                pruefeWahr('Gerechnet wird nach dem Alter, nicht nach der Kachel',
+                    istKinderfall() && kinderKriteriumLage('4.2.7').gesperrt);
+
+                // Stimmen Kachel und Alter überein, bleibt es beim ruhigen Hinweis
+                setzeModus('widerspruch', true);
+                pruefeWahr('Passt beides zusammen, kein Warnton',
+                    alterHinweisHtml().includes('alter-kind')
+                    && !alterHinweisHtml().includes('alter-offen'));
+
+                // Der Dateiname ändert sich durch die Kachel NICHT (Regel 51).
+                const merkBetr = document.getElementById('stam-betreffend').value;
+                const merkNr6 = document.getElementById('stam-kundennummer').value;
+                try {
+                    document.getElementById('stam-betreffend').value = 'Herr Max Mustermann';
+                    document.getElementById('stam-kundennummer').value = '100001';
+                    setzeModus('widerspruch', true);
+                    const mitKind = ausgabeDateiname('.doc');
+                    setzeModus('widerspruch', false);
+                    pruefe('Der Kindervorgang ändert den Dateinamen nicht',
+                        mitKind, ausgabeDateiname('.doc'));
+                    pruefe('Und er bleibt beim vereinbarten Schema',
+                        mitKind, 'PS_100001_Mustermann.doc');
+                } finally {
+                    document.getElementById('stam-betreffend').value = merkBetr;
+                    document.getElementById('stam-kundennummer').value = merkNr6;
+                }
+            } finally {
+                document.getElementById('stam-geboren').value = merkGK;
+                document.getElementById('stam-begutachtung').value = merkBK;
+                setzeModus(merkModus, merkKind);
+                kinderAnsichtAktualisieren();
+            }
+        }
+
         // KINDER BIS ZU 18 MONATEN – die eigene Welt (§ 15 Abs. 7 SGB XI, BRi S. 144,
         // 176, 200, 202, 258). Nur Module 3 und 5, dazu 4.1.B und die Frage KF 4.4.0;
         // die Module 1, 2, 4 und 6 entfallen ganz, und es gelten verschobene Schwellen.
@@ -6800,11 +6902,17 @@ async function selbsttest() {
                     kinderLage().klasse, ALTERSKLASSE.ERWACHSEN);
                 pruefeWahr('Dann ist es kein Kinderfall mehr', !istKinderfall());
 
-                // Der Hinweis landet im dafür vorgesehenen Kasten
+                // Der Hinweis landet im dafür vorgesehenen Kasten.
+                // Dafür muss auch der Kindervorgang gewählt sein: Ein Kinderalter ohne
+                // Kinderkachel ergibt seit der Startauswahl absichtlich eine Warnung
+                // statt des ruhigen Hinweises.
+                const merkKindH = appKindVorgang;
+                setzeModus(appModus, true);
                 setz('stam-begutachtung', '2025-06-15');
                 alterHinweisZeigen();
                 const kasten = document.getElementById('alter-hinweis');
                 pruefeWahr('Der Hinweis steht in der Karte', kasten.innerHTML.includes('alter-kind'));
+                setzeModus(appModus, merkKindH);
                 pruefeWahr('Der Kasten ist sichtbar', kasten.style.display === 'block');
                 setz('stam-geboren', ''); alterHinweisZeigen();
                 pruefeWahr('Ohne Geburtsdatum verschwindet der Kasten wieder',
@@ -6903,7 +7011,7 @@ async function selbsttest() {
             if (sicherung.anlagen && typeof anlagenLaden === 'function') anlagenLaden(sicherung.anlagen);
             if (sicherung.befund) befundLaden(sicherung.befund);
             if (sicherung.erfassung) erfassungLaden(sicherung.erfassung);
-            if (sicherung.modus) setzeModus(sicherung.modus);
+            if (sicherung.modus) setzeModus(sicherung.modus, sicherung.kindVorgang);
             // Erst genug Diagnosezeilen anlegen (wie beim Laden eines Falls), dann die Felder füllen
             if (typeof ensureDiagRows === 'function' && typeof maxDiagIndex === 'function') {
                 ensureDiagRows(maxDiagIndex(sicherung.felder));

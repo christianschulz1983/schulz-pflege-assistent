@@ -3,6 +3,23 @@
 
 let appModus = 'widerspruch';
 
+/* KINDERVORGANG – die Kachel sagt die Absicht, das Alter entscheidet die Rechnung.
+   ------------------------------------------------------------------------------
+   Die Kindersystematik hing bisher allein am Geburtsdatum und schaltete sich damit
+   still zu. Rechnerisch ist das richtig – zu bedienen war es schlecht: Beim Start war
+   nicht zu sehen, dass es den Weg überhaupt gibt, und wer das Geburtsdatum vergaß,
+   bekam ohne Warnung eine Rechnung nach dem Erwachsenenmaßstab.
+
+   Deshalb vier zusätzliche Kacheln. Sie legen NICHT fest, wie gerechnet wird – das
+   täte sonst ein Haken, und ein Haken kann falsch gesetzt sein. Maßgeblich bleibt das
+   Alter am Begutachtungstag (BRi Seite 146). Die Kachel bewirkt zweierlei:
+     1. Sie fordert Geburts- und Begutachtungsdatum ein, solange sie fehlen.
+     2. Weichen Kachel und Alter voneinander ab, wird das benannt statt verschwiegen.
+   Die Vorgangsart selbst bleibt dieselbe – ein Widerspruch für ein Kind ist ein
+   Widerspruch. Deshalb ändern sich weder die Vorlagen noch die Dateinamen
+   (PS_/HA_/EA_, Regel 51). */
+let appKindVorgang = false;
+
 const MODI = {
     widerspruch: {
         titel: 'Widerspruch',
@@ -34,21 +51,41 @@ const MODI = {
     }
 };
 
+/* Was an den vier Vorgängen anders ist, wenn es um ein Kind geht. Nur der Text –
+   der Ablauf ist derselbe. */
+const MODI_KINDER_TEXT = {
+    widerspruch: 'Gutachten und Bescheid für ein Kind liegen vor. Bewertet wird die Abweichung '
+        + 'von einem altersentsprechend entwickelten Kind (BRi Kapitel 5).',
+    erstantrag: 'Erstmaliger Antrag für ein Kind. Angaben, Entwicklungsstand und Befund erheben '
+        + 'und den Antrag erstellen.',
+    hoeherstufung: 'Vorgutachten für ein Kind liegt vor, der Zustand hat sich verschlechtert. '
+        + 'Achtung: Kinder lernen dazu – das Rückstufungsrisiko vorher prüfen.',
+    anhoerung: 'Der Widerspruch für ein Kind wurde abgelehnt, ein Zweitgutachten liegt vor. '
+        + 'Erstgutachten, eigene Stellungnahme und Zweitgutachten vergleichen.'
+};
+
+function startKachel(k, kind) {
+    const m = MODI[k];
+    const aktiv = (k === appModus && !!kind === !!appKindVorgang) ? ' aktiv' : '';
+    const titel = kind ? m.titel + ' (Kind)' : m.titel;
+    const text = kind ? MODI_KINDER_TEXT[k] : m.text;
+    return `<button type="button" class="start-kachel${aktiv}${kind ? ' kind' : ''}${m.fertig ? '' : ' vorbereitung'}" onclick="waehleModus('${k}',${kind ? 'true' : 'false'})">
+        <div class="sk-kopf"><span class="sk-zeichen">${m.zeichen}</span><span class="sk-titel">${escapeHtml(titel)}</span></div>
+        <div class="sk-text">${escapeHtml(text)}</div>
+        ${m.fertig ? '<div class="sk-status bereit">einsatzbereit</div>'
+                   : '<div class="sk-status offen">in Vorbereitung</div>'}
+    </button>`;
+}
+
 // Startauswahl anzeigen. schliessbar = false beim ersten Öffnen (es muss gewählt werden).
 function zeigeStart(schliessbar) {
     const ov = document.getElementById('start-overlay');
     if (!ov) return;
-    const kacheln = Object.keys(MODI).map(k => {
-        const m = MODI[k];
-        const aktiv = (k === appModus) ? ' aktiv' : '';
-        return `<button type="button" class="start-kachel${aktiv}${m.fertig ? '' : ' vorbereitung'}" onclick="waehleModus('${k}')">
-            <div class="sk-kopf"><span class="sk-zeichen">${m.zeichen}</span><span class="sk-titel">${escapeHtml(m.titel)}</span></div>
-            <div class="sk-text">${escapeHtml(m.text)}</div>
-            ${m.fertig ? '<div class="sk-status bereit">einsatzbereit</div>'
-                       : '<div class="sk-status offen">in Vorbereitung</div>'}
-        </button>`;
-    }).join('');
-    document.getElementById('start-modi').innerHTML = kacheln;
+    const schluessel = Object.keys(MODI);
+    document.getElementById('start-modi').innerHTML =
+        schluessel.map(k => startKachel(k, false)).join('');
+    const kinder = document.getElementById('start-modi-kinder');
+    if (kinder) kinder.innerHTML = schluessel.map(k => startKachel(k, true)).join('');
     const fuss = document.getElementById('start-fuss');
     if (fuss) fuss.style.display = schliessbar ? 'flex' : 'none';
     ov.classList.add('active');
@@ -60,18 +97,23 @@ function schliesseStart() {
 }
 
 // Auswahl einer Kachel
-function waehleModus(key) {
+function waehleModus(key, kind) {
     if (!MODI[key]) return;
     if (!MODI[key].fertig) { zeigeVorbereitung(key); return; }
-    setzeModus(key);
+    setzeModus(key, !!kind);
     schliesseStart();
 }
 
-function setzeModus(key) {
+/* `kind` ist absichtlich dreiwertig: Wird es weggelassen, bleibt die bisherige
+   Einstellung stehen. `setzeModus` wird auch aus „Fall laden", dem Selbsttest und
+   der Wiederherstellung heraus aufgerufen – dort darf die Angabe nicht verlorengehen. */
+function setzeModus(key, kind) {
     if (!MODI[key]) key = 'widerspruch';
     appModus = key;
+    if (kind !== undefined) appKindVorgang = !!kind;
     const anz = document.getElementById('modus-anzeige');
-    if (anz) anz.innerText = MODI[key].zeichen + ' ' + MODI[key].titel;
+    if (anz) anz.innerText = MODI[key].zeichen + ' ' + MODI[key].titel
+        + (appKindVorgang ? ' · Kind' : '');
     // Die Befunderhebung gehört zu Erstantrag und Höherstufungsantrag.
     // Im Widerspruch bleibt die Reiterleiste unverändert.
     const btn = document.getElementById('btn-tab-befund');
@@ -112,6 +154,14 @@ function setzeModus(key) {
     if (typeof renderAnalyseBereich === 'function') renderAnalyseBereich();
     // Verfahrensfehler-Checkliste: Widerspruch und Anhörung (js/verfahren.js)
     if (typeof renderVerfahrenBereich === 'function') renderVerfahrenBereich();
+    /* Kindervorgang: nur den Hinweis neu setzen – NICHT die ganze Ansicht.
+       Die Kachel ändert keine Sperre und keine Punktzahl, sie ändert allein den
+       Hinweistext. `kinderAnsichtAktualisieren()` würde hier die Kriterienliste neu
+       zeichnen und die Analyse ein zweites Mal rechnen (setzeModus ruft
+       `renderAnalyseBereich` bereits selbst auf, und `calculate('own')` tut es
+       nochmals). Die Analyse rechnet den ganzen Fall je abweichendem Kriterium neu –
+       der Selbsttest lief damit nicht mehr durch. */
+    if (typeof alterHinweisZeigen === 'function') alterHinweisZeigen();
     // Bereich für das Anhörungsverfahren nur dort
     const anh = document.getElementById('anhoerung-bereich');
     if (anh) {
