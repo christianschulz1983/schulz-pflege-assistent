@@ -951,6 +951,44 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
      JEDER Punkteermittlung je Kriterium, und die Kipp-Analyse rechnet den Fall je
      abweichendem Kriterium neu. Ein `find` darin macht daraus eine quadratische Suche.
 
+60. **Übernahme in Modul 5: wie mehrere Zeilen zu EINEM Kriterium werden**
+   (`modul5AusErfassung` in `js/erfassung.js`). Gemeldet: „Bei der Übernahme der
+   Arztbesuche wird in Modul 5 ein deutlich höherer Wert eingetragen und auch bei der
+   Medikation." Nachgestellt – **drei verschiedene Ursachen**:
+   - **(1) Der gröbste statt des feinsten Zeitraums.** „3 pro Tag" plus „1 pro Woche"
+     ergab **22 pro Woche**. Der Tagesdurchschnitt stimmte (22/7), aber im Kriterium
+     stand eine 22, und der Regler reicht nur bis 15. Jetzt bleibt der **feinste**
+     beteiligte Zeitraum: 3,1429 pro Tag.
+   - **(2) Gruppe C rechnet mit eigenen Faktoren, nicht mit Kalendertagen.** Die BRi
+     wertet dort jeden wöchentlichen Besuch mit **4,3** und jeden monatlichen mit 1
+     (bei 4.5.12 und 4.5.15 doppelt). Die Umrechnung über 30/7 = 4,2857 ergab aus
+     „1 pro Woche" plus „1 pro Monat" 5,2857 statt 5,3. In Gruppe C ist die **additive
+     Größe die Punktzahl**, nicht die Häufigkeit – erst zum Schluss wird zurückgerechnet.
+   - **(3) „pro Tag" fiel in Gruppe C still aus.** Die Zeitraum-Auswahl bietet „pro Tag"
+     an, die Punktetabelle von 4.5.13 bis 4.5.15 kennt aber nur W und M – `factor['D']`
+     war `undefined`, also **null Punkte, ohne jede Meldung**. Zwei Arztbesuche täglich
+     ergaben gar nichts. Jetzt wird ein täglicher Eintrag dort auf die Woche umgelegt
+     (×7); nur 4.5.12 hat einen eigenen Tagesfaktor (60) und behält ihn.
+   **Einzelne Zeilen rechnen unverändert** – die Änderung betrifft das Zusammenführen.
+   Dass der Fehler so lange überlebte, lag daran, dass keine Prüfung mehrere Zeilen mit
+   **verschiedenen** Zeiträumen auf dasselbe Kriterium führte. Genau das prüfen die
+   neuen Fälle; die Gegenprobe stellt den gemeldeten Wert „22 pro Woche" wieder her.
+
+61. **Tätigkeit der Pflegeperson am Hilfsmittel ist eine Auswahl mit freiem Ausweg**
+   (`HILFSMITTEL_TAETIGKEIT`, `js/erfassung.js`). Vorgabe des Verfassers: „selbständig
+   oder durch Pflegeperson und auch noch die Möglichkeit einer freien Eingabe."
+   Ein reines Schreibfeld war als Schalter unglücklich – man sah ihm nicht an, dass es
+   über die Wertung in Modul 5 entscheidet.
+   - **Der Schalter heißt jetzt „nicht selbständig", nicht mehr „nicht leer".**
+     Vorher galt allein „steht da etwas". Seit die Spalte eine Auswahl ist, kann dort
+     ausdrücklich „selbständig" stehen – das ist eine Aussage und bedeutet KEINE
+     personelle Hilfe. Eine **leere** Zelle bedeutet weiterhin dasselbe: Wer nichts
+     einträgt, hat nichts behauptet.
+   - Ältere Falldateien kennen das Feld nicht – dort gilt unverändert `durchfuehrung`.
+   - Offene Liste nach Regel 24: Was die Pflegeperson tut, BESCHREIBT; nur die
+     Unterscheidung „selbständig oder nicht" steuert die Rechnung, und die steht in
+     der Liste.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1015,8 +1053,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 1993 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl).
+Der Selbsttest umfasst 2012 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

@@ -23,6 +23,11 @@ const ZEITRAUM_UMRECHNUNG = {
 };
 const BEGLEITUNG = ['selbständig', 'in Begleitung'];
 const DURCHFUEHRUNG = ['selbständig', 'durch Pflegeperson'];
+/* Tätigkeit der Pflegeperson am Hilfsmittel. „selbständig" ist der einzige Wert, der
+   NICHT in Modul 5 einfließt – alles andere, auch eine eigene Beschreibung, bedeutet
+   personelle Hilfe. Die leere Zelle bleibt zulässig und zählt wie „selbständig":
+   Wer nichts einträgt, hat nichts behauptet. */
+const HILFSMITTEL_TAETIGKEIT = ['selbständig', 'durch Pflegeperson'];
 
 const ARZT_FACH = ['Hausarzt', 'Facharzt (bitte ergänzen)', 'Neurologe', 'Psychiater', 'Kardiologe',
     'Orthopäde', 'Urologe', 'Onkologe', 'Augenarzt', 'Zahnarzt'];
@@ -86,9 +91,11 @@ const ERFASSUNG_TABELLEN = [
         /* Eine Zeile je Hilfsmittel – hier steht ALLES dazu, auch was die Pflegeperson
            damit tut und wie oft. Vorher gab es dieselbe Angabe ein zweites Mal in der
            Behandlungspflege; die App hat beides addiert und 4.5.7 damit verdoppelt. */
-        hinweis: 'Eine Zeile je Hilfsmittel. Das Feld „Tätigkeit der Pflegeperson" ist der Schalter: '
-               + 'Steht dort etwas, liegt personelle Hilfe vor und das Hilfsmittel fließt in Modul 5 ein '
-               + '(körpernahe Hilfsmittel zu 4.5.7). Bleibt es leer, wird nur aufgelistet. '
+        hinweis: 'Eine Zeile je Hilfsmittel. Die Spalte „Tätigkeit der Pflegeperson" ist der '
+               + 'Schalter: Bei „selbständig" wird das Hilfsmittel nur aufgelistet, bei jeder '
+               + 'anderen Angabe fließt es in Modul 5 ein (körpernahe Hilfsmittel zu 4.5.7) – '
+               + 'dann bitte auch Anzahl und Zeitraum ausfüllen. Neben „durch Pflegeperson" '
+               + 'lässt sich die Hilfe über „＋ eigene Angabe" genauer beschreiben. '
                + 'Ungenutzte Hilfsmittel zählen nie. Nicht gewertet werden laut BRi: Brille, '
                + 'Zahnprothese (gehört zu 4.4.2) sowie Gehhilfen wie Rollator, Gehstock oder Rollstuhl.',
         spalten: [
@@ -96,7 +103,15 @@ const ERFASSUNG_TABELLEN = [
             { k: 'nutzung', l: 'Nutzung', typ: 'select', opt: HILFSMITTEL_NUTZUNG, b: '130px' },
             { k: 'anzahl', l: 'Anzahl', typ: 'number', b: '80px' },
             { k: 'zeitraum', l: 'Zeitraum', typ: 'select', opt: HAEUFIGKEIT_ZEITRAUM, b: '120px' },
-            { k: 'taetigkeit', l: 'Tätigkeit der Pflegeperson', typ: 'text' }
+            /* Vorgabe des Verfassers: „hier wäre eine Auswahl hilfreich. selbständig oder
+               durch Pflegeperson und auch noch die Möglichkeit einer freien Eingabe."
+               Ein reines Schreibfeld war als Schalter unglücklich – man sah ihm nicht an,
+               dass es über die Wertung in Modul 5 entscheidet. Die Liste ist offen
+               (Regel 24): Was die Pflegeperson tut, BESCHREIBT; nur die Unterscheidung
+               „selbständig oder nicht" steuert die Rechnung, und die steht in der Liste. */
+            { k: 'taetigkeit', l: 'Tätigkeit der Pflegeperson', typ: 'select',
+              opt: HILFSMITTEL_TAETIGKEIT, frei: true,
+              platzhalter: 'z. B. Anlegen und Abnehmen der Kompressionsstrümpfe' }
         ]
     },
     {
@@ -546,25 +561,82 @@ function medikationGruppiert(liste) {
 }
 
 // ------------------------------------------------- Übernahme in Modul 5
-// Liefert { kriteriumNr: {count, period} } aus den erfassten Angaben.
+/* Liefert { kriteriumNr: {count, period} } aus den erfassten Angaben.
+
+   WIE MEHRERE ZEILEN ZU EINEM KRITERIUM ZUSAMMENKOMMEN – drei gemeldete Fehler.
+   ------------------------------------------------------------------------------
+   Gemeldet: „Bei der Übernahme der Arztbesuche wird in Modul 5 ein deutlich höherer
+   Wert eingetragen und auch bei der Medikation." Nachgestellt, drei verschiedene
+   Ursachen:
+
+   (1) ZU HOHE ZAHL IM KRITERIUM. Beim Zusammenführen wurde der GRÖBSTE beteiligte
+       Zeitraum beibehalten. „3 pro Tag" plus „1 pro Woche" ergab damit „22 pro
+       Woche". Rechnerisch ist 22/7 zwar derselbe Tagesdurchschnitt, aber im
+       Kriterium stand eine 22, und der Regler reicht nur bis 15. Jetzt wird der
+       FEINSTE beteiligte Zeitraum behalten: 3,1429 pro Tag.
+
+   (2) GRUPPE C RECHNET MIT EIGENEN FAKTOREN, NICHT MIT KALENDERTAGEN. Die BRi wertet
+       dort jeden wöchentlichen Besuch mit 4,3 und jeden monatlichen mit 1 (bei 4.5.12
+       und 4.5.15 doppelt). Die alte Umrechnung ging über 30/7 = 4,2857 und ergab aus
+       „1 pro Woche" plus „1 pro Monat" 5,2857 statt 5,3. Deshalb wird in Gruppe C
+       jetzt über die PUNKTE zusammengezählt – die sind dort die additive Größe – und
+       erst zum Schluss wieder in eine Häufigkeit zurückgerechnet.
+
+   (3) „PRO TAG" FIEL IN GRUPPE C STILL AUS. Die Zeitraum-Auswahl bietet „pro Tag" an,
+       die Punktetabelle von 4.5.13 bis 4.5.15 kennt aber nur W und M. Zwei Arztbesuche
+       täglich ergaben dadurch NULL Punkte, ohne jede Meldung. Jetzt wird ein täglicher
+       Eintrag dort auf die Woche umgelegt (×7). Nur 4.5.12 hat einen eigenen
+       Tagesfaktor (60) und behält ihn.
+
+   Einzelne Zeilen rechnen unverändert wie bisher – die Änderung betrifft das
+   Zusammenführen und den Sonderfall „pro Tag" in Gruppe C.                          */
 function modul5AusErfassung() {
     const ziel = {};
+    const roh = {};        // nr -> [{ n, period }]
     const addieren = (nr, anzahl, zeitraum) => {
         let n = parseFloat(anzahl);
         if (!(n > 0) || !zeitraum) return;
         // Quartal und Jahr auf den Monat umlegen; alles Übrige bleibt, wie es ist.
         const u = ZEITRAUM_UMRECHNUNG[zeitraum] || { period: 'M', teiler: 1 };
-        const p = u.period;
-        // BRi Fußnote 13: jeder Rechenschritt auf die 4. Nachkommastelle (bisher nur 2)
+        // BRi Fußnote 13: jeder Rechenschritt auf die 4. Nachkommastelle
         if (u.teiler !== 1) n = m5Runden(n / u.teiler);
-        // je Kriterium auf einen gemeinsamen Zeitraum bringen (den bisher genutzten)
-        if (!ziel[nr]) { ziel[nr] = { count: n, period: p }; return; }
+        (roh[nr] = roh[nr] || []).push({ n: n, period: u.period });
+    };
+
+    // Wird am Ende von modul5AusErfassung aufgerufen – siehe dort.
+    const zusammenfuehren = () => {
         const proTag = { D: 1, W: 1 / 7, M: 1 / 30 };
-        const summeTag = ziel[nr].count * proTag[ziel[nr].period] + n * proTag[p];
-        // gröbsten der beteiligten Zeiträume beibehalten
         const rang = { D: 0, W: 1, M: 2 };
-        const p2 = rang[p] > rang[ziel[nr].period] ? p : ziel[nr].period;
-        ziel[nr] = { count: m5Runden(summeTag / proTag[p2]), period: p2 };
+        Object.keys(roh).forEach(nr => {
+            const item = ITEMS.find(i => i.nr === nr);
+            const faktor = (item && item.factor) ? item.factor : null;
+
+            if (faktor) {
+                /* Gruppe C: additiv sind die Punkte, nicht die Häufigkeiten. */
+                let punkte = 0, feinste = 'M';
+                roh[nr].forEach(e => {
+                    let n = e.n, p = e.period;
+                    // „pro Tag" bei 4.5.13 bis 4.5.15: auf die Woche umlegen, statt
+                    // mit einem fehlenden Faktor still auf null zu fallen.
+                    if (faktor[p] === undefined && p === 'D') { n = n * 7; p = 'W'; }
+                    if (faktor[p] === undefined) return;      // sollte nicht vorkommen
+                    punkte += n * faktor[p];
+                    if (rang[p] < rang[feinste]) feinste = p;
+                });
+                if (!(punkte > 0) || !faktor[feinste]) return;
+                ziel[nr] = { count: m5Runden(punkte / faktor[feinste]), period: feinste };
+                return;
+            }
+
+            /* Gruppen A und B: additiv ist der Tagesdurchschnitt (so rechnet m5Gruppen). */
+            let summeTag = 0, feinste = 'M';
+            roh[nr].forEach(e => {
+                summeTag += e.n * proTag[e.period];
+                if (rang[e.period] < rang[feinste]) feinste = e.period;
+            });
+            if (!(summeTag > 0)) return;
+            ziel[nr] = { count: m5Runden(summeTag / proTag[feinste]), period: feinste };
+        });
     };
 
     (erfassung.arztbesuche || []).forEach(z => {
@@ -587,8 +659,16 @@ function modul5AusErfassung() {
     (erfassung.hilfsmittel || []).forEach(z => {
         // Der Schalter ist die eingetragene Tätigkeit: Steht dort etwas, hilft eine Person.
         // Ältere Fälle kennen das Feld nicht – dort gilt weiterhin die Durchführung.
-        const hilft = (z.taetigkeit || '').trim()
-            ? true : (z.taetigkeit === undefined && z.durchfuehrung === 'durch Pflegeperson');
+        /* Der Schalter: „selbständig" zählt nicht, alles andere schon.
+           Vorher galt allein „steht da etwas". Seit die Spalte eine Auswahl ist, kann
+           dort ausdrücklich „selbständig" stehen – das ist eine Aussage und bedeutet
+           KEINE personelle Hilfe. Eine leere Zelle bedeutet weiterhin dasselbe: Wer
+           nichts einträgt, hat nichts behauptet.
+           Ältere Fälle kennen das Feld nicht – dort gilt weiterhin die Durchführung. */
+        const t = (z.taetigkeit || '').trim();
+        const hilft = t
+            ? (t.toLowerCase() !== 'selbständig')
+            : (z.taetigkeit === undefined && z.durchfuehrung === 'durch Pflegeperson');
         if (!hilft) return;
         if ((z.nutzung || '') === 'ungenutzt') return;   // ungenutzt begründet keinen Aufwand
         const b = (z.bezeichnung || '').toLowerCase();
@@ -613,6 +693,7 @@ function modul5AusErfassung() {
         else if (/katheter|abführ|abfuehr/.test(a)) nr = '4.5.10';
         addieren(nr, z.anzahl, z.zeitraum);
     });
+    zusammenfuehren();
     return ziel;
 }
 

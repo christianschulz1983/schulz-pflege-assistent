@@ -6172,6 +6172,108 @@ async function selbsttest() {
                 && auftragUebernehmen.toString().includes('cb.checked'));
         }
 
+        // ÜBERNAHME IN MODUL 5 – mehrere Zeilen zu EINEM Kriterium (js/erfassung.js).
+        // Gemeldet: „Bei der Übernahme der Arztbesuche wird in Modul 5 ein deutlich
+        // höherer Wert eingetragen und auch bei der Medikation." Drei Ursachen,
+        // drei Gruppen von Prüfungen.
+        {
+            const merkErf = JSON.parse(JSON.stringify(erfassung));
+            const A = (a, z) => ({ fach: 'Hausarzt', anzahl: String(a), zeitraum: z, begleitung: 'in Begleitung' });
+            const M = (ort, a, z) => ({ applikation: ort, anzahl: String(a), zeitraum: z,
+                                        unterstuetzung: 'Gabe durch Pflegeperson' });
+            const ORAL = 'oral (Tabletten, Tropfen, Säfte)';
+            const probe = (arzt, medi, hilf) => {
+                erfassung.arztbesuche = arzt || [];
+                erfassung.medikation = medi || [];
+                erfassung.hilfsmittel = hilf || [];
+                erfassung.behandlungspflege = [];
+                return modul5AusErfassung();
+            };
+            // Punkte der Gruppe C aus einem Übernahmeergebnis
+            const punkteC = w => {
+                const st = { special: 0, values: {}, kontinenz: { harn: 0, stuhl: 0 } };
+                ITEMS.forEach(i => {
+                    if (i.m === 5 && i.group !== 'D') st.values[i.id] = { count: 0, period: 'W' };
+                    else if (i.m) st.values[i.id] = 0;
+                });
+                Object.keys(w).forEach(nr => {
+                    const it = ITEMS.find(i => i.nr === nr);
+                    if (it && it.group !== 'D') st.values[it.id] = { count: w[nr].count, period: w[nr].period };
+                });
+                return m5Gruppen(st).C.summe;
+            };
+            try {
+                // ---- Einzelne Zeilen: unverändert wie bisher ------------------------
+                pruefe('Eine Zeile „1 pro Woche" bleibt 1 pro Woche',
+                    probe([A(1, 'pro Woche')])['4.5.13'], { count: 1, period: 'W' });
+                pruefe('Eine Zeile „3 pro Tag" bleibt 3 pro Tag',
+                    probe([], [M(ORAL, 3, 'pro Tag')])['4.5.1'], { count: 3, period: 'D' });
+                pruefe('„1 im Quartal" wird auf den Monat umgelegt',
+                    probe([A(1, 'im Quartal')])['4.5.13'], { count: 0.3333, period: 'M' });
+
+                // ---- (1) Der feinste Zeitraum bleibt, nicht der gröbste -------------
+                // Gemeldet als „deutlich höherer Wert": 3 pro Tag und 1 pro Woche
+                // ergaben 22 pro Woche. Rechnerisch derselbe Tagesdurchschnitt, aber
+                // im Kriterium stand eine 22 – und der Regler reicht nur bis 15.
+                const medi = probe([], [M(ORAL, 3, 'pro Tag'), M('Augentropfen', 1, 'pro Woche')]);
+                pruefe('Medikation täglich und wöchentlich: Tagesangabe bleibt',
+                    medi['4.5.1'], { count: 3.1429, period: 'D' });
+                pruefeWahr('Und der Wert liegt im Bereich des Reglers',
+                    medi['4.5.1'].count <= 15);
+
+                // ---- (2) Gruppe C rechnet mit ihren eigenen Faktoren ----------------
+                // Die BRi wertet einen Wochenbesuch mit 4,3 und einen Monatsbesuch
+                // mit 1. Über Kalendertage (30/7 = 4,2857) kam 5,2857 heraus.
+                const arzt = probe([A(1, 'pro Woche'), A(1, 'pro Monat')]);
+                pruefeWahr('Arztbesuche wöchentlich und monatlich ergeben 5,3 Punkte',
+                    Math.abs(punkteC(arzt) - 5.3) < 0.001);
+                pruefe('Die Häufigkeit bleibt in der Woche', arzt['4.5.13'].period, 'W');
+                pruefeWahr('Und sie ist eine plausible Zahl', arzt['4.5.13'].count < 2);
+
+                // ---- (3) „pro Tag" fällt in Gruppe C nicht mehr still aus -----------
+                // Die Zeitraum-Auswahl bietet „pro Tag" an, die Punktetabelle von
+                // 4.5.13 bis 4.5.15 kennt aber nur Woche und Monat. Zwei Arztbesuche
+                // täglich ergaben dadurch NULL Punkte, ohne jede Meldung.
+                const taeglich = probe([A(2, 'pro Tag')]);
+                pruefe('Zwei Arztbesuche täglich werden auf die Woche umgelegt',
+                    taeglich['4.5.13'], { count: 14, period: 'W' });
+                pruefeWahr('Und ergeben Punkte statt null',
+                    Math.abs(punkteC(taeglich) - 60.2) < 0.001);
+                // 4.5.12 hat einen eigenen Tagesfaktor und behält ihn
+                pruefeWahr('4.5.12 kennt einen Tagesfaktor',
+                    ITEMS.find(i => i.nr === '4.5.12').factor.D === 60);
+
+                // ---- Die Tätigkeit am Hilfsmittel ist jetzt eine Auswahl ------------
+                const H = (bez, t) => ({ bezeichnung: bez, nutzung: 'genutzt', anzahl: '2',
+                                         zeitraum: 'pro Tag', taetigkeit: t });
+                pruefe('Die Auswahl bietet selbständig und durch Pflegeperson',
+                    HILFSMITTEL_TAETIGKEIT, ['selbständig', 'durch Pflegeperson']);
+                const spalte = ERFASSUNG_TABELLEN.find(t => t.id === 'hilfsmittel')
+                                 .spalten.find(s => s.k === 'taetigkeit');
+                pruefe('Die Spalte ist eine Auswahl', spalte.typ, 'select');
+                pruefeWahr('Mit freier Eingabe als Ausweg', spalte.frei === true);
+
+                pruefeWahr('„selbständig" zählt NICHT in Modul 5',
+                    !probe([], [], [H('Kompressionsstrümpfe', 'selbständig')])['4.5.7']);
+                pruefe('„durch Pflegeperson" zählt',
+                    probe([], [], [H('Kompressionsstrümpfe', 'durch Pflegeperson')])['4.5.7'],
+                    { count: 2, period: 'D' });
+                pruefe('Eine eigene Beschreibung zählt ebenfalls',
+                    probe([], [], [H('Kompressionsstrümpfe', 'Anlegen und Abnehmen')])['4.5.7'],
+                    { count: 2, period: 'D' });
+                pruefeWahr('Eine leere Zelle zählt nicht',
+                    !probe([], [], [H('Kompressionsstrümpfe', '')])['4.5.7']);
+                // Ältere Fälle kennen das Feld nicht – dort gilt weiter die Durchführung
+                pruefe('Älterer Fall ohne das Feld folgt der Durchführung',
+                    probe([], [], [{ bezeichnung: 'Kompressionsstrümpfe', nutzung: 'genutzt',
+                                     anzahl: '2', zeitraum: 'pro Tag',
+                                     durchfuehrung: 'durch Pflegeperson' }])['4.5.7'],
+                    { count: 2, period: 'D' });
+            } finally {
+                erfassung = merkErf;
+            }
+        }
+
         // KINDERVORGANG AUF DER STARTSEITE (js/modus.js).
         // Vier zusätzliche Kacheln. Sie legen NICHT fest, wie gerechnet wird – das
         // tut das Alter am Begutachtungstag. Sie fordern die beiden Daten ein und
