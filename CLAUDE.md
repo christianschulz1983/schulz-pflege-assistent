@@ -989,6 +989,19 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
      Unterscheidung „selbständig oder nicht" steuert die Rechnung, und die steht in
      der Liste.
 
+62. **Der Gruppen-Einzelpunkt von Modul 5 steht auf der beitragenden Zeile**
+   (`showGroupPts` in `js/berechnung.js`). Gemeldet: „4.5.1 Medikation auf 1x täglich
+   geändert, die 1 fehlt dahinter" und „bei 4.5.7 bzw. 4.5.14 steht eine 1, obwohl dort
+   nichts gewertet ist". Modul 5 wird je Gruppe EINMAL bepunktet (A 4.5.1–4.5.7,
+   B 4.5.8–4.5.11, C 4.5.12–4.5.15) – der eine Punkt braucht eine Zeile zum Stehen. Vorher
+   war das starr die **strukturell unterste** Zeile der Gruppe (4.5.7, 4.5.11, 4.5.15); das
+   setzte einen Scheinpunkt auf eine 0-Zeile und ließ die Zeile mit dem Eintrag leer. Jetzt
+   steht er auf der **letzten Zeile der Gruppe mit einem Eintrag** (`count>0`, `m5Traegt`);
+   Zeilen ohne Eintrag zeigen „–". Trägt keine Zeile etwas bei, zeigen alle „–" (kein „0"
+   auf einer 0-Zeile). **Reine Anzeige – die Rechnung (`m5Gruppen`) ist unberührt**, Gruppe D
+   (4.5.16) zeigt wie bisher ihren eigenen Wert. Selbsttest: Abschnitt „3b" prüft, dass der
+   Gruppenpunkt bei 4.5.1 bzw. 4.5.13 steht und 4.5.7/4.5.14/4.5.15 „–" zeigen.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1053,8 +1066,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2012 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5).
+Der Selbsttest umfasst 2018 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

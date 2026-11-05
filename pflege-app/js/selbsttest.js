@@ -219,6 +219,29 @@ async function selbsttest() {
         pruefe('Modul 5, Gruppe A Grenze 9/Tag', m5(), 3);
         leerenM5();
 
+        // ---------- 3b. Modul-5-Anzeige: Gruppenpunkt auf der beitragenden Zeile ----------
+        // Der Gruppen-Einzelpunkt erscheint dort, wo ein Wert eingetragen ist – nicht starr auf
+        // der strukturell untersten Zeile. Zeilen ohne Eintrag zeigen "–" (U+2013), kein
+        // Scheinpunkt. Früher stand z.B. bei 4.5.7 oder 4.5.15 eine 1, obwohl dort nichts
+        // eingetragen war, und bei 4.5.1 (Medikation) fehlte sie.
+        const STRICH = '–';
+        if (document.getElementById('pts-own-43')) {
+            const ptsZelle = id => { const el = document.getElementById('pts-own-' + id); return el ? el.innerText.trim() : null; };
+            leerenM5();
+            setzeM5(43, 1, 'D');   // 4.5.1 Medikation 1x täglich      -> Gruppe A = 1 Punkt
+            setzeM5(55, 1, 'W');   // 4.5.13 Arztbesuche 1x wöchentlich -> Gruppe C = 1 Punkt
+            fillTable('own'); calculate('own');
+            pruefe('Anzeige: Gruppenpunkt A steht bei der Medikation (4.5.1)', ptsZelle(43), '1');
+            pruefe('Anzeige: 4.5.7 ohne Eintrag zeigt „–" (kein Scheinpunkt)', ptsZelle(49), STRICH);
+            pruefe('Anzeige: Gruppenpunkt C steht bei den Arztbesuchen (4.5.13)', ptsZelle(55), '1');
+            pruefe('Anzeige: 4.5.14 ohne Eintrag zeigt „–"', ptsZelle(56), STRICH);
+            pruefe('Anzeige: 4.5.15 ohne Eintrag zeigt „–"', ptsZelle(57), STRICH);
+            leerenM5(); fillTable('own'); calculate('own');
+            pruefeWahr('Anzeige: leere Gruppe zeigt überall „–"',
+                [43, 49, 55, 56, 57].every(id => ptsZelle(id) === STRICH));
+            leerenM5();
+        }
+
         // ---------- 4. Punkte und Pflegegrad ----------
         const alleAuf = (modul, stufe) => ITEMS.filter(i => i.m === modul && i.opts)
             .forEach(i => { stateEigene.values[i.id] = (stufe === 'max') ? i.opts.length - 1 : stufe; });

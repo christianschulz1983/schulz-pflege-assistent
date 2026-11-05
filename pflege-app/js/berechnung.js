@@ -323,20 +323,26 @@ function calculate(pref) {
 
     const getV = (id) => nbaEinzelpunkte(st, id);
     // Modul 5 nach BRi: Häufigkeiten je Gruppe summieren -> EIN Punktwert je Gruppe.
-    // Anzeige: der Gruppen-Punktwert erscheint NUR auf der untersten Zeile der Gruppe
-    // (wie die "Summe"-Zeile im BRi), die übrigen Zeilen zeigen "–" – damit nicht der
-    // Eindruck einer Mehrfachzählung entsteht.
+    // Anzeige: der Gruppen-Punktwert steht auf der Zeile, die ihn verursacht – der LETZTEN
+    // Zeile der Gruppe mit einem Eintrag (count>0). Zeilen ohne Eintrag zeigen "–", damit
+    // weder der Eindruck einer Mehrfachzählung entsteht noch ein Scheinpunkt auf einer 0-Zeile
+    // (früher stand der Punkt starr auf der strukturell untersten Zeile – z.B. eine 1 bei
+    // 4.5.7 oder 4.5.15, obwohl dort nichts eingetragen war). Trägt keine Zeile der Gruppe
+    // etwas bei, zeigen alle "–".
     const grp5 = m5Gruppen(st);
     ITEMS.filter(i => i.m === 5 && i.group === 'D').forEach(i => {
         const el = document.getElementById('pts-'+pref+'-'+i.id); if (el) el.innerText = getV(i.id);
     });
+    const m5Traegt = (id) => { const v = st.values[id]; return !!(v && typeof v === 'object' && (Number(v.count) || 0) > 0); };
     const showGroupPts = (grp, val, range) => {
         const ids = ITEMS.filter(i=>i.m===5 && i.group===grp).map(i=>i.id);
-        ids.forEach((id, k) => {
+        const beitragende = ids.filter(m5Traegt);
+        const zielId = beitragende.length ? beitragende[beitragende.length - 1] : null;
+        ids.forEach(id => {
             const el = document.getElementById('pts-'+pref+'-'+id);
             if(!el) return;
-            if(k === ids.length-1){ el.innerText = val; el.title = 'Gruppen-Einzelpunkte '+range+' (gemeinsam gewertet)'; }
-            else { el.innerText = '–'; el.title = 'Punkte werden je Gruppe '+range+' gemeinsam vergeben (Wert in der untersten Zeile der Gruppe)'; }
+            if(id === zielId){ el.innerText = val; el.title = 'Gruppen-Einzelpunkte '+range+' (gemeinsam gewertet)'; }
+            else { el.innerText = '–'; el.title = 'Punkte werden je Gruppe '+range+' gemeinsam vergeben (Wert auf der Zeile mit Eintrag)'; }
         });
     };
     showGroupPts('A', grp5.A.pkt, M5_BEREICHE.A);
