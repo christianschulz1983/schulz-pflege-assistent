@@ -5,7 +5,7 @@
    und eine einzelne Anfrage hatte keine Zeitgrenze. Jetzt: jede Anfrage höchstens
    KI_ZEIT.anfrageMs, alle Versuche zusammen höchstens KI_ZEIT.gesamtMs, höchstens
    KI_ZEIT.maxModelle Modelle – und der Berater kann jederzeit abbrechen. */
-const KI_ZEIT = { anfrageMs: 150000, gesamtMs: 240000, maxModelle: 3 };
+const KI_ZEIT = { anfrageMs: 150000, gesamtMs: 240000, maxModelle: 3, maxTokens: 65536 };
 let kiAbbruch = null;          // AbortController des laufenden Aufrufs
 let kiAbgebrochen = false;     // vom Berater abgebrochen
 
@@ -92,6 +92,12 @@ function kiFehlerErklaerung(fehler) {
     if (/KI_ZEITUEBERSCHREITUNG/.test(t))
         return 'Google hat nicht rechtzeitig geantwortet (Zeitgrenze überschritten). Bei großen, gescannten '
              + 'Gutachten kommt das vor, wenn Google ausgelastet ist – bitte in ein paar Minuten erneut versuchen.';
+    if (/KI_ABGESCHNITTEN/.test(t))
+        return 'Die Antwort von Google war zu lang und wurde abgeschnitten. Bitte erneut versuchen; bei sehr '
+             + 'umfangreichen Gutachten hilft es, weniger auf einmal auslesen zu lassen.';
+    if (/KI_ZURUECKGEHALTEN/.test(t))
+        return 'Google hat die Antwort aus Sicherheits- oder Urheberrechtsgründen zurückgehalten. Bitte erneut '
+             + 'versuchen; bleibt es dabei, das betroffene Dokument einzeln auslesen lassen.';
     if (/api key not valid|schlüssel ist ungültig|API_KEY_INVALID/i.test(t))
         return 'Der API-Schlüssel ist ungültig. Bitte auf aistudio.google.com/apikey neu kopieren und oben rechts '
              + 'einfügen – über das Kopiersymbol, damit der ganze Schlüssel übernommen wird (er beginnt je nach Alter mit „AIza“ oder „AQ.“).';
@@ -197,7 +203,13 @@ async function callGeminiWithFallback(payload, systemPrompt) {
         if (rest < 5000) { lastError = lastError || new Error("KI_ZEITUEBERSCHREITUNG (Gesamtzeit)"); break; }
         if (kiZeile) kiZeile.innerText = 'Google-KI: ' + model.name + (kandidaten.length > 1 ? ' (Versuch ' + nr + ' von ' + kandidaten.length + ')' : '');
         const url = `https://generativelanguage.googleapis.com/${model.version}/models/${model.name}:generateContent?key=${cleanApiKey}`;
+        // Ohne ausdrückliches Ausgabelimit schneidet Google lange Antworten am Standard-
+        // Limit (oft 8192 Token) ab. Gemeldet beim Höherstufungs-Vorbefund: Die große
+        // JSON-Struktur brach mitten im Text ab, JSON.parse warf „Expected double-quoted
+        // property name ... at position 132800". Deshalb setzen wir maxOutputTokens hoch;
+        // moderne Modelle begrenzen selbst, kleinere ignorieren ein zu hohes Limit.
         const fullPayload = { ...payload, systemInstruction: { parts: [{ text: systemPrompt }] } };
+        fullPayload.generationConfig = { ...(fullPayload.generationConfig || {}), maxOutputTokens: KI_ZEIT.maxTokens };
         try {
             const response = await callGeminiWithRetry(url, fullPayload, rest);
             if (response) { try { localStorage.setItem('pflege_pref_model', model.name); } catch (e) {} return response; }
@@ -209,6 +221,23 @@ async function callGeminiWithFallback(payload, systemPrompt) {
             if (e.message && e.message.includes("429")) { limitFehler = limitFehler || e; continue; }
             // Ungültiger Schlüssel, Standort, gesperrter Zugang: gilt für alle Modelle – abbrechen.
             if (e.message && /api key|location is not supported|PERMISSION_DENIED|has not been used|\b403\b/i.test(e.message)) throw e;
+
+            // Sicherheitsnetz: lehnt ein Modell maxOutputTokens ab (400), ohne das Feld erneut.
+            if (e.message && /maxOutputTokens|max_output_tokens/i.test(e.message)) {
+                try {
+                    const ohneLimit = JSON.parse(JSON.stringify(fullPayload));
+                    if (ohneLimit.generationConfig) {
+                        delete ohneLimit.generationConfig.maxOutputTokens;
+                        if (Object.keys(ohneLimit.generationConfig).length === 0) delete ohneLimit.generationConfig;
+                    }
+                    const resp3 = await callGeminiWithRetry(url, ohneLimit, KI_ZEIT.gesamtMs - (Date.now() - start));
+                    if (resp3) { try { localStorage.setItem('pflege_pref_model', model.name); } catch (e) {} return resp3; }
+                } catch (e3) {
+                    lastError = e3;
+                    if (e3.message && /KI_ABGEBROCHEN|KI_ZEITUEBERSCHREITUNG/.test(e3.message)) throw e3;
+                    if (e3.message && e3.message.includes("429")) { limitFehler = limitFehler || e3; continue; }
+                }
+            }
 
             // Sicherheitsnetz: kennt das Modell die Schema-Felder nicht, ohne sie erneut versuchen.
             if (e.message && /responseMimeType|responseSchema|generation_config/i.test(e.message) && fullPayload.generationConfig) {
@@ -232,6 +261,51 @@ async function callGeminiWithFallback(payload, systemPrompt) {
     }
     // Ein Limit ist aussagekräftiger als ein „Modell unbekannt" beim letzten Versuch
     throw limitFehler || lastError || new Error("Keines der KI-Modelle konnte erreicht werden.");
+}
+
+/* EINE Stelle, die die JSON-Antwort der KI liest. Gemeldet beim Höherstufungs-Vorbefund:
+   Die Antwort kam als kaputtes JSON zurück („Expected double-quoted property name in JSON
+   at position 132800"); jede Auslese-Stelle parste bis dahin selbst, und ein einziges
+   krummes Zeichen tief in 132 KB warf die ganze Erfassung weg – mit einer Meldung, die
+   dem Berater nichts sagte. Ursache war fast immer eine am Token-Limit ABGESCHNITTENE
+   Antwort (finishReason „MAX_TOKENS"). Jetzt:
+   - Text aus ALLEN parts zusammensetzen (nicht nur parts[0] – lange Antworten kommen
+     gestückelt), Code-Zaun ```json … ``` entfernen.
+   - Klartext je Grund: abgeschnitten (bitte erneut / kleineres Gutachten), von Google
+     zurückgehalten (SAFETY/RECITATION), sonst der rohe Parserfehler.
+   - KEINE stille Teilrettung: Ein halb geparstes Gutachten mit fehlenden Kriterien wäre
+     schlimmer als eine ehrliche Lücke (vgl. Regeln 35, 45). Nur ein abschließendes Komma
+     vor } oder ] – ein bekannter, verlustfreier Google-Ausrutscher – wird geglättet. */
+function kiTextAusAntwort(response) {
+    const cand = response && response.candidates && response.candidates[0];
+    const finish = (cand && cand.finishReason) || '';
+    let text = '';
+    const parts = cand && cand.content && cand.content.parts;
+    if (Array.isArray(parts)) text = parts.map(p => (p && p.text) || '').join('');
+    return { text: text || '', finish: finish };
+}
+function kiJsonAusAntwort(response) {
+    const { text, finish } = kiTextAusAntwort(response);
+    if (!text) {
+        if (finish === 'SAFETY' || finish === 'RECITATION')
+            throw new Error('KI_ZURUECKGEHALTEN: Google hat die Antwort wegen „' + finish + '" zurückgehalten – kein Text erhalten.');
+        if (finish === 'MAX_TOKENS')
+            throw new Error('KI_ABGESCHNITTEN: Die Antwort von Google war zu lang und wurde abgeschnitten, bevor Text kam. Bitte erneut versuchen (ggf. weniger auf einmal).');
+        throw new Error('Keine Textantwort von der KI erhalten.');
+    }
+    let s = text.trim();
+    const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fence) s = fence[1].trim();
+    try {
+        return JSON.parse(s);
+    } catch (e) {
+        // Verlustfreier Versuch: ein Komma unmittelbar vor schließender Klammer entfernen.
+        const glatt = s.replace(/,(\s*[}\]])/g, '$1');
+        if (glatt !== s) { try { return JSON.parse(glatt); } catch (e2) {} }
+        if (finish === 'MAX_TOKENS')
+            throw new Error('KI_ABGESCHNITTEN: Die Antwort von Google war zu lang und wurde abgeschnitten (JSON unvollständig). Bitte erneut versuchen – bei sehr umfangreichen Gutachten ggf. in mehreren Schritten.');
+        throw e;
+    }
 }
 
 /* „Schlüssel prüfen": ein einziger, winziger Aufruf – danach steht fest, ob der Schlüssel

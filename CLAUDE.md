@@ -1001,6 +1001,28 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    auf einer 0-Zeile). **Reine Anzeige – die Rechnung (`m5Gruppen`) ist unberührt**, Gruppe D
    (4.5.16) zeigt wie bisher ihren eigenen Wert. Selbsttest: Abschnitt „3b" prüft, dass der
    Gruppenpunkt bei 4.5.1 bzw. 4.5.13 steht und 4.5.7/4.5.14/4.5.15 „–" zeigen.
+63. **KI-Antwort robust lesen – EINE Stelle, kein kryptischer Fehler** (`kiJsonAusAntwort`,
+   `kiTextAusAntwort` in `js/ki.js`). Gemeldet beim Höherstufungs-Vorbefund (Patientin Linde):
+   „Google-KI nicht verfügbar: Expected double-quoted property name in JSON at position 132800".
+   Ursache: Die geforderte JSON-Struktur (Regel 21 füllt Befund UND Versorgungstabellen in
+   EINEM Aufruf) ist groß; ohne Ausgabelimit schnitt Google die Antwort am Standard-Token-Limit
+   ab (`finishReason: MAX_TOKENS`), und jede Auslese-Stelle parste bis dahin selbst – ein
+   krummes Zeichen tief in 132 KB warf die ganze Erfassung weg, mit einer Meldung, die der
+   Berater nicht deuten konnte. Drei Teile:
+   - **Ursache weg:** `callGeminiWithFallback` setzt zentral `maxOutputTokens` (`KI_ZEIT.maxTokens`
+     = 65536); moderne Modelle begrenzen selbst, kleinere ignorieren ein zu hohes Limit. Lehnt
+     ein Modell das Feld ab (400), wird es einmal ohne Limit wiederholt – wie beim responseSchema.
+   - **Klartext statt Parser-Kauderwelsch:** `kiJsonAusAntwort(response)` liest die Antwort an
+     EINER Stelle (alle elf früheren `JSON.parse`-Blöcke rufen sie auf), setzt den Text aus ALLEN
+     `parts` zusammen, entfernt den Code-Zaun und meldet `KI_ABGESCHNITTEN` (MAX_TOKENS) bzw.
+     `KI_ZURUECKGEHALTEN` (SAFETY/RECITATION); `kiFehlerErklaerung` übersetzt beide. `correctText`
+     nutzt `kiTextAusAntwort` (fängt abgeschnittene Korrekturen).
+   - **KEINE geratenen Teildaten:** Ein halb geparstes Gutachten mit fehlenden Kriterien wäre
+     schlimmer als eine ehrliche Lücke (Regeln 35, 45). Nur ein abschließendes Komma vor `}`/`]`
+     – ein bekannter, verlustfreier Ausrutscher – wird geglättet; alles andere scheitert ehrlich,
+     und der bestehende lokale Vorab-Füll-Pfad samt Warnung greift wie bisher.
+   Selbsttest: 12 Prüfungen mit synthetischen Antwortobjekten (sauber, Code-Zaun, mehrteiliger
+   Text, Komma-Glättung, MAX_TOKENS, SAFETY, leer, Klartext-Übersetzung, maxOutputTokens gesetzt).
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -1066,8 +1088,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2018 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige).
+Der Selbsttest umfasst 2030 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 12 KI-Antwort).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

@@ -233,11 +233,7 @@ async function vorbefundLesen(befundText, anamneseText) {
         contents: [{ role: 'user', parts: [{ text: eingabe }] }],
         generationConfig: { responseMimeType: 'application/json', responseSchema: VORBEFUND_SCHEMA }
     }, vorbefundAnweisung());
-    let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!txt) throw new Error('keine Antwort');
-    const zaun = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (zaun) txt = zaun[1];
-    return vorbefundPruefen(JSON.parse(txt.trim()));
+    return vorbefundPruefen(kiJsonAusAntwort(res));
 }
 
 /* Prüft jeden Vorschlag gegen den Katalog, BEVOR er angezeigt wird. Eine Stufe, die es

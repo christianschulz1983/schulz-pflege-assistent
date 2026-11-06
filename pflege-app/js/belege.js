@@ -100,11 +100,7 @@ async function belegAuslesen(a, datei) {
         contents: [{ role: 'user', parts: teile }],
         generationConfig: { responseMimeType: 'application/json', responseSchema: BELEG_SCHEMA }
     }, BELEG_PROMPT);
-    let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!txt) throw new Error('keine Antwort');
-    const zaun = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (zaun) txt = zaun[1];
-    belegUebernehmen(a, JSON.parse(txt.trim()));
+    belegUebernehmen(a, kiJsonAusAntwort(res));
     return true;
 }
 

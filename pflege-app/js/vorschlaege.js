@@ -138,11 +138,7 @@ Zwingende Regeln:
             generationConfig: { responseMimeType: "application/json", responseSchema: responseSchema }
         };
         const res = await callGeminiWithFallback(payload, systemPrompt);
-        let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!txt) throw new Error('Keine Antwort der KI erhalten.');
-        const fence = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-        if (fence) txt = fence[1];
-        const data = JSON.parse(txt.trim());
+        const data = kiJsonAusAntwort(res);
         // Nur plausible Vorschläge behalten: bekanntes Kriterium, echte Höherstufung
         vorschlagListe = (data.vorschlaege || []).map(v => {
             const item = ITEMS.find(i => i.nr === v.nr);
@@ -675,11 +671,7 @@ Gib die Felder „bereiche", ${mitAllgemein ? '„allgemein", ' : ''}und – fal
         contents: [{ role: "user", parts: [{ text: buildAntragPrompt(bereiche, mitAllgemein) }] }],
         generationConfig: { responseMimeType: "application/json", responseSchema: responseSchema }
     }, systemPrompt);
-    let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!txt) throw new Error("Keine Antwort der KI erhalten.");
-    const fence = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fence) txt = fence[1];
-    const data = JSON.parse(txt.trim());
+    const data = kiJsonAusAntwort(res);
     // Nur Absätze zu Bereichen, die es gibt – ein von der KI erfundener Bereich fällt weg
     const erlaubt = new Set(bereiche.map(b => b.nr));
     const map = {};
@@ -966,11 +958,7 @@ ZWINGEND:
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: "application/json", responseSchema: schema }
     }, systemPrompt);
-    let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!txt) throw new Error("Keine Antwort der KI erhalten.");
-    const fence = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fence) txt = fence[1];
-    const data = JSON.parse(txt.trim());
+    const data = kiJsonAusAntwort(res);
     return await haltenLaengenGrenzen(anhoerungAntwortZuMap(data, strittig),
         (data.allgemein || '').trim(), (data.anamnese || '').trim());
 }
@@ -1111,11 +1099,7 @@ Beachte zwingend:
         generationConfig: { responseMimeType: "application/json", responseSchema: responseSchema }
     };
     const res = await callGeminiWithFallback(payload, systemPrompt);
-    let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!txt) throw new Error("Keine Antwort der KI erhalten.");
-    const fence = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fence) txt = fence[1];
-    const data = JSON.parse(txt.trim());
+    const data = kiJsonAusAntwort(res);
     const map = {};
     const erlaubt = new Set(diffs.map(d => d.nr));
     (data.begruendungen || []).forEach(b => {

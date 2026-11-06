@@ -116,11 +116,7 @@ async function leseEineUnterlage(datei) {
         contents: [{ role: 'user', parts: teile }],
         generationConfig: { responseMimeType: 'application/json', responseSchema: UNTERLAGEN_SCHEMA }
     }, UNTERLAGEN_PROMPT);
-    let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!txt) throw new Error('keine Antwort');
-    const zaun = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (zaun) txt = zaun[1];
-    return JSON.parse(txt.trim());
+    return kiJsonAusAntwort(res);
 }
 
 /* Der Eintrag, wie er in den Notizen steht. Bewusst als schlichter Text mit festen

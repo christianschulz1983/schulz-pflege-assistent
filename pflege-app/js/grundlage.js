@@ -203,12 +203,7 @@ async function leseStellungnahmeDatei(datei) {
         generationConfig: { responseMimeType: 'application/json', responseSchema: schema }
     }, stellungnahmeAnweisung());
 
-    const roh = antwort && antwort.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!roh) throw new Error('Keine Antwort erhalten.');
-    let txt = roh.trim();
-    const zaun = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (zaun) txt = zaun[1].trim();
-    return stellungnahmeZuImport(JSON.parse(txt), lokal && lokal.text);
+    return stellungnahmeZuImport(kiJsonAusAntwort(antwort), lokal && lokal.text);
 }
 
 /* Baut aus der KI-Antwort die Struktur, die die Prüfansicht erwartet.

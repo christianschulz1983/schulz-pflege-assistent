@@ -64,11 +64,7 @@ async function leseArztberichte(event) {
                 contents: [{ role: 'user', parts: teile }],
                 generationConfig: { responseMimeType: 'application/json', responseSchema: BERICHT_SCHEMA }
             }, BERICHT_PROMPT);
-            let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!txt) throw new Error('keine Antwort');
-            const zaun = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-            if (zaun) txt = zaun[1];
-            const d = JSON.parse(txt.trim());
+            const d = kiJsonAusAntwort(res);
             Object.keys(gesamt).forEach(k => (d[k] || []).forEach(e => {
                 e._quelle = datei.name;
                 gesamt[k].push(e);

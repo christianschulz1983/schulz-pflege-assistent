@@ -182,11 +182,7 @@ Gib zu jeder Nummer den gekürzten Text zurück, sonst nichts.`;
             contents: [{ role: "user", parts: [{ text: eingabe }] }],
             generationConfig: { responseMimeType: "application/json", responseSchema: schema }
         }, systemPrompt);
-        let txt = res?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!txt) throw new Error('keine Antwort');
-        const fence = txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
-        if (fence) txt = fence[1];
-        (JSON.parse(txt.trim()).abschnitte || []).forEach(a => {
+        (kiJsonAusAntwort(res).abschnitte || []).forEach(a => {
             if (!a || !a.nr || !a.text) return;
             const neu = a.text.trim();
             const alt = (a.nr === '__allgemein__') ? allgemein

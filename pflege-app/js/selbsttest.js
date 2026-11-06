@@ -7106,6 +7106,44 @@ async function selbsttest() {
                 schwellenAnalyse.toString().includes('naechstePgSchwelle('));
         }
 
+        // KI-ANTWORT ROBUST LESEN (Regel: Höherstufungs-Vorbefund kam als kaputtes JSON,
+        // „Expected double-quoted property name ... at position 132800"). kiJsonAusAntwort
+        // liest EINE Stelle, erkennt abgeschnittene (MAX_TOKENS) und zurückgehaltene
+        // (SAFETY/RECITATION) Antworten und meldet sie in Klartext, ohne Teildaten zu raten.
+        if (typeof kiJsonAusAntwort === 'function') {
+            const antw = (text, finish) => ({ candidates: [{ finishReason: finish || 'STOP',
+                content: { parts: Array.isArray(text) ? text.map(t => ({ text: t })) : [{ text: text }] } }] });
+            const wirft = (fn, teil) => { try { fn(); return false; } catch (e) { return String((e && e.message) || e).indexOf(teil) !== -1; } };
+
+            pruefe('KI-JSON: sauberes Objekt wird gelesen',
+                kiJsonAusAntwort(antw('{"a":1,"b":"x"}')).b, 'x');
+            pruefe('KI-JSON: Code-Zaun ```json wird entfernt',
+                kiJsonAusAntwort(antw('```json\n{"a":2}\n```')).a, 2);
+            pruefe('KI-JSON: Text aus mehreren parts wird zusammengesetzt',
+                kiJsonAusAntwort(antw(['{"gross":', '1234}'])).gross, 1234);
+            pruefe('KI-JSON: abschließendes Komma vor } wird geglättet',
+                kiJsonAusAntwort(antw('{"a":1,"liste":[1,2,],}')).a, 1);
+            pruefeWahr('KI-JSON: abgeschnittenes JSON (MAX_TOKENS) meldet KI_ABGESCHNITTEN',
+                wirft(() => kiJsonAusAntwort(antw('{"a":1,"b":"unvoll', 'MAX_TOKENS')), 'KI_ABGESCHNITTEN'));
+            pruefeWahr('KI-JSON: leere Antwort bei MAX_TOKENS meldet KI_ABGESCHNITTEN',
+                wirft(() => kiJsonAusAntwort(antw('', 'MAX_TOKENS')), 'KI_ABGESCHNITTEN'));
+            pruefeWahr('KI-JSON: zurückgehaltene Antwort (SAFETY) meldet KI_ZURUECKGEHALTEN',
+                wirft(() => kiJsonAusAntwort(antw('', 'SAFETY')), 'KI_ZURUECKGEHALTEN'));
+            pruefeWahr('KI-JSON: gar keine Antwort meldet „Keine Textantwort"',
+                wirft(() => kiJsonAusAntwort({ candidates: [] }), 'Keine Textantwort'));
+            pruefeWahr('KI-JSON: kryptischer Parserfehler bleibt, wenn nicht abgeschnitten',
+                wirft(() => kiJsonAusAntwort(antw('{kaputt ohne Grund', 'STOP')), 'JSON'));
+            pruefeWahr('KI-Fehlertext: KI_ABGESCHNITTEN wird in Klartext übersetzt',
+                typeof kiFehlerErklaerung === 'function'
+                && /abgeschnitten/i.test(kiFehlerErklaerung(new Error('KI_ABGESCHNITTEN: x'))));
+            pruefeWahr('KI-Fehlertext: KI_ZURUECKGEHALTEN wird in Klartext übersetzt',
+                typeof kiFehlerErklaerung === 'function'
+                && /zurückgehalten/i.test(kiFehlerErklaerung(new Error('KI_ZURUECKGEHALTEN: x'))));
+            pruefeWahr('KI-Aufruf setzt ein Ausgabelimit (maxOutputTokens) gegen Abschneiden',
+                typeof callGeminiWithFallback === 'function'
+                && callGeminiWithFallback.toString().indexOf('maxOutputTokens') !== -1);
+        }
+
         // GOLDEN MASTER – die ganze Rechenkette an vier vollständigen Fällen.
         // Die Sollwerte stehen von Hand gerechnet in js/goldmaster.js, samt Herleitung
         // aus den Tabellen der BRi. Angelegt vor dem Einbau der Kinderbegutachtung:

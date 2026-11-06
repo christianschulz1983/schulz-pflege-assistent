@@ -197,8 +197,9 @@ async function correctText(text) {
     const systemPrompt = "Du bist ein professioneller Korrektor für deutschsprachige Texte. Korrigiere ausschließlich Rechtschreibung, Grammatik und Zeichensetzung des dir übergebenen Textes. Ändere weder Inhalt, Bedeutung noch Stil; füge nichts hinzu und lasse nichts weg. Behalte vorhandene Zeilenumbrüche exakt bei. Gib ausschließlich den korrigierten Text zurück – ohne Anführungszeichen, ohne Kommentare, ohne Einleitung.";
     const payload = { contents: [{ role: "user", parts: [{ text: text }] }] };
     const result = await callGeminiWithFallback(payload, systemPrompt);
-    const out = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!out || !out.trim()) throw new Error("Keine Korrektur erhalten.");
+    const { text: out, finish } = kiTextAusAntwort(result);
+    if (!out || !out.trim()) throw new Error(finish === 'MAX_TOKENS'
+        ? "Die Korrektur von Google wurde abgeschnitten (Text zu lang)." : "Keine Korrektur erhalten.");
     return out.trim();
 }
 

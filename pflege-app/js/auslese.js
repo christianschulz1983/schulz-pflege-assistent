@@ -502,12 +502,7 @@ async function aiReadGutachten(event, ziel) {
             let data = null, aiError = null;
             try {
                 const response = await callGeminiWithFallback(payload, systemPrompt);
-                const extractedText = response && response.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!extractedText) throw new Error("Keine Textantwort von der KI erhalten.");
-                let jsonText = extractedText.trim();
-                const fence = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/i);
-                if (fence) jsonText = fence[1].trim();
-                data = JSON.parse(jsonText);
+                data = kiJsonAusAntwort(response);
             } catch (e) {
                 aiError = e;
             }
