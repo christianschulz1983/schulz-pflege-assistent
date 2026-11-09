@@ -1023,6 +1023,16 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
      und der bestehende lokale Vorab-Füll-Pfad samt Warnung greift wie bisher.
    Selbsttest: 12 Prüfungen mit synthetischen Antwortobjekten (sauber, Code-Zaun, mehrteiliger
    Text, Komma-Glättung, MAX_TOKENS, SAFETY, leer, Klartext-Übersetzung, maxOutputTokens gesetzt).
+64. **Vorgutachten-Karte Modul 5: nie „0× pro Woche" bei Häufigkeit null** (`getVergleichsRef`
+   in `js/oberflaeche.js`). Gemeldet: In jeder Modul-5-Zeile stand in der Vorgutachten-Karte
+   der Kriterienliste „0× pro Woche" – in der Schmuckschrift gelesen als „ox pro Woche". Eine
+   Häufigkeit von null ist KEINE Bewertung (dieselbe Vorgabe gilt im Schriftstück, siehe
+   `m5HaeufigkeitText`: „entfällt oder selbständig", nie „0", „null", „0x pro Woche"). Jetzt
+   zeigt die Karte bei `count===0` **„entfällt oder selbständig"**, gedämpft wie der Leer-Fall
+   (`vorg-empty`); eine echte Häufigkeit (`3× pro Tag`) erscheint unverändert. Gilt für
+   Vorgutachten UND Zweitgutachten (beide über `getVergleichsRef`). Das Berichtigen-Feld
+   (`vorgEditFeld`, Zahl + Zeitraum) bleibt unberührt – dort ist 0 ein gültiger Eingabewert.
+   Selbsttest „3c": 0 zeigt nicht „0× pro", zeigt „entfällt oder selbständig", 3 zeigt „3× pro Tag".
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -1088,8 +1098,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2030 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 12 KI-Antwort).
+Der Selbsttest umfasst 2033 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 12 KI-Antwort + 3 Vorgutachten-Karte).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

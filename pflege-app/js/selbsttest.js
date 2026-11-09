@@ -242,6 +242,22 @@ async function selbsttest() {
             leerenM5();
         }
 
+        // ---------- 3c. Vorgutachten-Karte: nie „0x pro Woche" bei Häufigkeit null ----------
+        // Eine Häufigkeit von null ist keine Bewertung. Gemeldet: In jeder Modul-5-Zeile
+        // stand in der Vorgutachten-Karte „0× pro Woche" – in der Schmuckschrift „ox pro Woche".
+        if (typeof getVergleichsRef === 'function' && typeof zustandZu === 'function') {
+            const idM5 = nr => ITEMS.find(i => i.nr === nr).id;   // 4.5.1 = beliebige Modul-5-Gruppe-A-Zeile
+            const orig = zustandZu('orig');
+            orig.values[idM5('4.5.1')] = { count: 0, period: 'W' };
+            const leer = getVergleichsRef('orig', idM5('4.5.1'));
+            pruefeWahr('Vorgutachten-Karte: Häufigkeit 0 zeigt NICHT „0× pro Woche"', leer.indexOf('0× pro') === -1 && leer.indexOf('0x pro') === -1);
+            pruefeWahr('Vorgutachten-Karte: Häufigkeit 0 zeigt „entfällt oder selbständig"', leer.indexOf('entfällt oder selbständig') !== -1);
+            orig.values[idM5('4.5.1')] = { count: 3, period: 'D' };
+            const voll = getVergleichsRef('orig', idM5('4.5.1'));
+            pruefeWahr('Vorgutachten-Karte: echte Häufigkeit erscheint weiter (3× pro Tag)', voll.indexOf('3× pro Tag') !== -1);
+            orig.values[idM5('4.5.1')] = { count: 0, period: 'W' };
+        }
+
         // ---------- 4. Punkte und Pflegegrad ----------
         const alleAuf = (modul, stufe) => ITEMS.filter(i => i.m === modul && i.opts)
             .forEach(i => { stateEigene.values[i.id] = (stufe === 'max') ? i.opts.length - 1 : stufe; });

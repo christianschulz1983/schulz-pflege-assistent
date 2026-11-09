@@ -368,10 +368,13 @@ function getVergleichsRef(spalte, itemId) {
         return tag + '<div class="vorg-content"><span class="vorg-val vorg-empty">—</span></div>' + edit;
     }
     if(item.m===5 && item.group!=='D'){
-        const c = (val && typeof val==='object') ? val.count : 0;
+        const c = (val && typeof val==='object') ? Number(val.count)||0 : 0;
         const p = (val && typeof val==='object') ? val.period : 'W';
+        // Eine Häufigkeit von null ist KEINE Bewertung: niemals „0× pro Woche" anzeigen
+        // (gleiche Vorgabe wie im Schriftstück, m5HaeufigkeitText). Bei 0 gedämpft wie „—".
         const pTxt = p==='D' ? 'pro Tag' : p==='W' ? 'pro Woche' : 'pro Monat';
-        return tag + `<div class="vorg-content"><span class="vorg-val">${c}× ${pTxt}</span></div>` + edit;
+        const txt = c>0 ? `${c}× ${pTxt}` : 'entfällt oder selbständig';
+        return tag + `<div class="vorg-content"><span class="vorg-val${c>0?'':' vorg-empty'}">${txt}</span></div>` + edit;
     }
     const idx = (typeof val==='number') ? val : 0;
     const label = (item.opts && item.opts[idx]) ? item.opts[idx] : '-';
