@@ -2580,6 +2580,33 @@ async function selbsttest() {
             leeren();
         }
 
+        // ---------- 9c. Begründung baut auf den Erstgespräch-Notizen auf ----------
+        // Vorgabe des Verfassers: In ALLEN Vorgängen (Widerspruch, Anhörung, Höherstufung)
+        // muss die Begründung aus den Notizen in der App bestehen und darauf aufbauen.
+        if (typeof buildBegruendungPrompt === 'function' && typeof buildAntragPrompt === 'function'
+            && typeof generateBegruendungenAnhoerung === 'function' && document.getElementById('erstgespraech-notes')) {
+            const feld = document.getElementById('erstgespraech-notes');
+            const vorher = feld.value;
+            const marke = 'MARKE_ERSTGESPRAECH_4711';
+            feld.value = marke + ': Herr Muster kann die Treppe nur mit Festhalten bewältigen.';
+            const d9 = { nr: '4.1.4', title: 'Treppensteigen', m: 1, o: 'selbständig', e: 'überwiegend unselbständig' };
+
+            const pW = buildBegruendungPrompt([d9], false);
+            pruefeWahr('Widerspruch: Begründungs-Prompt enthält die Erstgespräch-Notizen', pW.includes(marke));
+            pruefeWahr('Widerspruch: Notizen stehen als HAUPTQUELLE', pW.includes('HAUPTQUELLE') && pW.includes(marke));
+
+            const pA = buildAntragPrompt((typeof antragBereiche === 'function') ? antragBereiche() : [], false);
+            pruefeWahr('Höherstufung/Antrag: Prompt enthält die Erstgespräch-Notizen', pA.includes(marke));
+
+            const anhSrc = generateBegruendungenAnhoerung.toString();
+            pruefeWahr('Anhörung: Prompt liest die Erstgespräch-Notizen (erstgespraech-notes)',
+                anhSrc.includes("getElementById('erstgespraech-notes')") && anhSrc.includes('MEINE FESTSTELLUNGEN AUS DEM ERSTGESPRÄCH'));
+            pruefeWahr('Anhörung: ZWINGEND-Regel verlangt den Aufbau auf den Notizen',
+                anhSrc.includes('Baue jede Begründung auf MEINEN NOTIZEN'));
+
+            feld.value = vorher;
+        }
+
         // ---------- 10b. Längenvorgaben für die erzeugten Texte ----------
         {
             pruefe('Satzzählung: einfache Sätze',

@@ -1033,6 +1033,17 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Vorgutachten UND Zweitgutachten (beide über `getVergleichsRef`). Das Berichtigen-Feld
    (`vorgEditFeld`, Zahl + Zeitraum) bleibt unberührt – dort ist 0 ein gültiger Eingabewert.
    Selbsttest „3c": 0 zeigt nicht „0× pro", zeigt „entfällt oder selbständig", 3 zeigt „3× pro Tag".
+65. **Die Begründung baut in ALLEN Vorgängen auf den Erstgespräch-Notizen auf** (`js/vorschlaege.js`).
+   Vorgabe des Verfassers: In Widerspruch, Anhörung und Höherstufungsantrag muss jede Begründung
+   aus den Notizen in der App bestehen und darauf aufbauen. Widerspruch (`buildBegruendungPrompt`)
+   und Erstantrag/Höherstufung (`buildAntragPrompt`) stellten die Erstgespräch-Notizen
+   (`erstgespraech-notes`) bereits als „HAUPTQUELLE" voran. Die **Anhörung**
+   (`generateBegruendungenAnhoerung`) kannte dagegen nur ihre eigenen `anh-notizen` – die
+   Mitschrift des Erstgesprächs fehlte. Jetzt erhält auch die Anhörung die Erstgespräch-Notizen
+   als HAUPTQUELLE, das System-Prompt-Feld „stellungnahme" nennt die Notizen (Erstgespräch und
+   Anhörungsverfahren) ausdrücklich als Quelle, und eine ZWINGEND-Regel verlangt, jede Begründung
+   auf den Notizen aufzubauen. Selbsttest „9c": alle drei Prompt-Bauer nehmen die Erstgespräch-
+   Notizen auf (Widerspruch und Antrag live geprüft, Anhörung über den Quelltext).
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -1098,8 +1109,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2033 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 12 KI-Antwort + 3 Vorgutachten-Karte).
+Der Selbsttest umfasst 2038 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 12 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

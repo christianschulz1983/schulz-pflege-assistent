@@ -731,6 +731,9 @@ async function haltenLaengenGrenzen(map, allgemein, anamnese) {
 async function generateBegruendungenAnhoerung(strittig, mitAllgemein, analyse) {
     const cut = (s, n) => (s && s.length > n) ? s.slice(0, n) + ' …' : (s || '');
     const anmerkungen = (document.getElementById('anh-notizen')?.value || '').trim();
+    // Die Mitschrift des Erstgesprächs ist auch in der Anhörung die inhaltliche Grundlage
+    // (Vorgabe des Verfassers: die Begründung baut auf den Notizen in der App auf).
+    const erstNotizen = (document.getElementById('erstgespraech-notes')?.value || '').trim();
     const kassenbegruendung = (document.getElementById('anh-kassenbegruendung')?.value || '').trim();
     const zweitArt = (document.getElementById('anh-art')?.value || '').trim();
 
@@ -758,8 +761,10 @@ AUFBAU JE KRITERIUM – vier Felder, die Bezeichnungen setzt die App (schreibe s
   erstgutachten   EIN kurzer Satz: die Wertung des Erstgutachtens und – nur wenn im Befund des
                   Erstgutachtens belegt – worauf sie sich stützte.
   stellungnahme   Ein bis zwei Sätze: was MEINE pflegefachliche Stellungnahme zu diesem Kriterium
-                  festgestellt hat (Einschränkung, Hilfebedarf, Befund). Quelle ist „MEINE DAMALIGE
-                  BEGRÜNDUNG"; fehlt sie, nur die vertretene Wertung und das Material – nichts erfinden.
+                  festgestellt hat (Einschränkung, Hilfebedarf, Befund). Quellen sind „MEINE DAMALIGE
+                  BEGRÜNDUNG" UND meine Notizen (Erstgespräch, Anhörungsverfahren) – baue die
+                  Stellungnahme darauf auf und greife auf, was dort zu diesem Kriterium steht. Fehlt
+                  beides, nur die vertretene Wertung und das Material – nichts erfinden.
   zweitgutachten  Zwei bis drei Sätze: die Wertung des Zweitgutachtens und WARUM sie falsch ist –
                   immer mit Verweis auf den Inhalt der Stellungnahme (die dort dargelegte
                   Einschränkung wird nicht widerlegt, der eigene Befund bestätigt sie, die Begründung
@@ -791,6 +796,8 @@ F – Die Wertung ist inkonsistent zu den Kriterien, in denen der Medizinische D
     Muster: „… wirkt fachlich inkonsistent zu den Heraufstufungen bei den übrigen … Kriterien.“
 
 ZWINGEND:
+- Baue jede Begründung auf MEINEN NOTIZEN (Erstgespräch und Anhörungsverfahren) auf – sie sind die
+  inhaltliche Grundlage. Nutze konkret, was dort zum jeweiligen Kriterium steht, ohne etwas zu erfinden.
 - Beziehe dich auf die Wertung des ZWEITGUTACHTENS, nicht auf die des Erstgutachtens.
 - Erfinde keine Befunde, Zitate, Zahlen oder Vorkommnisse. Zitiere die BRi ausschließlich wörtlich
   aus den mitgelieferten Texten; passt nichts wörtlich, gib es ohne Anführungszeichen sinngemäß wieder.
@@ -853,6 +860,14 @@ ZWINGEND:
     }
     prompt += '\n';
 
+    if (erstNotizen) {
+        prompt += '==================== HAUPTQUELLE ====================\n'
+                + 'MEINE FESTSTELLUNGEN AUS DEM ERSTGESPRÄCH (Mitschrift des Falls)\n'
+                + 'Dies ist die inhaltliche Grundlage. Baue jede Begründung – besonders das Feld\n'
+                + '„stellungnahme" – darauf auf und greife auf, was hier zum jeweiligen Kriterium steht.\n'
+                + 'Stichpunkte zu Fließtext ausformen, ohne den Inhalt zu ändern:\n\n'
+                + cut(erstNotizen, 6000) + '\n=====================================================\n\n';
+    }
     if (anmerkungen) {
         prompt += '==================== HAUPTQUELLE ====================\n'
                 + 'MEINE ANMERKUNGEN ZUM ANHÖRUNGSVERFAHREN\n'
