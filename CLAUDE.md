@@ -1023,6 +1023,16 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
      und der bestehende lokale Vorab-Füll-Pfad samt Warnung greift wie bisher.
    Selbsttest: 12 Prüfungen mit synthetischen Antwortobjekten (sauber, Code-Zaun, mehrteiliger
    Text, Komma-Glättung, MAX_TOKENS, SAFETY, leer, Klartext-Übersetzung, maxOutputTokens gesetzt).
+   **Nachtrag (v66.85): Die eigentliche Ursache war das „Denken".** `maxOutputTokens = 65536`
+   half nicht, weil das schon die Obergrenze von `gemini-2.5-flash` ist – verschenkt wurde das
+   Budget an den Denkmodus (Gemini 2.5 denkt per Voreinstellung mit, die Denk-Token zählen gegen
+   maxOutputTokens). Beim großen Vorbefund fraß das Denken so viel, dass die JSON-Antwort am
+   Limit abbrach und der Berater weiter „Antwort war zu lang und wurde abgeschnitten" sah. Jetzt
+   setzt `callGeminiWithFallback` zentral `thinkingConfig.thinkingBudget: 0` (Auslesen und
+   geführtes Schreiben brauchen kein Nachdenken) – so geht das ganze Budget an die Antwort. Ein
+   Modell, das das Feld ablehnt (ältere ohne Denkmodus), fängt dasselbe 400-Sicherheitsnetz wie
+   bei maxOutputTokens (beide Felder werden entfernt und erneut versucht). Selbsttest prüft
+   zusätzlich, dass der Aufruf `thinkingBudget: 0` setzt (13. Prüfung).
 64. **Vorgutachten-Karte Modul 5: nie „0× pro Woche" bei Häufigkeit null** (`getVergleichsRef`
    in `js/oberflaeche.js`). Gemeldet: In jeder Modul-5-Zeile stand in der Vorgutachten-Karte
    der Kriterienliste „0× pro Woche" – in der Schmuckschrift gelesen als „ox pro Woche". Eine
@@ -1110,7 +1120,7 @@ beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
 Der Selbsttest umfasst 2038 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 12 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung).
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 13 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

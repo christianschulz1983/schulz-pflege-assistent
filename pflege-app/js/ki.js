@@ -210,6 +210,14 @@ async function callGeminiWithFallback(payload, systemPrompt) {
         // moderne Modelle begrenzen selbst, kleinere ignorieren ein zu hohes Limit.
         const fullPayload = { ...payload, systemInstruction: { parts: [{ text: systemPrompt }] } };
         fullPayload.generationConfig = { ...(fullPayload.generationConfig || {}), maxOutputTokens: KI_ZEIT.maxTokens };
+        // Gemini 2.5 „denkt" standardmäßig mit, und die Denk-Token zählen gegen maxOutputTokens
+        // (= schon die Obergrenze des Modells). Beim großen Höherstufungs-Vorbefund fraß das
+        // Denken so viel Budget, dass die JSON-Antwort am Limit abbrach (finishReason
+        // MAX_TOKENS) – Meldung „Antwort war zu lang und wurde abgeschnitten". Auslesen und
+        // geführtes Schreiben brauchen kein Nachdenken; wir schalten es ab und geben das ganze
+        // Budget der eigentlichen Antwort. Ältere Modelle ohne Denkmodus fängt das Netz unten.
+        if (!fullPayload.generationConfig.thinkingConfig)
+            fullPayload.generationConfig.thinkingConfig = { thinkingBudget: 0 };
         try {
             const response = await callGeminiWithRetry(url, fullPayload, rest);
             if (response) { try { localStorage.setItem('pflege_pref_model', model.name); } catch (e) {} return response; }
@@ -222,12 +230,14 @@ async function callGeminiWithFallback(payload, systemPrompt) {
             // Ungültiger Schlüssel, Standort, gesperrter Zugang: gilt für alle Modelle – abbrechen.
             if (e.message && /api key|location is not supported|PERMISSION_DENIED|has not been used|\b403\b/i.test(e.message)) throw e;
 
-            // Sicherheitsnetz: lehnt ein Modell maxOutputTokens ab (400), ohne das Feld erneut.
-            if (e.message && /maxOutputTokens|max_output_tokens/i.test(e.message)) {
+            // Sicherheitsnetz: lehnt ein Modell maxOutputTokens oder thinkingConfig ab (400,
+            // ältere Modelle ohne Denkmodus), diese Zusatzfelder weglassen und erneut versuchen.
+            if (e.message && /maxOutputTokens|max_output_tokens|thinking/i.test(e.message)) {
                 try {
                     const ohneLimit = JSON.parse(JSON.stringify(fullPayload));
                     if (ohneLimit.generationConfig) {
                         delete ohneLimit.generationConfig.maxOutputTokens;
+                        delete ohneLimit.generationConfig.thinkingConfig;
                         if (Object.keys(ohneLimit.generationConfig).length === 0) delete ohneLimit.generationConfig;
                     }
                     const resp3 = await callGeminiWithRetry(url, ohneLimit, KI_ZEIT.gesamtMs - (Date.now() - start));
