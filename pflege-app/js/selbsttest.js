@@ -7188,6 +7188,10 @@ async function selbsttest() {
             pruefeWahr('KI-Aufruf schaltet das Denken ab (thinkingBudget 0), damit die Antwort nicht abbricht',
                 typeof callGeminiWithFallback === 'function'
                 && /thinkingBudget\s*:\s*0/.test(callGeminiWithFallback.toString()));
+            pruefeWahr('Einlesen: schlanker Rückfall bei zu langer Antwort (nur Bewertungen, ohne Freitexte)',
+                typeof aiReadGutachten === 'function'
+                && /KI_ABGESCHNITTEN/.test(aiReadGutachten.toString())
+                && /schemaSchlank[\s\S]*delete[\s\S]*anamnese/.test(aiReadGutachten.toString()));
         }
 
         // GOLDEN MASTER – die ganze Rechenkette an vier vollständigen Fällen.

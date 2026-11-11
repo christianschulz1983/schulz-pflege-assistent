@@ -1033,6 +1033,15 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Modell, das das Feld ablehnt (ältere ohne Denkmodus), fängt dasselbe 400-Sicherheitsnetz wie
    bei maxOutputTokens (beide Felder werden entfernt und erneut versucht). Selbsttest prüft
    zusätzlich, dass der Aufruf `thinkingBudget: 0` setzt (13. Prüfung).
+   **Nachtrag (v66.86): schlanker Rückfall beim Einlesen.** Wurde dieselbe Abbruch-Meldung trotz
+   abgeschaltetem Denken erneut gemeldet (gescanntes Gutachten, auch im Widerspruch), fängt
+   `aiReadGutachten` (`js/auslese.js`) sie jetzt ab: Bei `KI_ABGESCHNITTEN` startet EIN zweiter
+   Versuch mit einem schlanken Schema OHNE die langen Freitexte (`anamnese`, `befund`,
+   `versorgung` gelöscht) und dem Hinweis, nur Bewertungen, Stammdaten, Modulsummen und Diagnosen
+   zu liefern. So kommen die Wertungspunkte und die Berechnung zustande, statt in die lokale
+   Vorab-Füllung zu fallen; die Schlussmeldung sagt, dass Anamnese/Befund aus der PDF zu ergänzen
+   sind. Der Versuch greift NUR nach einem Fehlschlag und kann nichts Funktionierendes stören.
+   Selbsttest prüft, dass `aiReadGutachten` diesen Rückfall enthält (14. Prüfung).
 64. **Vorgutachten-Karte Modul 5: nie „0× pro Woche" bei Häufigkeit null** (`getVergleichsRef`
    in `js/oberflaeche.js`). Gemeldet: In jeder Modul-5-Zeile stand in der Vorgutachten-Karte
    der Kriterienliste „0× pro Woche" – in der Schmuckschrift gelesen als „ox pro Woche". Eine
@@ -1119,8 +1128,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2038 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 13 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung).
+Der Selbsttest umfasst 2040 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 14 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

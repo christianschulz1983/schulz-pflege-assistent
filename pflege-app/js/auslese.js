@@ -499,12 +499,39 @@ async function aiReadGutachten(event, ziel) {
                 generationConfig: { responseMimeType: "application/json", responseSchema: responseSchema }
             };
 
-            let data = null, aiError = null;
+            let data = null, aiError = null, knappWegenLaenge = false;
             try {
                 const response = await callGeminiWithFallback(payload, systemPrompt);
                 data = kiJsonAusAntwort(response);
             } catch (e) {
                 aiError = e;
+                // War die Antwort zu lang (abgeschnitten)? Ein zweiter, SCHLANKER Versuch: nur
+                // Bewertungen, Stammdaten, Modulsummen und Diagnosen – OHNE die langen Freitexte
+                // (Anamnese, Befund, Versorgung). So kommen wenigstens die Wertungspunkte und die
+                // Berechnung zustande, statt in die lokale Vorab-Füllung zu fallen. Der Versuch
+                // greift NUR nach einem Fehlschlag und kann deshalb nichts Funktionierendes stören.
+                if (e && /KI_ABGESCHNITTEN/.test(e.message || '')) {
+                    try {
+                        updateOverlay("Antwort war zu lang – schlanker Versuch (nur Bewertungen)...", 72);
+                        const schemaSchlank = JSON.parse(JSON.stringify(responseSchema));
+                        delete schemaSchlank.properties.anamnese;
+                        delete schemaSchlank.properties.befund;
+                        delete schemaSchlank.properties.versorgung;
+                        const partsSchlank = userParts.concat([{ text:
+                            "WICHTIG: Die vorige Antwort war zu lang und wurde abgeschnitten. Gib jetzt NUR "
+                            + "die Bewertungen (values_orig), die Stammdaten, die Modulsummen und die Diagnosen "
+                            + "zurück – KEINE Anamnese, KEINEN Befund, KEINE Versorgung. Fasse dich knapp." }]);
+                        const payloadSchlank = {
+                            contents: [{ role: "user", parts: partsSchlank }],
+                            generationConfig: { responseMimeType: "application/json", responseSchema: schemaSchlank }
+                        };
+                        data = kiJsonAusAntwort(await callGeminiWithFallback(payloadSchlank, systemPrompt));
+                        aiError = null;
+                        knappWegenLaenge = true;
+                    } catch (e2) {
+                        aiError = e2;
+                    }
+                }
             }
 
             updateOverlay("Ergebnisse aufbereiten...", 85);
@@ -531,7 +558,9 @@ async function aiReadGutachten(event, ziel) {
                 if (haveLocalText) data._text = local.text;
                 if (scanInfo) data._scan = scanInfo;
                 openImportReview(file, data, mimeType);
-                showToast("Gutachten gelesen ✓ – bitte prüfen und übernehmen.", "success");
+                showToast(knappWegenLaenge
+                    ? "Gutachten gelesen ✓ (schlanker Versuch, weil die Antwort zu lang war): Bewertungen und Diagnosen stehen – Anamnese und Befund bitte aus der PDF ergänzen."
+                    : "Gutachten gelesen ✓ – bitte prüfen und übernehmen.", "success");
             } else {
                 // Google nicht verfügbar (z.B. 429) -> lokale Reserve, damit nichts blockiert
                 const fb = (local && local.ok) ? localMetaToData(local) : {};
