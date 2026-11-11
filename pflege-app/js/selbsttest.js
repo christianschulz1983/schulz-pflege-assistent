@@ -7192,6 +7192,17 @@ async function selbsttest() {
                 typeof aiReadGutachten === 'function'
                 && /KI_ABGESCHNITTEN/.test(aiReadGutachten.toString())
                 && /schemaSchlank[\s\S]*delete[\s\S]*anamnese/.test(aiReadGutachten.toString()));
+            if (typeof diagnosenBereinigen === 'function') {
+                pruefe('Lokale Diagnosen: ab der Modul-Zusammenfassung wird abgeschnitten',
+                    diagnosenBereinigen([{ icd: '', text: 'Koxarthrose beidseits' },
+                        { icd: '', text: 'Einschränkungen fanden sich:' },
+                        { icd: '', text: 'im Modul 2 „Kognitive…" mit 3,75 gewichteten Punkten' }]).length, 1);
+                pruefe('Lokale Diagnosen: echte Diagnosen bleiben erhalten',
+                    diagnosenBereinigen([{ text: 'Koxarthrose beidseits' }, { text: 'Diabetes mellitus Typ 2' }]).length, 2);
+                pruefeWahr('Lokale Diagnosen: Modulsummen-Zeile fliegt raus',
+                    !diagnosenBereinigen([{ text: 'Herzinsuffizienz' },
+                        { text: 'im Modul 4 „Selbstversorgung" mit 20 gewichteten Punkten' }]).some(d => /gewichtete/.test(d.text)));
+            }
         }
 
         // GOLDEN MASTER – die ganze Rechenkette an vier vollständigen Fällen.

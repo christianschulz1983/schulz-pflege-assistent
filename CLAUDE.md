@@ -1063,6 +1063,18 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Anhörungsverfahren) ausdrücklich als Quelle, und eine ZWINGEND-Regel verlangt, jede Begründung
    auf den Notizen aufzubauen. Selbsttest „9c": alle drei Prompt-Bauer nehmen die Erstgespräch-
    Notizen auf (Widerspruch und Antrag live geprüft, Anhörung über den Quelltext).
+66. **Lokale Vorab-Diagnosen hören am Diagnosen-Kapitel auf** (`diagnosenBereinigen` in
+   `js/auslese.js`). Gemeldet (gescanntes Gutachten, KI abgeschnitten → lokale Vorab-Füllung):
+   In den Diagnosefeldern standen Überschriften und die Modul-Zusammenfassung statt Diagnosen
+   („Einschränkungen fanden sich:", „im Modul 2 … mit 3,75 gewichteten Punkten"). Ursache: Die
+   Server-Auslese (`extract_diagnoses` in `pflege_server.py`) liest über das Diagnosen-Kapitel
+   hinaus. Behoben **im Browser, ohne Server-Neustart**: `localMetaToData` schickt die Liste
+   durch `diagnosenBereinigen`, das ab der ersten Zusammenfassungszeile abschneidet
+   (`Einschränkungen fanden sich`, `… gewichtete Punkte`, `im Modul N`) und leere Zeilen
+   entfernt. Nur die Vorab-Füllung ist betroffen; die KI-Diagnosen bleiben unangetastet, die
+   Rechnung ebenso. Selbsttest: Zusammenfassung wird abgeschnitten, echte Diagnosen bleiben,
+   Modulsummen-Zeile fliegt raus. (Die saubere Lösung an der Quelle – Kapitelende in
+   `extract_diagnoses` – bleibt offen und braucht dann einen Server-Neustart, Regel 1.)
 
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
@@ -1128,8 +1140,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2040 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 14 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung).
+Der Selbsttest umfasst 2043 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 14 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

@@ -60,6 +60,23 @@ function textDecktDokumentAb(local) {
     return (local.text.match(/\b[45]\.[1-6]\.\d{1,2}\b/g) || []).length >= 20;
 }
 
+// Diagnosen vom nicht-diagnostischen Rest trennen. Die lokale Auslese liest manchmal über das
+// Diagnosen-Kapitel hinaus und fängt Überschriften und die Modul-Zusammenfassung mit ein
+// (gemeldet: „Einschränkungen fanden sich:", „im Modul 2 … mit 3,75 gewichteten Punkten"). Das
+// sind KEINE Diagnosen. Ab der ersten solchen Zeile wird abgeschnitten (danach kommt nur noch
+// die Zusammenfassung); leere Zeilen fallen weg. Nur Anzeige – die Rechnung bleibt unberührt.
+function diagnosenBereinigen(liste) {
+    if (!Array.isArray(liste)) return [];
+    const istZusammenfassung = t => /einschr[aä]nkungen\s+fanden\s+sich|gewichtete[rn]?\s+punkt|(?:^|[,;]\s*)im\s+modul\s+\d/i.test(t || '');
+    const out = [];
+    for (const d of liste) {
+        const t = (d && d.text) || '';
+        if (istZusammenfassung(t)) break;
+        if (t.trim()) out.push(d);
+    }
+    return out;
+}
+
 // Lokal ausgelesene Stammdaten/Diagnosen/Texte (vom Server) ins Datenformat der App bringen.
 function localMetaToData(local) {
     const m = (local && local.meta) ? local.meta : {};
@@ -76,7 +93,7 @@ function localMetaToData(local) {
         stam_pts_manual: m.pts || '',
         anamnese: m.anamnese || '',
         befund: m.befund || '',
-        diagnoses: Array.isArray(m.diagnoses) ? m.diagnoses : []
+        diagnoses: diagnosenBereinigen(m.diagnoses)
     };
 }
 
