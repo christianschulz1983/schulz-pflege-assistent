@@ -7192,6 +7192,11 @@ async function selbsttest() {
                 typeof aiReadGutachten === 'function'
                 && /KI_ABGESCHNITTEN/.test(aiReadGutachten.toString())
                 && /schemaSchlank[\s\S]*delete[\s\S]*anamnese/.test(aiReadGutachten.toString()));
+            pruefeWahr('Höherstufung: Versorgung läuft in einem EIGENEN Aufruf (nicht im großen Hauptaufruf)',
+                typeof aiReadGutachten === 'function'
+                && /haVorbefund/.test(aiReadGutachten.toString())
+                && /schemaVers/.test(aiReadGutachten.toString())
+                && !/vorbefundImportSchema\s*\(\s*responseSchema\s*\)/.test(aiReadGutachten.toString()));
             if (typeof diagnosenBereinigen === 'function') {
                 pruefe('Lokale Diagnosen: ab der Modul-Zusammenfassung wird abgeschnitten',
                     diagnosenBereinigen([{ icd: '', text: 'Koxarthrose beidseits' },

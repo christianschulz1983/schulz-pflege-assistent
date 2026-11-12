@@ -382,8 +382,11 @@ async function aiReadGutachten(event, ziel) {
             - anh_gutachten_datum: Erstellungsdatum des Zweitgutachtens (tt.mm.jjjj)
             - anh_art: Durchführungsart des Zweitgutachtens, wörtlich wie im Dokument
             Erfinde nichts. Findest du eine Angabe nicht, gib einen leeren String zurück.` : '')
-            // Höherstufungsantrag: Versorgung und Befund für die Erfassungsmaske mitlesen
-            + ((typeof vorbefundImportAktiv === 'function' && vorbefundImportAktiv()) ? vorbefundImportAnweisung() : '');
+            ;
+            // Höherstufungsantrag: Die Versorgung (Regel 21) wird NICHT mehr in diesen großen
+            // Hauptaufruf gepackt, sondern danach in einem EIGENEN, best-effort Aufruf geholt –
+            // der kombinierte Aufruf brach am Token-Limit ab („Das kommt beim HA").
+            const haVorbefund = (typeof vorbefundImportAktiv === 'function' && vorbefundImportAktiv());
 
             const responseSchema = {
                 type: "OBJECT",
@@ -444,7 +447,7 @@ async function aiReadGutachten(event, ziel) {
                 },
                 required: ["diagnoses", "values_orig"]
             };
-            if (typeof vorbefundImportAktiv === 'function' && vorbefundImportAktiv()) vorbefundImportSchema(responseSchema);
+            // (Versorgung bewusst NICHT hier – eigener Aufruf nach dem Haupt-Einlesen, s. haVorbefund.)
             if (istZweit) {
                 responseSchema.properties.anh_schreiben_datum = { type: "STRING" };
                 responseSchema.properties.anh_frist = { type: "STRING" };
@@ -479,9 +482,8 @@ async function aiReadGutachten(event, ziel) {
             // Text wird nur dieser kleine Text geschickt (statt großes Bild) -> deutlich weniger 429.
             let userParts;
             if (textVollstaendig) {
-                userParts = [{ text: "Lies aus folgendem Gutachten-Text die Stammdaten, Diagnosen, Anamnese und Befund vollständig aus"
-                    + ((typeof vorbefundImportAktiv === 'function' && vorbefundImportAktiv()) ? ", dazu die Angaben zur Versorgung (Feld versorgung)" : "")
-                    + ".\n\n=== GUTACHTEN-TEXT ===\n" + local.text }];
+                userParts = [{ text: "Lies aus folgendem Gutachten-Text die Stammdaten, Diagnosen, Anamnese und Befund vollständig aus."
+                    + "\n\n=== GUTACHTEN-TEXT ===\n" + local.text }];
                 updateOverlay("Stammdaten/Diagnosen werden gelesen...", 55);
             } else if (haveLocalText) {
                 // Gescanntes Dokument: BEIDES schicken. Der Text hilft bei Namen, Daten und
@@ -516,7 +518,7 @@ async function aiReadGutachten(event, ziel) {
                 generationConfig: { responseMimeType: "application/json", responseSchema: responseSchema }
             };
 
-            let data = null, aiError = null, knappWegenLaenge = false;
+            let data = null, aiError = null, knappWegenLaenge = false, versorgungFehlt = false;
             try {
                 const response = await callGeminiWithFallback(payload, systemPrompt);
                 data = kiJsonAusAntwort(response);
@@ -551,6 +553,30 @@ async function aiReadGutachten(event, ziel) {
                 }
             }
 
+            // HÖHERSTUFUNGSANTRAG: Versorgung in EINEM eigenen, best-effort Aufruf holen – getrennt
+            // vom großen Hauptaufruf, der sonst am Token-Limit abbrach („Das kommt beim HA").
+            // Scheitert dieser Aufruf, bleibt die Versorgung leer; Kriterien, Stammdaten und
+            // Diagnosen stehen trotzdem. VORBEFUND_SCHEMA liegt in js/vorbefund.js.
+            if (data && haVorbefund && typeof VORBEFUND_SCHEMA !== 'undefined'
+                && typeof vorbefundImportAnweisung === 'function') {
+                try {
+                    updateOverlay("Versorgung (Hilfsmittel, Pflegepersonen, Arztbesuche) wird gelesen...", 80);
+                    const schemaVers = { type: "OBJECT", properties: { versorgung: VORBEFUND_SCHEMA }, required: ["versorgung"] };
+                    const promptVers = systemPrompt + "\n\n" + vorbefundImportAnweisung()
+                        + "\nGib AUSSCHLIESSLICH das Feld versorgung zurueck, sonst nichts.";
+                    const vData = kiJsonAusAntwort(await callGeminiWithFallback(
+                        { contents: [{ role: "user", parts: userParts }],
+                          generationConfig: { responseMimeType: "application/json", responseSchema: schemaVers } },
+                        promptVers));
+                    if (vData && vData.versorgung) data.versorgung = vData.versorgung;
+                    else versorgungFehlt = true;
+                } catch (eV) {
+                    // Versorgung ist optional – ein Fehlschlag darf den Import nicht kippen.
+                    console.info("Versorgung konnte nicht gelesen werden:", eV && eV.message);
+                    versorgungFehlt = true;
+                }
+            }
+
             updateOverlay("Ergebnisse aufbereiten...", 85);
 
             // Hinweis auf gescannte Seiten – der Berater muss wissen, welche Seiten
@@ -577,7 +603,9 @@ async function aiReadGutachten(event, ziel) {
                 openImportReview(file, data, mimeType);
                 showToast(knappWegenLaenge
                     ? "Gutachten gelesen ✓ (schlanker Versuch, weil die Antwort zu lang war): Bewertungen und Diagnosen stehen – Anamnese und Befund bitte aus der PDF ergänzen."
-                    : "Gutachten gelesen ✓ – bitte prüfen und übernehmen.", "success");
+                    : versorgungFehlt
+                        ? "Gutachten gelesen ✓ – Bewertungen, Stammdaten und Diagnosen stehen. Die Versorgungstabellen konnten nicht gelesen werden; bitte aus der PDF ergänzen."
+                        : "Gutachten gelesen ✓ – bitte prüfen und übernehmen.", "success");
             } else {
                 // Google nicht verfügbar (z.B. 429) -> lokale Reserve, damit nichts blockiert
                 const fb = (local && local.ok) ? localMetaToData(local) : {};

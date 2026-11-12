@@ -1042,6 +1042,20 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Vorab-Füllung zu fallen; die Schlussmeldung sagt, dass Anamnese/Befund aus der PDF zu ergänzen
    sind. Der Versuch greift NUR nach einem Fehlschlag und kann nichts Funktionierendes stören.
    Selbsttest prüft, dass `aiReadGutachten` diesen Rückfall enthält (14. Prüfung).
+   **Nachtrag (v66.88): Der Abbruch kam vor allem beim Höherstufungsantrag** („Das kommt beim
+   HA"). Grund: Nur im HA packte Regel 21 zusätzlich die **Versorgungstabellen** in denselben,
+   ohnehin großen Einlese-Aufruf – das war die mit Abstand größte Antwort und brach zuerst ab.
+   Deshalb wird die Versorgung jetzt **nicht mehr** in den Hauptaufruf gepackt (`vorbefundImportSchema`
+   wird nicht mehr aufgerufen, `vorbefundImportAnweisung` nicht mehr an den Haupt-Prompt gehängt),
+   sondern **nach** dem Haupt-Einlesen in einem EIGENEN, best-effort Aufruf geholt (`haVorbefund`,
+   `schemaVers = {versorgung: VORBEFUND_SCHEMA}`). Der Hauptaufruf (Kriterien, Stammdaten,
+   Diagnosen, Anamnese, Befund) ist damit so klein wie bei jedem anderen Vorgang und bricht nicht
+   mehr ab. Scheitert der Versorgungs-Aufruf, bleibt `versorgungFehlt`-Hinweis in der
+   Schlussmeldung und die Tabellen bleiben leer – Kriterien und Berechnung stehen trotzdem. Das
+   ist die bewusste Abkehr von Regel 21 („kein zweiter Aufruf"): zwei kleine Aufrufe sind
+   verlässlicher als ein riesiger, der ganz scheitert; das 429-Limit fängt die Modell-Kaskade.
+   Selbsttest (15.): `aiReadGutachten` nutzt `haVorbefund`/`schemaVers` und ruft NICHT mehr
+   `vorbefundImportSchema(responseSchema)` auf.
 64. **Vorgutachten-Karte Modul 5: nie „0× pro Woche" bei Häufigkeit null** (`getVergleichsRef`
    in `js/oberflaeche.js`). Gemeldet: In jeder Modul-5-Zeile stand in der Vorgutachten-Karte
    der Kriterienliste „0× pro Woche" – in der Schmuckschrift gelesen als „ox pro Woche". Eine
@@ -1141,7 +1155,7 @@ beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
 Der Selbsttest umfasst 2043 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 14 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen).
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle
