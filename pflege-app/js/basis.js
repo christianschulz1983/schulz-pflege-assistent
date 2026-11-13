@@ -150,6 +150,26 @@ function gutachtenAngaben(r, pgFeld, ptsFeld) {
     return { pg: pgHand || String(pgRech), pts: ptsHand ? punkteDE(ptsHand) : ptsRech, widerspruch: null };
 }
 
+/* Nach dem Übernehmen eines Gutachtens müssen die Kopffelder „Gesamtpunkte (Gutachten)"
+   und „Pflegegrad (Gutachten)" zu den tatsächlich übernommenen Modulwerten passen – also
+   zu dem, was die Tabelle „Modulergebnisse laut Gutachten" zeigt (calculateInternal).
+   Vorher blieb dort der roh gelesene Kopfwert stehen (gemeldet: Feld 10 Punkte / Pflegegrad
+   1, während die Module 12,5 ergaben); Feld und Tabelle widersprachen sich. Die Gegenprobe
+   gegen den gedruckten Kopfwert ist in der Prüfansicht erfolgt (modulGegenprobe,
+   rvPruefePlausibel); ab der Übernahme gilt das bestätigte Ergebnis. Formatierung genau wie
+   die Modultabelle (total-w-… : zwei Nachkommastellen mit Komma), damit beide Stellen
+   zeichengleich sind. Gilt für alle vier Vorgangsarten: Widerspruch, Erstantrag und
+   Höherstufung über stam-*-manual ('orig'), die Anhörung über das Zweitgutachten ('zweit',
+   anh-pg/anh-pts). */
+function gutachtenFelderAusRechnung(pref, pgFeld, ptsFeld) {
+    if (typeof calculateInternal !== 'function') return;
+    const r = calculateInternal(pref || 'orig');
+    const elPts = document.getElementById(ptsFeld || 'stam-pts-manual');
+    const elPg  = document.getElementById(pgFeld  || 'stam-pg-manual');
+    if (elPts) elPts.value = Number(r.total || 0).toFixed(2).replace('.', ',');
+    if (elPg)  elPg.value  = r.pg > 0 ? String(r.pg) : 'kein Pflegegrad';
+}
+
 // Lesbare Meldung zu einem Widerspruch aus gutachtenAngaben (für App und Schriftstück)
 function gutachtenWiderspruchText(bezeichnung, w) {
     if (!w) return '';

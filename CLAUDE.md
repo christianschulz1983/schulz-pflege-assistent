@@ -1090,6 +1090,29 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Modulsummen-Zeile fliegt raus. (Die saubere Lösung an der Quelle – Kapitelende in
    `extract_diagnoses` – bleibt offen und braucht dann einen Server-Neustart, Regel 1.)
 
+67. **Nach dem Übernehmen zeigt das Kopffeld das übernommene Modulergebnis**
+   (`gutachtenFelderAusRechnung` in `js/basis.js`). Gemeldet: „GESAMTPUNKTE (GUTACHTEN)" stand
+   auf 10 (der roh gelesene Kopfwert des Gutachtens), während die Tabelle „Modulergebnisse
+   laut Gutachten" aus denselben Modulen 12,5 ergab. Grund: Die KI liest die Gesamtpunktzahl
+   aus ZWEI Stellen – dem gedruckten Kopfwert (`stam_pts_manual`) und der Summe der
+   Modul-Zusammenfassung (`total_weight`, = `extracted.total`). Gehen sie auseinander (ein
+   Lesefehler an einer der beiden), widersprachen sich Kopffeld und Modultabelle. Vorgabe des
+   Verfassers: „Wenn ich Werte übernehme und auf übernehmen klicke, dann muss das da aufgeführt
+   werden." Deshalb setzt die Übernahme die Kopffelder „GESAMTPUNKTE/PFLEGEGRAD (GUTACHTEN)"
+   auf das, was die Modultabelle zeigt (`calculateInternal('…').total`/`.pg`, Format wie
+   `total-w-…`: zwei Nachkommastellen mit Komma; 0 → „kein Pflegegrad"). In **allen vier
+   Vorgängen**: Widerspruch, Erstantrag und Höherstufung über `stam-pts-manual`/
+   `stam-pg-manual` (`applyImportedData`, nach `calculate('orig')`), die Anhörung über das
+   Zweitgutachten `anh-pts`/`anh-pg` (`uebernehmeAnhoerung`, nach `calculate('zweit')`).
+   - **Die Gegenprobe gegen den gedruckten Kopfwert bleibt** – sie läuft VOR der Übernahme in
+     der Prüfansicht (`modulGegenprobe` nach Regel 12, `rvPruefePlausibel`). Ab der Übernahme
+     gilt das vom Berater bestätigte Ergebnis. Das ergänzt Regel 48: Berichtigt der Berater
+     später ein Kreuz in der Kriterienliste, nennt `origRefText()` weiterhin beide Zahlen.
+   - **`gutachtenAngaben` (Regel 37) bleibt unberührt** – es rechnete die Rechnung ohnehin
+     gegen die Handeingabe; jetzt stimmen beide nach der Übernahme von selbst überein.
+   Selbsttest „37b": Kopfwert 10 weicht bewusst von der Modul-Zusammenfassung 12,5 ab; nach
+   `applyImportedData` steht im Feld die 12,50, nicht die 10 – ebenso in der Anhörung.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1154,8 +1177,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2043 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen).
+Der Selbsttest umfasst 2049 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

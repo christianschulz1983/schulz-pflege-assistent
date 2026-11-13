@@ -1128,6 +1128,11 @@ function applyImportedData(rev) {
     if (typeof letzteProvided !== 'undefined') letzteProvided = rev.provided || null;
     if (typeof veraltetZuruecksetzen === 'function') veraltetZuruecksetzen();
     fillTable('orig'); fillTable('own'); calculate('orig'); calculate('own'); syncSpecialUI();
+    // „Wenn ich Werte übernehme, muss das da aufgeführt werden" (Vorgabe des Verfassers):
+    // GESAMTPUNKTE/PFLEGEGRAD (GUTACHTEN) auf die übernommenen Modulwerte setzen, damit
+    // Kopffeld und Tabelle „Modulergebnisse laut Gutachten" dasselbe zeigen. Widerspruch,
+    // Erstantrag und Höherstufung laufen alle hier durch.
+    if (typeof gutachtenFelderAusRechnung === 'function') gutachtenFelderAusRechnung('orig');
     // Höherstufungsantrag: die in der Prüfansicht freigegebenen Angaben eintragen
     if (typeof vorbefundImportUebernehmen === 'function') vorbefundImportUebernehmen(rev);
     if (typeof renderErfassung === 'function') renderErfassung();

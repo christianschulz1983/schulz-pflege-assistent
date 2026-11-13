@@ -214,6 +214,10 @@ function uebernehmeAnhoerung(rev) {
     }
 
     fillTable('own'); calculate('own'); calculate('zweit'); syncSpecialUI();
+    // Wie beim Erstgutachten (applyImportedData): die Kopffelder des ZWEITgutachtens auf die
+    // übernommenen Modulwerte setzen, damit „Gesamtpunkte/Pflegegrad" und die Modultabelle
+    // des Zweitgutachtens übereinstimmen.
+    if (typeof gutachtenFelderAusRechnung === 'function') gutachtenFelderAusRechnung('zweit', 'anh-pg', 'anh-pts');
     aktualisiereAnhoerungStatus();
 }
 

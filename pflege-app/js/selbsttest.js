@@ -7210,6 +7210,71 @@ async function selbsttest() {
             }
         }
 
+        // ---------- 37b. Übernahme: Kopffeld (Gutachten) = übernommene Modulwerte ----------
+        /* Gemeldet: GESAMTPUNKTE (GUTACHTEN) zeigte 10 (der roh gelesene Kopfwert des
+           Gutachtens), während die Tabelle „Modulergebnisse laut Gutachten" aus denselben
+           Modulen 12,5 ergab (Kopfwert und Modul-Zusammenfassung des Gutachtens gingen
+           auseinander). Nach „Werte übernehmen" müssen Kopffeld und Tabelle dasselbe zeigen
+           (gutachtenFelderAusRechnung). In allen vier Vorgängen: Widerspruch/Erstantrag/
+           Höherstufung über stam-*-manual, Anhörung über anh-pg/anh-pts. */
+        if (typeof applyImportedData === 'function' && typeof gutachtenFelderAusRechnung === 'function'
+            && typeof normalizeImport === 'function') {
+            const sf37 = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+            const merk37 = {
+                o: stateOrig, e: stateEigene, z: stateZweit, modus: appModus,
+                pts: (document.getElementById('stam-pts-manual') || {}).value,
+                pg: (document.getElementById('stam-pg-manual') || {}).value,
+                apts: (document.getElementById('anh-pts') || {}).value,
+                apg: (document.getElementById('anh-pg') || {}).value
+            };
+            try {
+                setzeModus('widerspruch');
+                // Kopfwert 10 weicht bewusst von der Modul-Zusammenfassung 12,5 ab
+                // (Modul 1: 2,5 gewichtet + Modul 4: 10 gewichtet = 12,5).
+                applyImportedData(normalizeImport({
+                    values_orig: [], diagnoses: [],
+                    stam_pts_manual: '10', stam_pg_manual: '1',
+                    total_weight: 12.5, pflegegrad: 1,
+                    modul_1_weight: 2.5, modul_4_weight: 10
+                }));
+                const rO37 = calculateInternal('orig');
+                pruefe('Übernahme: GESAMTPUNKTE (GUTACHTEN) zeigt die übernommenen Modulpunkte',
+                    document.getElementById('stam-pts-manual').value,
+                    Number(rO37.total).toFixed(2).replace('.', ','));
+                pruefe('Übernahme: PFLEGEGRAD (GUTACHTEN) zeigt den übernommenen Pflegegrad',
+                    document.getElementById('stam-pg-manual').value,
+                    rO37.pg > 0 ? String(rO37.pg) : 'kein Pflegegrad');
+                pruefeWahr('Übernahme: Kopffeld ist nicht mehr der roh gelesene Kopfwert (10)',
+                    document.getElementById('stam-pts-manual').value !== '10'
+                    && Math.abs(Number(document.getElementById('stam-pts-manual').value.replace(',', '.')) - rO37.total) < 0.01);
+
+                if (typeof uebernehmeAnhoerung === 'function') {
+                    setzeModus('anhoerung');
+                    const vmA = {};
+                    ITEMS.forEach(i => { if (i.m) vmA[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+                    uebernehmeAnhoerung({
+                        stam: { pg: '1', pts: '10', begutachtung: '2026-04-08', art: DURCHFUEHRUNGSARTEN[1] },
+                        anh: { gutachten: '2026-04-08' },
+                        valuesMap: vmA, special: 0,
+                        extracted: { raws: [0, 0, 0, 0, 0, 0], weights: [2.5, 0, 0, 10, 0, 0], total: 12.5, pg: 1 }
+                    });
+                    const rZ37 = calculateInternal('zweit');
+                    pruefe('Übernahme Anhörung: Gesamtpunkte des Zweitgutachtens = Modulwerte',
+                        document.getElementById('anh-pts').value,
+                        Number(rZ37.total).toFixed(2).replace('.', ','));
+                    pruefe('Übernahme Anhörung: Pflegegrad des Zweitgutachtens stimmt',
+                        document.getElementById('anh-pg').value,
+                        rZ37.pg > 0 ? String(rZ37.pg) : 'kein Pflegegrad');
+                }
+            } finally {
+                stateOrig = merk37.o; stateEigene = merk37.e; stateZweit = merk37.z;
+                sf37('stam-pts-manual', merk37.pts); sf37('stam-pg-manual', merk37.pg);
+                sf37('anh-pts', merk37.apts); sf37('anh-pg', merk37.apg);
+                if (merk37.modus) setzeModus(merk37.modus); else setzeModus('widerspruch');
+                leeren();
+            }
+        }
+
         // GOLDEN MASTER – die ganze Rechenkette an vier vollständigen Fällen.
         // Die Sollwerte stehen von Hand gerechnet in js/goldmaster.js, samt Herleitung
         // aus den Tabellen der BRi. Angelegt vor dem Einbau der Kinderbegutachtung:
