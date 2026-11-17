@@ -1113,6 +1113,32 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Selbsttest „37b": Kopfwert 10 weicht bewusst von der Modul-Zusammenfassung 12,5 ab; nach
    `applyImportedData` steht im Feld die 12,50, nicht die 10 – ebenso in der Anhörung.
 
+68. **Jede Begründung bleibt im Gegenstand ihres Kriteriums/Moduls** (`kriteriumZuordnungRegel`
+   in `js/vorschlaege.js`). Gemeldet (4.4.7 „Mundgerechtes Zubereiten der Nahrung/Eingießen von
+   Getränken"): Die KI begründete mit „Tabletten aus dem Blister drücken und teilen" – das ist
+   Medikation (Modul 5, 4.5.1) und gehört NICHT zur Nahrungszubereitung. Der Verfasser hatte mit
+   dem Öffnen von Flaschen argumentiert, was zu 4.4.7 passt. Daraus die drei Vorgaben:
+   1. **Zuordnung:** Jede Begründung behandelt ausschließlich das, was DIESES Kriterium misst
+      (seine BRi-Definition). Angaben aus Notizen, Befund und Arztberichten werden dem Kriterium
+      zugeordnet, zu dem sie fachlich gehören. Eine Einschränkung aus einem ANDEREN Kriterium/
+      Modul darf nur **ergänzendes Indiz** sein, nie die tragende Begründung – und nur mit
+      ausdrücklicher Brücke (Beispiel: An-/Ausziehen der Kompressionsstrümpfe ist bei 4.4.6
+      „An-/Auskleiden Unterkörper" nur Indiz; tragend ist „Socken an-/ausziehen gelingt nicht,
+      da Handkraft reduziert und Sprunggelenke nicht erreicht"). Die Regel steht in **allen vier
+      Vorgängen** im System-Prompt (`einheit` = „Kriterium" bei Widerspruch/Anhörung,
+      „Lebensbereich" beim Antrag) und nennt die Beispiele des Verfassers (Flaschen, Socken).
+   2. **„Befund und Stellungnahme":** kurz, prägnant, aber nicht so gekürzt, dass der Kern
+      verloren geht – höchstens 5 Sätze (Widerspruch, Regel 8; Anhörung bis 10, Regel 38), unter
+      Einbezug von Richtlinien, Befund, Arztberichten und dem Unterstützungsbedarf aus den Notizen,
+      jeweils korrekt dem Modul zugeordnet.
+   3. **Prozess-spezifische Argumentation:** Erstantrag, Höherstufung, Widerspruch und Anhörung
+      argumentieren unterschiedlich (eigene System-Prompts – bestand bereits). Zusätzlich lernt
+      die App den Stil jetzt **getrennt je Vorgang**: `stilLernenAuswahl` (`js/stillernen.js`)
+      filtert Stilpaare HART nach `appModus` (vorher nur weiches Gewicht) – ein Paar aus einem
+      anderen Vorgang prägt die Begründung nicht mehr.
+   Selbsttest „35d" (Regel, Einheit, Verankerung in allen vier Prompts) und „35" (fremder Vorgang
+   wird aus `stilLernenAuswahl` ausgeschlossen).
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1177,8 +1203,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2049 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme).
+Der Selbsttest umfasst 2057 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

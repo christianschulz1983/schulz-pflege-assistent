@@ -5850,6 +5850,17 @@ async function selbsttest() {
                 pruefe('Höchstens sechs Paare je Aufruf', aus35.length, STIL_LERNEN_PROMPT_MAX);
                 pruefeWahr('Paare zum gesuchten Kriterium zuerst', aus35.every(p => p.nr === '4.4.2'));
 
+                // Vorgang ist jetzt ein harter Filter: ein Stilpaar aus einem ANDEREN Vorgang
+                // darf die Begründung im aktuellen Vorgang nicht prägen (Widerspruch-Modus läuft).
+                const gemischt = viele.slice();
+                gemischt.push({ id: 'ha1', nr: '4.4.2', vorgang: 'hoeherstufung',
+                                zeit: '2026-02-02', vorher: 'alt HA', nachher: 'neu HA' });
+                stilLernenSpeichern(gemischt);
+                const ausVorgang = stilLernenAuswahl(['4.4.2']);
+                pruefeWahr('Stilpaare eines fremden Vorgangs werden ausgeschlossen',
+                    ausVorgang.every(p => p.vorgang === 'widerspruch') && !ausVorgang.some(p => p.id === 'ha1'));
+                stilLernenSpeichern(viele);
+
                 // Speichergrenze und Löschen
                 const zuviele = [];
                 for (let k = 0; k < STIL_LERNEN_MAX + 20; k++) zuviele.push({ id: 'z' + k, nr: '4.1.1', vorgang: 'widerspruch', zeit: '2026-01-01', vorher: 'a', nachher: 'b' });
@@ -5880,6 +5891,29 @@ async function selbsttest() {
             }
         }
 
+
+        /* 35d. Zuordnung zum Kriterium/Modul – jede Begründung bleibt im Gegenstand des
+           Kriteriums. Gemeldet (4.4.7): Die KI begründete mit „Tabletten teilen" (Medikation,
+           Modul 5). Die Regel steht in ALLEN vier Vorgängen im System-Prompt. */
+        if (typeof kriteriumZuordnungRegel === 'function') {
+            const rk = kriteriumZuordnungRegel('Kriterium');
+            pruefeWahr('Zuordnungsregel nennt den Medikations-Fehlgriff (4.4.7)',
+                /Tabletten/.test(rk) && /4\.4\.7/.test(rk) && /Medikation/.test(rk));
+            pruefeWahr('Zuordnungsregel nennt das Kompressionsstrumpf-/Socken-Beispiel (4.4.6)',
+                /Kompressionsstrümpfe/.test(rk) && /4\.4\.6/.test(rk) && /Socken/.test(rk));
+            pruefeWahr('Zuordnungsregel: fremdes Kriterium nur als Indiz, nie tragend',
+                /Indiz/.test(rk) && /NIEMALS die tragende/.test(rk));
+            const rl = kriteriumZuordnungRegel('Lebensbereich');
+            pruefeWahr('Zuordnungsregel passt die Einheit an (Lebensbereich im Antrag)',
+                /ZUORDNUNG ZUM LEBENSBEREICH/.test(rl));
+            // In allen vier Vorgängen im System-Prompt verankert
+            pruefeWahr('Widerspruch-Prompt enthält die Zuordnungsregel',
+                generateBegruendungen.toString().includes("kriteriumZuordnungRegel('Kriterium')"));
+            pruefeWahr('Antrags-Prompt (Erstantrag/Höherstufung) enthält die Zuordnungsregel',
+                generateBegruendungenAntrag.toString().includes("kriteriumZuordnungRegel('Lebensbereich')"));
+            pruefeWahr('Anhörungs-Prompt enthält die Zuordnungsregel',
+                generateBegruendungenAnhoerung.toString().includes("kriteriumZuordnungRegel('Kriterium')"));
+        }
 
         /* 36. Kriterienliste, Modulergebnisse und Auswertung sagen dasselbe (js/bewertung.js,
            js/berechnung.js, js/oberflaeche.js).

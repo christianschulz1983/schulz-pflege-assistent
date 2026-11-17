@@ -10,6 +10,35 @@ function briLevel(nr, idx) {
     return { name: keys[idx], text: b.levels[keys[idx]] };
 }
 
+/* ZUORDNUNG ZUM KRITERIUM/MODUL – die fachlich häufigste Fehlerquelle der KI. Gemeldet
+   (4.4.7 „Mundgerechtes Zubereiten der Nahrung"): Die KI begründete mit „Tabletten aus dem
+   Blister drücken und teilen" – das ist Medikation (Modul 5) und gehört nicht hierher. Eine
+   Einschränkung, die zu einem anderen Kriterium gehört, darf höchstens Indiz sein, nie die
+   tragende Begründung. Diese Regel steht in ALLEN vier Vorgängen im System-Prompt
+   (Widerspruch, Erstantrag, Höherstufung, Anhörung). `einheit` ist „Kriterium" (Widerspruch,
+   Anhörung) oder „Lebensbereich" (Antrag). Die Beispiele sind die des Verfassers. */
+function kriteriumZuordnungRegel(einheit) {
+    const e = einheit || 'Kriterium';
+    return `ZUORDNUNG ZUM ${e.toUpperCase()} – FACHLICH ENTSCHEIDEND:
+Jede Begründung behandelt AUSSCHLIESSLICH das, was dieses ${e} misst (siehe seine BRi-Definition
+bzw. die genannten Kriterien). Ordne jede Angabe aus Notizen, Befund und Arztberichten dem ${e}
+zu, zu dem sie fachlich gehört, und begründe hier nur mit dem, was hierher gehört.
+Eine Einschränkung, die zu einem ANDEREN ${e} oder Modul gehört, darf NIEMALS die tragende
+Begründung sein. Sie darf nur als ergänzendes Indiz vorkommen – und nur mit ausdrücklicher Brücke
+zu dem, was dieses ${e} verlangt.
+Beispiele für FALSCHE Zuordnung (so nicht):
+- „Tabletten aus dem Blister drücken/teilen" ist Medikation (Modul 5) und begründet NICHT das
+  mundgerechte Zubereiten der Nahrung bzw. das Eingießen von Getränken (4.4.7); dort trägt etwa,
+  dass Flaschen oder Verpackungen nicht geöffnet und Getränke nicht sicher eingegossen werden können.
+- „Kompressionsstrümpfe an-/ausziehen" gehört zur Hilfsmittelversorgung; beim An- und Auskleiden
+  des Unterkörpers (4.4.6) ist es höchstens ein Indiz, nie die einzige Begründung. Tragend ist, was
+  beim Kleiden selbst nicht gelingt, etwa: „Das An- und Ausziehen der Socken gelingt nicht
+  selbständig, da die Handkraft reduziert ist und die Sprunggelenke nicht erreicht werden."
+Trägt das Material zu diesem ${e} nichts Einschlägiges, lasse den Punkt weg – erfinde nichts und
+borge keine Begründung aus einem fremden ${e}.
+`;
+}
+
 /* ============ Weitere Widerspruchspunkte aus Notizen und Befund vorschlagen ============
    Die Anzahl der Widerspruchspunkte hängt daran, wie viele Kriterien abweichend bewertet sind.
    Diese Funktion prüft alle noch NICHT abweichenden Kriterien gegen Notizen, Befund und Anamnese
@@ -646,6 +675,7 @@ Inhalt je Absatz – konkret, alltagsnah, aus Notizen, Befund und Versorgung:
 - Bündle zu einem zusammenhängenden Bild des Bereichs. Zähle die Kriterien NICHT einzeln ab –
   die Einschätzung je Kriterium steht bereits in einer eigenen Zeile unter dem Absatz.
 
+${kriteriumZuordnungRegel('Lebensbereich')}
 STRENG VERBOTEN in allen Abschnitten:
 - jedes Zitat aus den Begutachtungs-Richtlinien und jeder Verweis „laut Richtlinien"
 - jeder Ableitungssatz („… ist somit eine Wertung mit … ableitbar")
@@ -795,6 +825,7 @@ E – Die Schwelle zum nächsten Pflegegrad wurde knapp unterschritten. Nenne di
 F – Die Wertung ist inkonsistent zu den Kriterien, in denen der Medizinische Dienst gefolgt ist.
     Muster: „… wirkt fachlich inkonsistent zu den Heraufstufungen bei den übrigen … Kriterien.“
 
+${kriteriumZuordnungRegel('Kriterium')}
 ZWINGEND:
 - Baue jede Begründung auf MEINEN NOTIZEN (Erstgespräch und Anhörungsverfahren) auf – sie sind die
   inhaltliche Grundlage. Nutze konkret, was dort zum jeweiligen Kriterium steht, ohne etwas zu erfinden.
@@ -1028,6 +1059,7 @@ RANGFOLGE DER QUELLEN – dies ist die wichtigste Vorgabe überhaupt:
 Enthalten die Notizen zu einem Kriterium nichts Einschlägiges, begründe aus BRi-Text und
 Befundtext – aber erfinde niemals Feststellungen.
 
+${kriteriumZuordnungRegel('Kriterium')}
 STARKES ZUSATZARGUMENT – der innere Widerspruch des Gutachtens:
 Prüfe den Befund- und Anamnesetext daraufhin, ob der Gutachter dort selbst eine Einschränkung,
 eine Hilfeleistung, einen pathologischen Messwert oder einen Hilfsmittelbedarf beschreibt, den er

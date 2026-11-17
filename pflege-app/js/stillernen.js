@@ -173,15 +173,19 @@ function stilLernenPruefen(stillMelden) {
 }
 
 // ---------------------------------------------------------------- Für die KI
-/* Die passendsten Paare: erst zum selben Kriterium, dann zum selben Vorgang, dann die
-   jüngsten. Mehr als STIL_LERNEN_PROMPT_MAX gehen nie mit – sonst verdrängen sie das
-   eigentliche Material des Falls. */
+/* Die passendsten Paare: NUR aus demselben Vorgang (harte Trennung), darunter die zum
+   gesuchten Kriterium zuerst, dann die jüngsten. Mehr als STIL_LERNEN_PROMPT_MAX gehen nie
+   mit – sonst verdrängen sie das eigentliche Material des Falls.
+   Vorgabe des Verfassers: Die Argumentation zu Erstantrag, Höherstufung, Widerspruch und
+   Anhörung ist UNTERSCHIEDLICH und muss genau dem jeweiligen Vorgang zugeordnet bleiben.
+   Deshalb wird der Vorgang nicht mehr nur bevorzugt (weiches Gewicht), sondern als Filter
+   gesetzt: ein Stilpaar aus einem anderen Vorgang darf die Begründung hier nicht prägen. */
 function stilLernenAuswahl(nrn) {
     if (!stilLernenAktiv()) return [];
     const gesucht = new Set(nrn || []);
     const vorgang = (typeof appModus !== 'undefined') ? appModus : 'widerspruch';
-    const liste = stilLernenListe();
-    const wert = p => (gesucht.has(p.nr) ? 4 : 0) + (p.vorgang === vorgang ? 2 : 0);
+    const liste = stilLernenListe().filter(p => (p.vorgang || 'widerspruch') === vorgang);
+    const wert = p => (gesucht.has(p.nr) ? 4 : 0);
     return liste.slice().reverse()
         .map((p, i) => ({ p: p, rang: wert(p) * 1000 - i }))
         .sort((a, b) => b.rang - a.rang)
