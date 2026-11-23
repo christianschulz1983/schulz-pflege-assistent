@@ -1183,6 +1183,35 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Selbsttest „45b": alle Module gesichert; eine Summenabweichung macht genau ihr Modul
    strittig; ein Konflikt macht sein Modul trotz passender Summe strittig; ohne Grundlage `offen`.
 
+71. **Auslese-Verbesserung, Stufe 3: gezielte Bild-Nachfrage** (`modulBildNachfrage` und
+   `bildNachfrage*` in `js/auslese.js`). Der Melder (Stufe 2, Regel 70) markiert strittige
+   Module; Stufe 3 löst sie auf: Für die strittigen **Spalten-Module (1, 2, 3, 4, 6)** liest die
+   KI NUR deren Kriterien noch einmal aus dem **Bild** – mit einer fokussierten Frage je Kriterium
+   („welche der vier Spalten ist angekreuzt, 0 bis 3?"). Das ist layout-UNABHÄNGIG (ein Sehmodell
+   braucht keine Koordinaten) und klein (nur die strittigen Kriterien, winzige Antwort → kein
+   Token-Limit, Regel 63). Anlass: Auf einem **gescannten** Gutachten findet der koordinatengenaue
+   Leser nichts (Kreuze sind Bildpixel), und die erste KI-Lesung fiel auf „selbständig" zurück –
+   genau das liest Stufe 3 gezielt nach.
+   - **Ablauf:** Knopf „⟳ Strittige Module per Bild nachlesen" in der Melder-Box →
+     `modulBildNachfrage()` schickt die **gemerkte Datei** (`letzterUpload`, beim Einlesen
+     gesetzt) mit `bildNachfragePrompt`/`bildNachfrageSchema` an `callGeminiWithFallback` →
+     `bildNachfrageAuswerten` filtert die Antwort (nur erlaubte Nummern, Stufe 0..3) →
+     `bildNachfrageCrosscheck` rechnet je Modul gegen die gedruckte Summe → Anzeige als
+     **Vorschlag** mit „Modul N übernehmen".
+   - **Regel 11 bleibt:** Nichts wird automatisch eingetragen. „Übernehmen" setzt die Werte über
+     `rvValNum` – denselben Weg wie eine Handkorrektur – und baut die Prüfansicht mit `rvFormNeu`
+     neu auf (Melder/Gegenprobe ziehen nach).
+   - **Leitplanke (Regel 70):** Die gedruckte Modulsumme ist Prüfmaßstab, nicht die Wahrheit.
+     Stimmt der Bild-Vorschlag trotzdem nicht mit der Summe überein, sagt die Anzeige das
+     („⚠ Summe weicht weiter ab – bitte prüfen"), statt zu biegen. Erkennt die KI nichts
+     Eindeutiges, wird zum Handabgleich mit der PDF geraten – nichts geraten.
+   - **Modul 5 (Häufigkeiten) ist noch nicht dabei** – das ist eine andere Frage (Zeitraum statt
+     Spalte) und folgt. Ist nur Modul 5 strittig, sagt die App das.
+   - Wiederherstellungspunkt vor dieser Änderung: Git-Tag `v66.92-vor-bildnachfrage`.
+   Selbsttest „45c" prüft die reinen Bausteine (Kriterienauswahl ohne Modul 5, Schema, Prompt
+   nennt 0–3, Auswertung verwirft ungültige Stufen/Nummern, Summen-Gegenprobe passt/passt nicht);
+   der Live-KI-Aufruf ist ohne Schlüssel nicht prüfbar und wird im echten Betrieb getestet.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1248,7 +1277,7 @@ beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
 Der Selbsttest umfasst 2062 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder).
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

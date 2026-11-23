@@ -264,6 +264,9 @@ async function aiReadGutachten(event, ziel) {
             updateOverlay("Inhalt an Gemini übergeben...", 30);
             const base64Data = reader.result.split(',')[1];
             const mimeType = file.type;
+            // Für die gezielte Bild-Nachfrage (Stufe 3) die Datei merken, damit strittige
+            // Module später erneut aus dem Bild gelesen werden können.
+            letzterUpload = { base64: base64Data, mime: mimeType };
 
             const systemPrompt = `Du bist ein hochqualifizierter KI-Assistent für das deutsche Pflegerecht (SGB XI) und das Neue Begutachtungsassessment (NBA).
             Deine Aufgabe ist es, aus dem übermittelten Dokument (Pflegegutachten des MD, MEDICPROOF etc.) alle relevanten Stammdaten, ICD-10 Diagnosen, Anamnesedaten, Befunddaten sowie die exakten Modulbewertungen des VORGUTACHTENS (Originalgutachten) zu extrahieren.
@@ -939,10 +942,164 @@ function rvZeigeModulMelder() {
                      ? ' (aus den Kriterien ' + x.ausKriterien + ', laut Gutachten ' + x.lautGutachten + ')'
                      : ' (eine Zeile ist strittig oder unsicher)')).join('; ') + '.';
     }
+    // Stufe 3: Knopf, um die strittigen SPALTEN-Module (1,2,3,4,6) gezielt aus dem Bild
+    // nachzulesen. Modul 5 (Häufigkeiten) ist noch nicht dabei.
+    const spaltenStrittig = strittig.filter(x => x.nr !== 5).length;
+    const knopf = (spaltenStrittig && letzterUpload && letzterUpload.base64)
+        ? '<div style="margin-top:8px"><button onclick="modulBildNachfrage()">⟳ Strittige Module per Bild nachlesen (KI)</button></div>'
+        : '';
     box.innerHTML = '<div style="padding:8px 10px;border-radius:6px;background:'
         + (strittig.length ? '#fffbeb' : '#f0fdf4') + ';border:1px solid '
         + (strittig.length ? '#fcd34d' : '#bbf7d0') + '">' + chips
-        + '<div style="margin-top:6px;font-size:13px">' + text + '</div></div>';
+        + '<div style="margin-top:6px;font-size:13px">' + text + '</div>' + knopf + '</div>';
+}
+
+/* ---------- STUFE 3 der Auslese-Verbesserung: gezielte Bild-Nachfrage ----------
+   Markiert der Melder (Stufe 2) ein Modul als strittig, liest die KI NUR dieses Modul noch
+   einmal aus dem Bild – mit einer fokussierten Frage je Kriterium („welche der vier Spalten
+   ist angekreuzt?"). Das ist layout-UNABHÄNGIG (das Sehmodell braucht keine Koordinaten) und
+   klein (nur die strittigen Kriterien, winzige Antwort → kein Token-Limit, Regel 63). Das
+   Ergebnis ist ein VORSCHLAG: nichts wird automatisch eingetragen (Regel 11), der Berater
+   übernimmt es mit einem Klick über denselben Weg wie eine Handkorrektur (rvValNum). Geprüft
+   wird gegen die gedruckte Modulsumme – Leitplanke: stimmt der Vorschlag trotzdem nicht mit
+   der Summe überein, wird das gesagt, nicht gebogen. Nur Spalten-Module (1,2,3,4,6);
+   Modul 5 (Häufigkeiten) ist eine andere Frage und folgt später. */
+let letzterUpload = { base64: null, mime: null };   // zuletzt eingelesene Datei, für die Bild-Nachfrage
+let bildVorschlaege = {};   // nr -> stufe (0..3), nur zur Anzeige und Übernahme
+
+function bildModulKriterien(modulNummern) {
+    const set = new Set(modulNummern);
+    return ITEMS.filter(i => i.m && i.m !== 5 && set.has(i.m) && Array.isArray(i.opts) && i.opts.length === 4);
+}
+function bildNachfrageSchema() {
+    return { type: "OBJECT", properties: { werte: { type: "ARRAY", items: {
+        type: "OBJECT", properties: { nr: { type: "STRING" }, stufe: { type: "INTEGER" } },
+        required: ["nr", "stufe"] } } }, required: ["werte"] };
+}
+function bildNachfragePrompt(kriterien) {
+    const zeilen = kriterien.map(i => i.nr + ' ' + i.title + ' — Spalten: '
+        + i.opts.map((o, oi) => oi + '=' + o).join(', ')).join('\n');
+    return 'Lies AUSSCHLIESSLICH aus dem beigefügten Dokument (dem Bild) für die folgenden '
+        + 'Kriterien die EINE angekreuzte Spalte. Gib je Kriterium die Spaltennummer 0 bis 3. '
+        + 'Ein angekreuztes Feld ist gefüllt (Haken, Kreuz, ausgefüllter Kreis); leere Felder '
+        + 'zählen nicht. Wenn du es nicht sicher erkennst, lass das Kriterium weg – rate nicht. '
+        + 'Antworte nur mit JSON {"werte":[{"nr":"4.4.1","stufe":0}, ...]}.\n\nKriterien:\n' + zeilen;
+}
+function bildNachfrageAuswerten(antwort, erlaubteNrn) {
+    const erlaubt = new Set(erlaubteNrn);
+    const map = {};
+    const liste = (antwort && Array.isArray(antwort.werte)) ? antwort.werte : [];
+    liste.forEach(w => {
+        if (!w || !erlaubt.has(w.nr)) return;
+        const s = Math.round(Number(w.stufe));
+        if (Number.isFinite(s) && s >= 0 && s <= 3) map[w.nr] = s;
+    });
+    return map;
+}
+/* Prüft je Modul, ob die Modulsumme MIT den Bild-Vorschlägen zur gedruckten Summe passt. */
+function bildNachfrageCrosscheck(vorschlagMap) {
+    const stand = { special: 0, values: {} };
+    ITEMS.forEach(i => {
+        const v = reviewData.valuesMap[i.id];
+        stand.values[i.id] = (i.m === 5 && i.group !== 'D')
+            ? { count: (v && typeof v === 'object') ? Number(v.count) || 0 : 0,
+                period: (v && typeof v === 'object') ? (v.period || 'W') : 'W' }
+            : (Number(v) || 0);
+    });
+    Object.keys(vorschlagMap).forEach(nr => {
+        const it = ITEMS.find(i => i.nr === nr);
+        if (it) stand.values[it.id] = vorschlagMap[nr];
+    });
+    const r = calculateInternal(stand);
+    const ergebnis = {};
+    for (let m = 1; m <= 6; m++) {
+        const laut = (reviewData.extracted && reviewData.extracted.raws) ? Number(reviewData.extracted.raws[m - 1]) : NaN;
+        if (!Number.isFinite(laut)) continue;
+        ergebnis[m] = { passt: Math.round(r.raws[m - 1]) === Math.round(laut),
+                        summeVorschlag: r.raws[m - 1], summeGutachten: laut };
+    }
+    return ergebnis;
+}
+async function modulBildNachfrage() {
+    const box = document.getElementById('rev-bild-nachfrage');
+    if (!reviewData) return;
+    if (!letzterUpload || !letzterUpload.base64) {
+        if (box) box.innerHTML = '<div class="hinweis-warnung">Die Gutachten-Datei ist nicht mehr im Speicher – bitte das Gutachten neu einlesen.</div>';
+        return;
+    }
+    const urteil = (typeof modulSelbstpruefung === 'function') ? modulSelbstpruefung(reviewData) : [];
+    const strittigeNrn = urteil.filter(x => x.status === 'strittig').map(x => x.nr);
+    const spaltenModule = strittigeNrn.filter(m => m !== 5);
+    const hatM5 = strittigeNrn.indexOf(5) >= 0;
+    if (!spaltenModule.length) {
+        if (box) box.innerHTML = '<div class="hinweis-ok" style="color:#6b7280">' + (hatM5
+            ? 'Nur Modul 5 (Häufigkeiten) ist strittig – das liest die Bild-Nachfrage noch nicht.'
+            : 'Kein strittiges Spalten-Modul – nichts nachzulesen.') + '</div>';
+        return;
+    }
+    const kriterien = bildModulKriterien(spaltenModule);
+    if (box) box.innerHTML = '<div style="color:#1d4ed8"><i>Strittige Module (' + spaltenModule.join(', ') + ') werden aus dem Bild nachgelesen …</i></div>';
+    try {
+        const userParts = [{ text: bildNachfragePrompt(kriterien) },
+                           { inlineData: { mimeType: letzterUpload.mime, data: letzterUpload.base64 } }];
+        const payload = { contents: [{ role: 'user', parts: userParts }],
+                          generationConfig: { responseMimeType: 'application/json', responseSchema: bildNachfrageSchema() } };
+        const antwort = kiJsonAusAntwort(await callGeminiWithFallback(payload,
+            'Du liest Ankreuzungen aus einem deutschen Pflegegutachten (NBA, SGB XI) exakt aus dem beigefügten Bild.'));
+        bildVorschlaege = bildNachfrageAuswerten(antwort, kriterien.map(i => i.nr));
+        bildNachfrageAnzeigen(spaltenModule, hatM5);
+    } catch (e) {
+        const msg = (typeof kiFehlerErklaerung === 'function') ? kiFehlerErklaerung(e) : (e && e.message || 'Fehler');
+        if (box) box.innerHTML = '<div class="hinweis-warnung">Bild-Nachfrage nicht möglich: ' + escapeHtml(msg) + '</div>';
+    }
+}
+function bildNachfrageAnzeigen(spaltenModule, hatM5) {
+    const box = document.getElementById('rev-bild-nachfrage');
+    if (!box) return;
+    if (!Object.keys(bildVorschlaege).length) {
+        box.innerHTML = '<div class="hinweis-warnung">Die KI konnte im Bild keine eindeutigen Ankreuzungen erkennen. '
+            + 'Bitte die Module von Hand mit der PDF links abgleichen.</div>';
+        return;
+    }
+    const cross = bildNachfrageCrosscheck(bildVorschlaege);
+    const namen = ['', 'Modul 1', 'Modul 2', 'Modul 3', 'Modul 4', 'Modul 5', 'Modul 6'];
+    let html = '<div style="padding:8px 10px;border-radius:6px;background:#eff6ff;border:1px solid #bfdbfe">'
+        + '<b>Bild-Nachlesen (KI):</b> Vorschläge – nichts wird automatisch übernommen.';
+    spaltenModule.forEach(m => {
+        const krit = bildModulKriterien([m]).filter(i => bildVorschlaege[i.nr] !== undefined);
+        if (!krit.length) return;
+        const c = cross[m];
+        html += '<div style="margin-top:8px"><u>' + namen[m] + '</u>'
+            + (c ? (c.passt
+                ? ' <span style="color:#1b7f3b">✓ Summe stimmt jetzt mit dem Gutachten (' + c.summeGutachten + ')</span>'
+                : ' <span style="color:#b45309">⚠ Summe ' + c.summeVorschlag + ' weicht weiter von der gedruckten ' + c.summeGutachten + ' ab – bitte prüfen</span>') : '')
+            + '<br>' + krit.map(i => escapeHtml(i.nr + ' ' + i.title) + ': <b>' + escapeHtml(i.opts[bildVorschlaege[i.nr]]) + '</b>').join('<br>')
+            + '<br><button style="margin-top:4px" onclick="bildVorschlagUebernehmen(' + m + ')">Modul ' + m + ' übernehmen</button></div>';
+    });
+    if (hatM5) html += '<div style="margin-top:8px;color:#6b7280">Modul 5 (Häufigkeiten) ist nicht enthalten – bitte von Hand abgleichen.</div>';
+    html += '</div>';
+    box.innerHTML = html;
+}
+function bildVorschlagUebernehmen(modulNr) {
+    bildModulKriterien([modulNr]).forEach(i => {
+        if (bildVorschlaege[i.nr] !== undefined && typeof rvValNum === 'function') rvValNum(i.id, bildVorschlaege[i.nr]);
+    });
+    rvFormNeu();
+    if (typeof showToast === 'function') showToast('Modul ' + modulNr + ' aus dem Bild übernommen – bitte prüfen.', 'info');
+}
+/* Baut nur das rechte Formular neu auf (nicht die PDF-Vorschau) und zieht die Prüfungen nach –
+   nach einer Übernahme aus dem Bild, damit Dropdowns, Melder und Gegenprobe den neuen Stand zeigen. */
+function rvFormNeu() {
+    const f = document.getElementById('review-form');
+    if (!f) return;
+    f.innerHTML = buildReviewForm(reviewData);
+    if (typeof rvZeigeScanHinweis === 'function') rvZeigeScanHinweis();
+    rvPruefePlausibel();
+    rvZeigeModulZeilen();
+    rvZeigeModulGegenprobe();
+    if (typeof rvZeigeModulMelder === 'function') rvZeigeModulMelder();
+    if (typeof rvZeigeStellungnahmePruefung === 'function') rvZeigeStellungnahmePruefung();
+    if (typeof nameHinweisAnzeigen === 'function') nameHinweisAnzeigen();
 }
 
 // Seitenliste kurz schreiben: aus 4,5,6,7,9 wird "4–7, 9".
@@ -1328,6 +1485,7 @@ function buildReviewForm(rev) {
         }
         html += `<div><b>Gesamt / PG</b></div><div><input type="number" step="1" id="rev-extract-pg" value="${rev.extracted.pg}" oninput="rvExtract('pg',0,this.value)" title="Pflegegrad"></div><div><input type="number" step="0.01" id="rev-extract-total" value="${rev.extracted.total}" oninput="rvExtract('total',0,this.value)" title="Gesamtpunkte"></div>`;
         html += `</div><div id="rev-modul-melder" style="margin-top:10px"></div>`
+              + `<div id="rev-bild-nachfrage" style="margin-top:10px"></div>`
               + `<div id="rev-modul-zeilen" style="margin-top:10px"></div>`
               + `<div id="rev-modul-pruefung" style="margin-top:10px"></div></div>`;
     }

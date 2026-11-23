@@ -7387,6 +7387,47 @@ async function selbsttest() {
             }
         }
 
+        // ---------- 45c. Bild-Nachfrage (Stufe 3) – die reinen Bausteine ----------
+        /* Gezielte Bild-Nachfrage je strittigem Spalten-Modul. Der Live-KI-Aufruf lässt sich
+           ohne Schlüssel nicht prüfen; getestet werden die reinen Teile: Kriterienauswahl,
+           Schema, Prompt, Auswertung der KI-Antwort und die Summen-Gegenprobe. */
+        if (typeof bildNachfrageAuswerten === 'function') {
+            // Kriterienauswahl: nur Spalten-Module (1,2,3,4,6), Modul 5 ausgeschlossen
+            const krit45c = bildModulKriterien([4, 5]);
+            pruefeWahr('Bild: nur Spalten-Module, Modul 5 ist ausgeschlossen',
+                krit45c.length > 0 && krit45c.every(i => i.m !== 5));
+            // Schema
+            const sch45c = bildNachfrageSchema();
+            pruefeWahr('Bild-Schema trägt ein werte-Array mit nr und stufe',
+                !!(sch45c.properties && sch45c.properties.werte && sch45c.properties.werte.items
+                   && sch45c.properties.werte.items.properties.nr && sch45c.properties.werte.items.properties.stufe));
+            // Prompt nennt die Kriteriumsnummern und den Spaltenbereich 0..3
+            const p45c = bildNachfragePrompt(bildModulKriterien([4]).slice(0, 2));
+            pruefeWahr('Bild-Prompt nennt „0 bis 3" und eine Modul-4-Nummer',
+                /0 bis 3/.test(p45c) && /4\.4\./.test(p45c));
+            // Auswertung: nur erlaubte Nummern, Stufe 0..3, sonst verworfen
+            const map45c = bildNachfrageAuswerten(
+                { werte: [{ nr: '4.4.2', stufe: 2 }, { nr: '4.4.3', stufe: 9 }, { nr: '9.9.9', stufe: 1 }] },
+                ['4.4.2', '4.4.3']);
+            pruefe('Bild-Auswertung übernimmt 4.4.2 = 2', map45c['4.4.2'], 2);
+            pruefeWahr('Bild-Auswertung verwirft Stufe 9 (außerhalb 0..3)', map45c['4.4.3'] === undefined);
+            pruefeWahr('Bild-Auswertung verwirft eine fremde Kriteriumsnummer', map45c['9.9.9'] === undefined);
+            // Summen-Gegenprobe: ein Vorschlag, der Modul 4 auf die gedruckte Summe bringt
+            if (typeof bildNachfrageCrosscheck === 'function') {
+                const merk45c = reviewData;
+                try {
+                    const vm45c = {}; ITEMS.forEach(i => { vm45c[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+                    reviewData = { valuesMap: vm45c, extracted: { raws: [0, 0, 0, 2, 0, 0], weights: [0, 0, 0, 0, 0, 0] } };
+                    const c45c = bildNachfrageCrosscheck({ '4.4.2': 2 });
+                    pruefeWahr('Bild-Gegenprobe: passender Vorschlag bringt Modul 4 auf die gedruckte Summe',
+                        !!(c45c[4] && c45c[4].passt === true));
+                    const c45d = bildNachfrageCrosscheck({ '4.4.2': 0 });
+                    pruefeWahr('Bild-Gegenprobe: ohne passenden Vorschlag bleibt Modul 4 abweichend',
+                        !!(c45d[4] && c45d[4].passt === false));
+                } finally { reviewData = merk45c; }
+            }
+        }
+
         // GOLDEN MASTER – die ganze Rechenkette an vier vollständigen Fällen.
         // Die Sollwerte stehen von Hand gerechnet in js/goldmaster.js, samt Herleitung
         // aus den Tabellen der BRi. Angelegt vor dem Einbau der Kinderbegutachtung:
