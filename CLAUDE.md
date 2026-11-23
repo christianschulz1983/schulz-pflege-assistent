@@ -1139,6 +1139,26 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Selbsttest „35d" (Regel, Einheit, Verankerung in allen vier Prompts) und „35" (fremder Vorgang
    wird aus `stilLernenAuswahl` ausgeschlossen).
 
+69. **Eine Korrektur zieht die Gutachten-Kopffelder nach** (`gutachtenFelderNachKorrektur`
+   in `js/basis.js`). Gemeldet: Feld „GESAMTPUNKTE (GUTACHTEN)" zeigte 36,25 (der Stand beim
+   Import), die Auswertung und die Modultabelle aber 32,50, nachdem der Berater ein Kriterium
+   in der Kriterienliste berichtigt hatte. Grund: Regel 67 setzte die Kopffelder nur beim
+   Übernehmen (`applyImportedData`/`uebernehmeAnhoerung`); eine spätere Handkorrektur verwarf
+   zwar die Zusammenfassung (`extracted`) und rechnete die Module neu (→ 32,50), ließ das
+   Kopffeld aber auf dem Import-Wert stehen. Jetzt zieht **jede** Korrektur die Kopffelder
+   nach – `gutachtenFelderNachKorrektur(pref)` ruft `gutachtenFelderAusRechnung` für `orig`
+   (stam-*-manual) bzw. `zweit` (anh-pg/anh-pts). Angeschlossen in `js/oberflaeche.js`
+   (`updateValue`, `updateM5Count`, `updateM5Period`, `updateSpecial`, `updateNahrung`) und in
+   `js/korrektur.js` (Übernahme der „Erfassten Daten korrigieren"). Gilt für **alle vier
+   Vorgänge**. Damit stimmen Kopffeld, Live-Tabelle und Auswertung immer überein (alle lesen
+   `calculateInternal(pref).total`).
+   - **Das ergänzt, was Regel 48 zur Gegenprobe sagt:** Der gedruckte Gutachten-Kopfwert ist
+     die Gegenprobe VOR der Übernahme (Prüfansicht: `modulGegenprobe`, `vorgutachtenAbweichung`).
+     Nach einer bestätigten Korrektur gilt das vom Berater gerechnete Ergebnis – Feld und
+     Tabelle dürfen sich nicht widersprechen.
+   Selbsttest „37c": Kopfwert 36,25 beim Import, nach `updateValue('orig', …)` folgt das Feld
+   dem neu gerechneten `calculateInternal('orig').total` und ist nicht mehr 36,25.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1203,8 +1223,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2057 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung).
+Der Selbsttest umfasst 2062 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

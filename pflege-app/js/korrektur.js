@@ -230,6 +230,9 @@ function uebernehmeKorrektur() {
     }
 
     fillTable('orig'); fillTable('own'); calculate('orig'); calculate('own'); syncSpecialUI();
+    // Kopffelder „Gesamtpunkte/Pflegegrad (Gutachten)" dem korrigierten Modulergebnis
+    // nachziehen – sonst bliebe der Import-Stand stehen (Regel 67).
+    if (typeof gutachtenFelderNachKorrektur === 'function') gutachtenFelderNachKorrektur('orig');
     // Steht bereits eine Stellungnahme, passt sie nicht mehr zu den Werten.
     const vorhanden = (document.getElementById('appeal-document')?.innerHTML || appealDraft || '').trim();
     if (korrigiert && vorhanden) markiereStellungnahmeVeraltet('Korrektur der erfassten Daten');

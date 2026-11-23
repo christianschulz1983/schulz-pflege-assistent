@@ -458,6 +458,7 @@ function updateValue(pref, id, idx) {
     if(labelEl) labelEl.innerText = ITEMS.find(it=>it.id===id).opts[idx];
     calculate(pref);
     if(pref==='orig'){ refreshOrigRef(id); calculate('own'); updateLiveCompRows(); }
+    gutachtenFelderNachKorrektur(pref);
 }
 function updateM5Count(pref, id, val) {
     const st = zustandZu(pref);
@@ -470,6 +471,7 @@ function updateM5Count(pref, id, val) {
     if(disp) disp.innerText = val;
     calculate(pref);
     if(pref==='orig'){ refreshOrigRef(id); calculate('own'); updateLiveCompRows(); }
+    gutachtenFelderNachKorrektur(pref);
 }
 function updateM5Period(pref, id, p) {
     const st = zustandZu(pref);
@@ -480,6 +482,7 @@ function updateM5Period(pref, id, p) {
     setzeBewertung(pref, id, {count:Number(b.count)||0, period:p}, 'berater');
     fillTable(pref); calculate(pref);
     if(pref==='orig'){ refreshOrigRef(id); calculate('own'); updateLiveCompRows(); }
+    gutachtenFelderNachKorrektur(pref);
 }
 function updateSpecial(pref, val) {
     const st = zustandZu(pref);
@@ -490,6 +493,7 @@ function updateSpecial(pref, val) {
     document.getElementById('special-label-'+pref).innerText = val==1 ? 'Ja' : 'Nein';
     calculate(pref);
     if(pref==='orig') calculate('own');
+    gutachtenFelderNachKorrektur(pref);
 }
 
 /* KF 4.4.0 – gravierende Probleme bei der Nahrungsaufnahme (Kinder bis 18 Monate).
@@ -508,5 +512,6 @@ function updateNahrung(pref, val) {
     }
     calculate(pref);
     if(pref==='orig') calculate('own');
+    gutachtenFelderNachKorrektur(pref);
 }
 

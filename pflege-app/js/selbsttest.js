@@ -7309,6 +7309,51 @@ async function selbsttest() {
             }
         }
 
+        // ---------- 37c. Handkorrektur: Kopffeld folgt dem neuen Modulergebnis ----------
+        /* Gemeldet: Feld „GESAMTPUNKTE (GUTACHTEN)" zeigte 36,25 (Import-Stand), die
+           Auswertung aber 32,50 – weil eine Berichtigung in der Kriterienliste das Feld nicht
+           mitzog. Jetzt zieht jede Korrektur (updateValue, updateM5Count, updateM5Period,
+           updateSpecial, updateNahrung und „Erfasste Daten korrigieren") das Kopffeld nach
+           (gutachtenFelderNachKorrektur). */
+        if (typeof updateValue === 'function' && typeof gutachtenFelderNachKorrektur === 'function'
+            && typeof applyImportedData === 'function' && typeof normalizeImport === 'function') {
+            const sf37c = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+            const merk37c = {
+                o: stateOrig, e: stateEigene, z: stateZweit, modus: appModus,
+                pts: (document.getElementById('stam-pts-manual') || {}).value,
+                pg: (document.getElementById('stam-pg-manual') || {}).value
+            };
+            try {
+                setzeModus('widerspruch');
+                // Import mit Kopfwert 36,25 (wie im gemeldeten Fall) – Feld steht danach auf 36,25.
+                applyImportedData(normalizeImport({
+                    values_orig: [], diagnoses: [],
+                    stam_pts_manual: '36,25', stam_pg_manual: '2',
+                    total_weight: 36.25, pflegegrad: 2
+                }));
+                pruefe('Vor der Korrektur steht der Import-Kopfwert im Feld',
+                    document.getElementById('stam-pts-manual').value, '36,25');
+                // Ein Modul-6-Kriterium berichtigen -> Zusammenfassung verworfen, Ergebnis ändert sich
+                const krit37c = ITEMS.find(i => i.m === 6);
+                updateValue('orig', krit37c.id, 3);
+                const rN = calculateInternal('orig');
+                pruefeWahr('Korrektur verwirft die Zusammenfassung (extracted)', !stateOrig.extracted);
+                pruefe('Korrektur: GESAMTPUNKTE (GUTACHTEN) folgt dem neuen Modulergebnis',
+                    document.getElementById('stam-pts-manual').value,
+                    Number(rN.total).toFixed(2).replace('.', ','));
+                pruefe('Korrektur: PFLEGEGRAD (GUTACHTEN) folgt dem neuen Modulergebnis',
+                    document.getElementById('stam-pg-manual').value,
+                    rN.pg > 0 ? String(rN.pg) : 'kein Pflegegrad');
+                pruefeWahr('Korrektur: Kopffeld ist nicht mehr der Import-Wert 36,25',
+                    document.getElementById('stam-pts-manual').value !== '36,25');
+            } finally {
+                stateOrig = merk37c.o; stateEigene = merk37c.e; stateZweit = merk37c.z;
+                sf37c('stam-pts-manual', merk37c.pts); sf37c('stam-pg-manual', merk37c.pg);
+                setzeModus(merk37c.modus || 'widerspruch');
+                leeren();
+            }
+        }
+
         // GOLDEN MASTER – die ganze Rechenkette an vier vollständigen Fällen.
         // Die Sollwerte stehen von Hand gerechnet in js/goldmaster.js, samt Herleitung
         // aus den Tabellen der BRi. Angelegt vor dem Einbau der Kinderbegutachtung:

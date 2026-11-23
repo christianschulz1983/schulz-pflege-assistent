@@ -170,6 +170,20 @@ function gutachtenFelderAusRechnung(pref, pgFeld, ptsFeld) {
     if (elPg)  elPg.value  = r.pg > 0 ? String(r.pg) : 'kein Pflegegrad';
 }
 
+/* Nach einer HANDKORREKTUR eines Gutachtenwerts (berichtigen in der Kriterienliste –
+   updateValue/updateM5Count/updateM5Period/updateSpecial/updateNahrung – oder „Erfasste
+   Daten korrigieren") müssen die Kopffelder „Gesamtpunkte/Pflegegrad (Gutachten)" dem neu
+   gerechneten Modulergebnis folgen. Gemeldet: Feld zeigte 36,25 (Import-Stand), die
+   Auswertung aber 32,50 nach einer Korrektur, weil das Feld nur beim Import gesetzt wurde.
+   Dieselbe Funktion wie beim Übernehmen (Regel 67), damit Feld und Modultabelle immer
+   übereinstimmen. Für ALLE Vorgänge: orig -> stam-*-manual, zweit (Anhörung) -> anh-pg/anh-pts.
+   Wird 'own' übergeben, gibt es kein Gutachten-Kopffeld – dann passiert nichts. */
+function gutachtenFelderNachKorrektur(pref) {
+    if (typeof gutachtenFelderAusRechnung !== 'function') return;
+    if (pref === 'orig') gutachtenFelderAusRechnung('orig');
+    else if (pref === 'zweit') gutachtenFelderAusRechnung('zweit', 'anh-pg', 'anh-pts');
+}
+
 // Lesbare Meldung zu einem Widerspruch aus gutachtenAngaben (für App und Schriftstück)
 function gutachtenWiderspruchText(bezeichnung, w) {
     if (!w) return '';
