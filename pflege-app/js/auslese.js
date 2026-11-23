@@ -775,6 +775,7 @@ function rvExtract(kind, idx, v) {
         // Beide Prüfungen sofort neu rechnen – so sieht man an der Zeile, ob es jetzt passt.
         if (typeof rvZeigeModulZeilen === 'function') rvZeigeModulZeilen();
         if (typeof rvZeigeModulGegenprobe === 'function') rvZeigeModulGegenprobe();
+        if (typeof rvZeigeModulMelder === 'function') rvZeigeModulMelder();
     }
     rvPruefePlausibel();
 }
@@ -812,6 +813,61 @@ function modulGegenprobe(rev) {
         }
     }
     return abw;
+}
+
+/* STUFE 2 der Auslese-Verbesserung – der „Melder". Fasst je Modul zu EINEM Urteil zusammen,
+   ob die Lesung belastbar ist, und führt dafür zwei unabhängige, layout-UNABHÄNGIGE Prüfungen
+   zusammen (die Position der Tabelle auf dem Blatt spielt keine Rolle):
+   1. Summenabgleich – stimmt die aus den Kriterien gerechnete Modulsumme mit der vom
+      Gutachten gedruckten „Summe der Einzelpunkte" überein (wie `modulGegenprobe`, nur je
+      Modul als Urteil, nicht nur als Abweichungsliste)?
+   2. Zeilenlage – ist in diesem Modul eine Zeile strittig (Konflikt lokal/KI, fehlend oder
+      unsicher, über `quelleZuPruefen`)? Das fängt auch Lesefehler, die sich in der Summe
+      gegenseitig aufheben und die der reine Summenabgleich übersieht.
+   Urteil je Modul: 'gesichert' (Summe passt bzw. Zeilen gesichert UND keine offene Zeile) ·
+   'strittig' (Summe weicht ab ODER offene Zeile) · 'offen' (keine Grundlage: weder gedruckte
+   Summe noch Quelleninfo).
+   REINES URTEIL – ändert nichts an der Lesung, der Bewertung oder der Rechnung (Regel 11).
+   Es ist die Grundlage, auf der Stufe 3 später gezielt NUR die strittigen Module per Bild
+   nachliest. Bewusst additiv: `modulGegenprobe` und `modulZeilenPruefung` bleiben unberührt. */
+function modulSelbstpruefung(rev) {
+    const namen = ['Modul 1 Mobilität', 'Modul 2 Kognition', 'Modul 3 Verhalten',
+                   'Modul 4 Selbstversorgung', 'Modul 5 Krankheitsbewältigung', 'Modul 6 Alltag'];
+    let r = null;
+    if (rev && rev.valuesMap) {
+        const stand = { special: 0, values: {} };
+        ITEMS.forEach(i => {
+            const v = rev.valuesMap[i.id];
+            stand.values[i.id] = (i.m === 5 && i.group !== 'D')
+                ? { count: (v && typeof v === 'object') ? Number(v.count) || 0 : 0,
+                    period: (v && typeof v === 'object') ? (v.period || 'W') : 'W' }
+                : (Number(v) || 0);
+        });
+        r = calculateInternal(stand);
+    }
+    const urteil = [];
+    for (let m = 1; m <= 6; m++) {
+        const mi = m - 1;
+        const laut = (rev && rev.extracted && rev.extracted.raws) ? Number(rev.extracted.raws[mi]) : NaN;
+        const hatSumme = Number.isFinite(laut);
+        const ausKriterien = r ? r.raws[mi] : null;
+        const summeStimmt = hatSumme && r && Math.round(r.raws[mi]) === Math.round(laut);
+        let zeilenOffen = 0, hatQuellen = false;
+        ITEMS.filter(i => i.m === m).forEach(i => {
+            const q = (rev && rev.quellen) ? rev.quellen[i.nr] : null;
+            if (!q) return;
+            hatQuellen = true;
+            if (typeof quelleZuPruefen === 'function' && quelleZuPruefen(q)) zeilenOffen++;
+        });
+        let status;
+        if (hatSumme && !summeStimmt) status = 'strittig';
+        else if (zeilenOffen > 0) status = 'strittig';
+        else if (summeStimmt || hatQuellen) status = 'gesichert';
+        else status = 'offen';
+        urteil.push({ nr: m, modul: namen[mi], status: status, ausKriterien: ausKriterien,
+                      lautGutachten: hatSumme ? laut : null, hatSumme: hatSumme, zeilenOffen: zeilenOffen });
+    }
+    return urteil;
 }
 
 /* Prüft die Modul-Zusammenfassung IN SICH: Passen Einzelpunkte und gewichtete Punkte
@@ -853,6 +909,40 @@ function rvZeigeModulGegenprobe() {
         + '<br>In diesen Modulen wurde mindestens ein Kriterium falsch gelesen. '
         + 'Häufigste Ursache bei Medicproof: der Punktwert neben der Option wurde mit der '
         + 'Spaltenposition verwechselt (etwa bei 4.4.8 Essen mit den Werten 0, 3, 6, 9).</div>';
+}
+
+/* STUFE 2 – Anzeige des Melders: eine kompakte Modul-Ampel über der Prüfansicht. Grün =
+   gesichert (das Gutachten bestätigt sich selbst und die Zeilen sind einig), Orange = zu
+   prüfen, Grau = offen. So sieht der Berater auf einen Blick, welche wenigen Module er
+   überhaupt noch ansehen muss. Reine Anzeige, inline gestaltet (keine neue CSS-Klasse). */
+function rvZeigeModulMelder() {
+    const box = document.getElementById('rev-modul-melder');
+    if (!box) return;
+    const u = (typeof modulSelbstpruefung === 'function') ? modulSelbstpruefung(reviewData) : [];
+    if (!u.length) { box.innerHTML = ''; return; }
+    const farbe = { gesichert: '#1b7f3b', strittig: '#b45309', offen: '#6b7280' };
+    const bg = { gesichert: '#e6f4ea', strittig: '#fef3c7', offen: '#f3f4f6' };
+    const sym = { gesichert: '✓', strittig: '⚠', offen: '–' };
+    const chips = u.map(x =>
+        '<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border-radius:10px;'
+        + 'font-size:12px;color:' + farbe[x.status] + ';background:' + bg[x.status] + '">'
+        + sym[x.status] + ' Modul ' + x.nr + '</span>').join('');
+    const strittig = u.filter(x => x.status === 'strittig');
+    let text;
+    if (!strittig.length) {
+        text = '<b>Selbstprüfung:</b> Alle Module, zu denen das Gutachten eine Summe ausweist, '
+             + 'stimmen mit den gelesenen Kriterien überein und sind in sich einig.';
+    } else {
+        text = '<b>Selbstprüfung – ' + strittig.length + ' Modul(e) zu prüfen:</b> '
+             + strittig.map(x => escapeHtml(x.modul)
+                 + (x.hatSumme && Math.round(x.ausKriterien) !== Math.round(x.lautGutachten)
+                     ? ' (aus den Kriterien ' + x.ausKriterien + ', laut Gutachten ' + x.lautGutachten + ')'
+                     : ' (eine Zeile ist strittig oder unsicher)')).join('; ') + '.';
+    }
+    box.innerHTML = '<div style="padding:8px 10px;border-radius:6px;background:'
+        + (strittig.length ? '#fffbeb' : '#f0fdf4') + ';border:1px solid '
+        + (strittig.length ? '#fcd34d' : '#bbf7d0') + '">' + chips
+        + '<div style="margin-top:6px;font-size:13px">' + text + '</div></div>';
 }
 
 // Seitenliste kurz schreiben: aus 4,5,6,7,9 wird "4–7, 9".
@@ -920,6 +1010,7 @@ function rvMarkEdited(id) {
     if (el) { el.classList.remove('rev-missing'); el.classList.add('rev-ok'); }
     // Nach jeder Korrektur neu gegenrechnen – so sieht man sofort, ob es jetzt passt.
     if (typeof rvZeigeModulGegenprobe === 'function') rvZeigeModulGegenprobe();
+    if (typeof rvZeigeModulMelder === 'function') rvZeigeModulMelder();
     if (typeof rvZeigeStellungnahmePruefung === 'function') rvZeigeStellungnahmePruefung();
 }
 function rvValNum(id, v) { reviewData.valuesMap[id] = parseInt(v); rvMarkEdited(id); rvQuelleKorrigiert(id); }
@@ -1039,6 +1130,7 @@ function openImportReview(file, data, mimeType) {
     rvPruefePlausibel();
     rvZeigeModulZeilen();
     rvZeigeModulGegenprobe();
+    if (typeof rvZeigeModulMelder === 'function') rvZeigeModulMelder();
     if (typeof rvZeigeStellungnahmePruefung === 'function') rvZeigeStellungnahmePruefung();
     if (typeof nameHinweisAnzeigen === 'function') nameHinweisAnzeigen();
     document.getElementById('review-overlay').classList.add('active');
@@ -1235,7 +1327,8 @@ function buildReviewForm(rev) {
             html += `<div>${m + 1}. ${modNames[m]}</div><div><input type="number" step="1" value="${rev.extracted.raws[m]}" oninput="rvExtract('raws',${m},this.value)"></div><div><input type="number" step="0.01" value="${rev.extracted.weights[m]}" oninput="rvExtract('weights',${m},this.value)"></div>`;
         }
         html += `<div><b>Gesamt / PG</b></div><div><input type="number" step="1" id="rev-extract-pg" value="${rev.extracted.pg}" oninput="rvExtract('pg',0,this.value)" title="Pflegegrad"></div><div><input type="number" step="0.01" id="rev-extract-total" value="${rev.extracted.total}" oninput="rvExtract('total',0,this.value)" title="Gesamtpunkte"></div>`;
-        html += `</div><div id="rev-modul-zeilen" style="margin-top:10px"></div>`
+        html += `</div><div id="rev-modul-melder" style="margin-top:10px"></div>`
+              + `<div id="rev-modul-zeilen" style="margin-top:10px"></div>`
               + `<div id="rev-modul-pruefung" style="margin-top:10px"></div></div>`;
     }
 

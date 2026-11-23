@@ -7354,6 +7354,39 @@ async function selbsttest() {
             }
         }
 
+        // ---------- 45b. Modulsummen-Melder (Stufe 2 der Auslese-Verbesserung) ----------
+        /* Der Melder (modulSelbstpruefung) fasst je Modul zu EINEM Urteil zusammen:
+           Summenabgleich (gelesene Modulsumme gegen die gedruckte Summe des Gutachtens)
+           UND Zeilenlage (Konflikt/unsicher). Reines Urteil, ändert nichts an der Lesung. */
+        if (typeof modulSelbstpruefung === 'function') {
+            const mkQ = (over) => {
+                const q = {}; ITEMS.forEach(i => { q[i.nr] = { id: i.id, status: 'beide', sicher: true, grund: '' }; });
+                Object.keys(over || {}).forEach(nr => { q[nr] = Object.assign(q[nr] || { id: '' }, over[nr]); });
+                return q;
+            };
+            const mkV = () => { const vm = {}; ITEMS.forEach(i => { vm[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; }); return vm; };
+            // A: alle Summen 0, alle Zeilen einig -> alle gesichert
+            const uA = modulSelbstpruefung({ valuesMap: mkV(), extracted: { raws: [0, 0, 0, 0, 0, 0], weights: [0, 0, 0, 0, 0, 0] }, quellen: mkQ() });
+            pruefeWahr('Melder A: alle sechs Module gesichert', uA.length === 6 && uA.every(x => x.status === 'gesichert'));
+            // B: Modul 4 Summe weicht ab (laut Gutachten 5, aus Kriterien 0) -> nur Modul 4 strittig
+            const uB = modulSelbstpruefung({ valuesMap: mkV(), extracted: { raws: [0, 0, 0, 5, 0, 0], weights: [0, 0, 0, 0, 0, 0] }, quellen: mkQ() });
+            pruefe('Melder B: Modul 4 wegen Summenabweichung strittig', uB[3].status, 'strittig');
+            pruefeWahr('Melder B: die übrigen Module bleiben gesichert', uB.filter((x, ix) => ix !== 3).every(x => x.status === 'gesichert'));
+            // C: Summen passen, aber ein Konflikt in Modul 1 -> Modul 1 strittig (Fehler, der sich in der Summe aufhebt)
+            const k1 = ITEMS.find(i => i.m === 1);
+            const uC = modulSelbstpruefung({ valuesMap: mkV(), extracted: { raws: [0, 0, 0, 0, 0, 0], weights: [0, 0, 0, 0, 0, 0] }, quellen: mkQ({ [k1.nr]: { status: 'konflikt', sicher: false } }) });
+            pruefe('Melder C: Konflikt macht Modul 1 trotz passender Summe strittig', uC[0].status, 'strittig');
+            // D: weder Summe noch Quellen -> offen (keine Grundlage)
+            const uD = modulSelbstpruefung({ valuesMap: mkV(), extracted: { raws: [NaN, NaN, NaN, NaN, NaN, NaN], weights: [0, 0, 0, 0, 0, 0] }, quellen: {} });
+            pruefeWahr('Melder D: ohne Grundlage lautet das Urteil offen', uD.every(x => x.status === 'offen'));
+            // Die bestehende modulGegenprobe bleibt unberührt und meldet dieselbe Abweichung in B
+            if (typeof modulGegenprobe === 'function') {
+                const abwB = modulGegenprobe({ valuesMap: mkV(), extracted: { raws: [0, 0, 0, 5, 0, 0], weights: [0, 0, 0, 0, 0, 0] } });
+                pruefeWahr('Melder berührt modulGegenprobe nicht (Modul 4 weiter gemeldet)',
+                    abwB.some(a => /Modul 4/.test(a.modul)));
+            }
+        }
+
         // GOLDEN MASTER – die ganze Rechenkette an vier vollständigen Fällen.
         // Die Sollwerte stehen von Hand gerechnet in js/goldmaster.js, samt Herleitung
         // aus den Tabellen der BRi. Angelegt vor dem Einbau der Kinderbegutachtung:

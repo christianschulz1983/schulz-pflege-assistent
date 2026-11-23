@@ -1159,6 +1159,30 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Selbsttest „37c": Kopfwert 36,25 beim Import, nach `updateValue('orig', …)` folgt das Feld
    dem neu gerechneten `calculateInternal('orig').total` und ist nicht mehr 36,25.
 
+70. **Auslese-Verbesserung, Stufe 2: der Modulsummen-Melder** (`modulSelbstpruefung`,
+   `rvZeigeModulMelder` in `js/auslese.js`). Ausgangsproblem (Vorgabe des Verfassers): Die
+   Bewertungstabellen stehen nie an derselben Position – je MD, Scan und Upload anders –, das
+   koordinatenbasierte Auslesen bleibt fehleranfällig. Lösung ist nicht, die Koordinaten zu
+   verbessern, sondern an **layout-unabhängigen Inhalten** zu verankern. Stufe 2 ist der
+   „Melder": je Modul EIN Urteil, ob die Lesung belastbar ist, aus zwei unabhängigen Prüfungen:
+   (1) Summenabgleich – gelesene Modulsumme gegen die vom Gutachten gedruckte „Summe der
+   Einzelpunkte" (reiner Text, immer vorhanden, positionsunabhängig); (2) Zeilenlage – ist eine
+   Zeile des Moduls strittig (`quelleZuPruefen`: Konflikt lokal/KI, fehlend, unsicher)? Punkt (2)
+   fängt auch Lesefehler, die sich in der Summe gegenseitig **aufheben** und die der reine
+   Summenabgleich übersieht. Urteil: `gesichert` / `strittig` / `offen`. Eine kompakte
+   Modul-Ampel (grün/orange/grau) steht oben in der Prüfansicht, damit der Berater sofort sieht,
+   welche wenigen Module er noch ansehen muss.
+   - **Rein additiv, ändert nichts** an Lesung, Bewertung oder Rechnung (Regel 11).
+     `modulGegenprobe` und `modulZeilenPruefung` bleiben unberührt und laufen weiter; der Melder
+     nutzt dieselben Daten (`rev.extracted.raws`, `rev.quellen`) und ist die **Grundlage für
+     Stufe 3** (gezielte Bild-Nachfrage nur für die strittigen Module – noch offen).
+   - **Leitplanke:** Die gedruckte Summe ist Prüfmaßstab, nicht die Wahrheit, zu der hin gebogen
+     wird. Stimmen lokaler Leser UND KI überein und weichen trotzdem von der Summe ab, rechnet
+     das Gutachten selbst falsch (Regel 12) – dann wird gemeldet, nicht korrigiert.
+   - Wiederherstellungspunkt vor dieser Änderung: Git-Tag `v66.91-vor-melder`.
+   Selbsttest „45b": alle Module gesichert; eine Summenabweichung macht genau ihr Modul
+   strittig; ein Konflikt macht sein Modul trotz passender Summe strittig; ohne Grundlage `offen`.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1224,7 +1248,7 @@ beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
 Der Selbsttest umfasst 2062 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur).
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle
