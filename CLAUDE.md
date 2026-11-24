@@ -3,6 +3,11 @@
 Diese Datei wird bei jeder Sitzung automatisch geladen. Sie ersetzt das fehlende
 Gedächtnis zwischen Sitzungen. Bei Änderungen an der Arbeitsweise hier nachtragen.
 
+**Mastercode: v66.95** (Stand 24.11.2026). Geprüfter, freigegebener Referenzstand –
+Git-Tag `v66.95-master`. Selbsttest 2086/2086 grün, alle JS-Dateien syntaktisch sauber,
+lokal und Remote identisch. Konfliktauflösung beim Einlesen (Regel 45) für Spaltenmodule
+und Modul 5 abgeschlossen. Dieser Stand ist der Wiederherstellungspunkt für alles Weitere.
+
 ## Was die App ist
 Lokale Web-App für einen Pflegeberater (Familiara GmbH). Liest deutsche Pflegegutachten
 (Medizinischer Dienst, Medicproof) ein, lässt die NBA-Modulwerte prüfen und erzeugt eine
