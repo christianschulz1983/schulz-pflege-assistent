@@ -1424,6 +1424,7 @@ function applyReviewedImport() {
         showToast('Eigene Beurteilung übernommen. ' + ausPS + ' Kriterien stammen aus Ihrer '
             + 'damaligen Stellungnahme, alle übrigen aus dem Erstgutachten. '
             + 'Das Erstgutachten selbst blieb unverändert.', 'success');
+        if (typeof nachImportAblauf === 'function') nachImportAblauf('stellungnahme');
         return;
     }
     if (importZiel === 'zweit' && typeof uebernehmeAnhoerung === 'function') {
@@ -1431,12 +1432,14 @@ function applyReviewedImport() {
         closeReview();
         switchTab(1);
         showToast("Anhörungsgutachten übernommen. Ihr Widerspruchsfall bleibt unverändert.", "success");
+        if (typeof nachImportAblauf === 'function') nachImportAblauf('zweit');
         return;
     }
     applyImportedData(reviewData);
     closeReview();
     switchTab(1);
     showToast("Werte geprüft und übernommen.", "success");
+    if (typeof nachImportAblauf === 'function') nachImportAblauf('orig');
 }
 
 function buildReviewForm(rev) {

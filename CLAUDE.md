@@ -3,10 +3,11 @@
 Diese Datei wird bei jeder Sitzung automatisch geladen. Sie ersetzt das fehlende
 Gedächtnis zwischen Sitzungen. Bei Änderungen an der Arbeitsweise hier nachtragen.
 
-**Mastercode: v66.95** (Stand 24.11.2026). Geprüfter, freigegebener Referenzstand –
-Git-Tag `v66.95-master`. Selbsttest 2086/2086 grün, alle JS-Dateien syntaktisch sauber,
-lokal und Remote identisch. Konfliktauflösung beim Einlesen (Regel 45) für Spaltenmodule
-und Modul 5 abgeschlossen. Dieser Stand ist der Wiederherstellungspunkt für alles Weitere.
+**Mastercode: v66.96** (Stand 24.11.2026). Geprüfter, freigegebener Referenzstand –
+Git-Tag `v66.96-master` (Vorgänger `v66.95-master`). Selbsttest 2098/2098 grün, alle
+JS-Dateien syntaktisch sauber, lokal und Remote identisch. Konfliktauflösung beim Einlesen
+(Regel 45) abgeschlossen; Komfort-Abläufe nach dem Übernehmen (Regeln 72-73) ergänzt. Dieser
+Stand ist der Wiederherstellungspunkt für alles Weitere.
 
 ## Was die App ist
 Lokale Web-App für einen Pflegeberater (Familiara GmbH). Liest deutsche Pflegegutachten
@@ -49,6 +50,7 @@ pflege-app/
   js/hoeherstufung.js Dokumentvorlage der Anträge und Deckblatt
   js/arztberichte.js  Mehrfach-Upload ärztlicher Unterlagen in die Erfassungstabellen
   js/unterlagen.js    Unterlagen als dokumentierten Eintrag in die Notizen
+  js/nachimport.js    Komfort-Abläufe nach dem Übernehmen: Anhörungs-Kette, Unterlagen-Frage (Regeln 72-73)
   js/auftrag.js       Auftragsbogen S1/A1 einlesen (nur Erstantrag)
   js/nummerierung.js  Nummerierung des Gutachtens (4.x.y bzw. 5.x.y bei Medicproof)
   js/alter.js         Alter am Begutachtungstag, drei Altersklassen (Kinderbegutachtung)
@@ -1242,6 +1244,32 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    nennt 0–3, Auswertung verwirft ungültige Stufen/Nummern, Summen-Gegenprobe passt/passt nicht);
    der Live-KI-Aufruf ist ohne Schlüssel nicht prüfbar und wird im echten Betrieb getestet.
 
+72. **Komfort-Abläufe nach dem Übernehmen – rein additiv** (`js/nachimport.js`). Zwei geführte
+   Abläufe setzen NACH dem interaktiven „✓ Werte übernehmen" an, über den EINEN Einstieg
+   `nachImportAblauf(ziel)` am Ende von `applyReviewedImport` (`js/auslese.js`). **Angestoßen nur
+   von dort, nicht von `applyImportedData`** – deshalb löst der Selbsttest, der `applyImportedData`
+   direkt ruft, keine Dialoge aus. Beide führen in die BESTEHENDEN Upload-Funktionen hinein und
+   setzen **nie** eine Bewertung (Regel 11); wird der Weg nicht genutzt, läuft die App
+   zeichengleich wie bisher.
+   **Anhörungs-Kette (Ausweichweg, Regel 9a):** Bei `appModus === 'anhoerung'` erscheint nach
+   jedem Übernehmen der nächste Knopf (`anhoerungKetteSchritt`): Erstgutachten (`ziel 'orig'`) →
+   „jetzt pflegefachliche Stellungnahme hochladen" (klickt `grundlageStellungnahme`); Stellungnahme
+   (`ziel 'stellungnahme'`) → „jetzt Anhörungsschreiben / Zweitgutachten hochladen" (klickt
+   `anhoerungFiles`); Zweitgutachten (`ziel 'zweit'`) → Kette fertig, danach die Unterlagen-Frage.
+   Der Regelweg „Fall laden" importiert nichts und löst daher nichts aus.
+   Der Dialog ist ein wiederverwendbares Modal (`nachImportModal`, Muster von `#confirm-modal`,
+   `#nachimport-overlay`).
+73. **Frage nach weiteren Unterlagen – alle Vorgänge und Kinderfälle** (`nachImportFrage`,
+   `js/nachimport.js`). In Widerspruch, Erstantrag, Höherstufung und Kinderfällen (und am Ende der
+   Anhörungs-Kette) fragt die App nach dem Übernehmen: „Befunde, Berichte hochladen? Ja/Nein".
+   Ja öffnet den Auswahl-Dialog `nachImportWahl` mit den Zielen aus `nachImportZiele(modus)`:
+   **Notizen** immer (`unterlagenWaehlen`, `js/unterlagen.js`), dazu vorgangsspezifisch **Beleg**
+   bei Widerspruch/Anhörung (`anlagenFiles`, `js/belege.js`) bzw. **Arztbericht** bei
+   Erstantrag/Höherstufung (`berichteWaehlen`, `js/arztberichte.js`). Nein schließt. Die Abfrage
+   erscheint jedes Mal (nicht abschaltbar). `nachImportUploadStart(key)` löst nur den vorhandenen
+   Upload aus und trägt selbst nichts ein. Selbsttest „72/73": Ziele je Vorgang, Kettenschritte
+   (Input-IDs), Dialog-Aufbau und -Abbau, `nachImportAblauf` richtet sich nach `appModus`.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1306,8 +1334,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2086 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung).
+Der Selbsttest umfasst 2098 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

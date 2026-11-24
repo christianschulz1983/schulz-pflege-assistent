@@ -7472,6 +7472,58 @@ async function selbsttest() {
             }
         }
 
+        // ---------- 72/73. Komfort-Abläufe nach dem Import (js/nachimport.js) ----------
+        /* Feature 1 (Regel 72): Anhörungs-Kette im Ausweichweg. Feature 2 (Regel 73): Frage
+           nach weiteren Unterlagen in allen Vorgängen. Beide rein additiv, nichts wird
+           eingetragen. Geprüft werden die puren Helfer und der Dialog-Aufbau; der Dialog
+           wird nach jeder Prüfung wieder entfernt. */
+        if (typeof nachImportZiele === 'function') {
+            const merkModus72 = (typeof appModus !== 'undefined') ? appModus : 'widerspruch';
+            try {
+                // Upload-Ziele je Vorgang
+                const schluessel = m => nachImportZiele(m).map(z => z.key).join(',');
+                pruefe('Ziele Widerspruch: Notizen + Beleg', schluessel('widerspruch'), 'notizen,beleg');
+                pruefe('Ziele Anhörung: Notizen + Beleg', schluessel('anhoerung'), 'notizen,beleg');
+                pruefe('Ziele Erstantrag: Notizen + Arztbericht', schluessel('erstantrag'), 'notizen,arztbericht');
+                pruefe('Ziele Höherstufung: Notizen + Arztbericht', schluessel('hoeherstufung'), 'notizen,arztbericht');
+
+                // Anhörungs-Kette: welcher Upload folgt auf welchen Schritt
+                pruefe('Kette nach Erstgutachten → Stellungnahme-Upload',
+                    anhoerungKetteSchritt('nachErst').inputId, 'grundlageStellungnahme');
+                pruefe('Kette nach Stellungnahme → Zweitgutachten-Upload',
+                    anhoerungKetteSchritt('nachStellungnahme').inputId, 'anhoerungFiles');
+                pruefeWahr('Kette nach Zweitgutachten endet (kein weiterer Schritt)',
+                    anhoerungKetteSchritt('nachZweit') === null);
+
+                // Dialog-Aufbau und -Abbau
+                nachImportFrage();
+                const ov = document.getElementById('nachimport-overlay');
+                pruefeWahr('Unterlagen-Frage baut ein Overlay', !!ov);
+                pruefeWahr('Frage-Overlay nennt Ja und Nein',
+                    !!ov && /Ja,/.test(ov.textContent) && /Nein,/.test(ov.textContent));
+                nachImportModalSchliessen();
+                pruefeWahr('Overlay lässt sich wieder schließen', !document.getElementById('nachimport-overlay'));
+
+                // nachImportAblauf richtet sich nach appModus: Anhörung → Kette, sonst → Frage
+                appModus = 'anhoerung';
+                nachImportAblauf('orig');
+                const t1 = (document.querySelector('#nachimport-overlay .modal-title') || {}).textContent || '';
+                pruefeWahr('Anhörung/orig startet die Kette (Erstgutachten übernommen)',
+                    /Erstgutachten übernommen/.test(t1));
+                nachImportModalSchliessen();
+
+                appModus = 'widerspruch';
+                nachImportAblauf('orig');
+                const t2 = (document.querySelector('#nachimport-overlay .modal-title') || {}).textContent || '';
+                pruefeWahr('Widerspruch/orig stellt die Unterlagen-Frage',
+                    /Weitere Unterlagen/.test(t2));
+                nachImportModalSchliessen();
+            } finally {
+                nachImportModalSchliessen();
+                appModus = merkModus72;
+            }
+        }
+
         // GOLDEN MASTER – die ganze Rechenkette an vier vollständigen Fällen.
         // Die Sollwerte stehen von Hand gerechnet in js/goldmaster.js, samt Herleitung
         // aus den Tabellen der BRi. Angelegt vor dem Einbau der Kinderbegutachtung:
