@@ -342,7 +342,9 @@ function fallDaten() {
                 bewertungsProtokoll: (typeof bewertungsProtokoll !== 'undefined') ? bewertungsProtokoll : [],
                 // Passt die gespeicherte Stellungnahme noch zu den Werten?
                 stellungnahmeVeraltet: (typeof stellungnahmeVeraltet !== 'undefined') ? stellungnahmeVeraltet : false,
-                veraltetGruende: (typeof veraltetGruende !== 'undefined') ? veraltetGruende : []};
+                veraltetGruende: (typeof veraltetGruende !== 'undefined') ? veraltetGruende : [],
+                // Zeiterfassung je Fall (js/zeit.js, Regel 74) – gehört zum Fall
+                zeiterfassung: (typeof zeitState === 'function') ? zeitState() : null};
     return data;
 }
 
@@ -425,6 +427,8 @@ function loadCase(e) {
             if (typeof erfassungLaden === 'function') erfassungLaden(data.erfassung);
             if (typeof anlagenLaden === 'function') anlagenLaden(data.anlagen);
             if (typeof verfahrenLaden === 'function') verfahrenLaden(data.verfahrensfehler);
+            // Zeiterfassung des Falls wiederherstellen (js/zeit.js)
+            if (typeof zeitLadeState === 'function') zeitLadeState(data.zeiterfassung);
             if (typeof vorschlagGruende !== 'undefined') vorschlagGruende = (data.vorschlagGruende && typeof data.vorschlagGruende === 'object') ? data.vorschlagGruende : {};
             // War die Stellungnahme beim Speichern veraltet, bleibt der Hinweis erhalten.
             if (data.stellungnahmeVeraltet && typeof stellungnahmeVeraltet !== 'undefined') {

@@ -7524,6 +7524,62 @@ async function selbsttest() {
             }
         }
 
+        // ---------- 74. Zeiterfassung (js/zeit.js) ----------
+        /* Vier Phasen, Aufrundung auf 5 Minuten, Phasenwechsel, Kopier-Zeile und die Runde
+           durch die Falldatei. Reine Erfassung – kein Einfluss auf die Rechnung. Der
+           Timer-Stand wird vor dem Abschnitt gesichert und danach wiederhergestellt. */
+        if (typeof zeitMinutenAufgerundet === 'function') {
+            const merkZeit = (typeof zeitState === 'function') ? zeitState() : null;
+            try {
+                if (typeof zeitTickerStop === 'function') zeitTickerStop();
+                // Aufrundung: 6 -> 10, 23 -> 25, 5 bleibt 5, 0 bleibt 0
+                zeitLaufend = null; zeitStartEpoch = null;
+                zeitSek = { admin: 360, et: 1380, psga: 300, coaching: 0 };
+                pruefe('Aufrundung 6 Min → 10', zeitMinutenAufgerundet('admin'), 10);
+                pruefe('Aufrundung 23 Min → 25', zeitMinutenAufgerundet('et'), 25);
+                pruefe('Genau 5 Min bleibt 5 (kein Sprung auf 10)', zeitMinutenAufgerundet('psga'), 5);
+                pruefe('0 bleibt 0', zeitMinutenAufgerundet('coaching'), 0);
+
+                // Kopier-Zeile: vier Spalten, Tab-getrennt, 0 als leere Zelle
+                pruefe('Kopier-Zeile Admin·ET·PS/GA·Coaching', zeitKopierZeile(), '10\t25\t5\t');
+
+                // Phasenwechsel: es läuft immer nur EINE Phase; die vorige wird gefaltet
+                zeitSek = { admin: 0, et: 0, psga: 0, coaching: 0 };
+                zeitStart('admin');
+                zeitStartEpoch = Date.now() - 360000;   // 6 Minuten simulieren
+                zeitStart('et');                        // faltet admin, startet et
+                pruefeWahr('Nach Phasenwechsel läuft nur die neue Phase', zeitLaufend === 'et');
+                pruefe('Die vorige Phase wurde gesichert (6 Min → 10)', zeitMinutenAufgerundet('admin'), 10);
+                zeitStopp();
+                pruefeWahr('Stopp beendet die laufende Phase', zeitLaufend === null);
+
+                // Runde durch die Falldatei: speichern und wieder laden
+                zeitSek = { admin: 600, et: 1500, psga: 0, coaching: 120 };
+                zeitLaufend = null; zeitStartEpoch = null;
+                const gespeichert = zeitState();
+                zeitSek = { admin: 0, et: 0, psga: 0, coaching: 0 };
+                zeitLadeState(gespeichert);
+                pruefe('Falldatei-Runde: Admin erhalten', Math.round(zeitSek.admin), 600);
+                pruefe('Falldatei-Runde: ET erhalten', Math.round(zeitSek.et), 1500);
+
+                // Alte laufende Marke (über der Kappung) bläht die Zeit nicht auf
+                zeitLadeState({ sek: { admin: 300, et: 0, psga: 0, coaching: 0 },
+                                laufend: 'admin', start: Date.now() - (6 * 3600 * 1000) });
+                pruefe('Lange Pause wird nicht mitgezählt (Admin bleibt 5 Min)',
+                    zeitMinutenAufgerundet('admin'), 5);
+                if (typeof zeitTickerStop === 'function') zeitTickerStop();
+
+                // Zurücksetzen leert alle Phasen
+                zeitReset();
+                pruefe('Zurücksetzen leert Admin', zeitSek.admin, 0);
+                pruefe('Zurücksetzen leert ET', zeitSek.et, 0);
+            } finally {
+                if (typeof zeitTickerStop === 'function') zeitTickerStop();
+                if (merkZeit && typeof zeitLadeState === 'function') zeitLadeState(merkZeit);
+                if (typeof zeitTickerStop === 'function') zeitTickerStop();
+            }
+        }
+
         // GOLDEN MASTER – die ganze Rechenkette an vier vollständigen Fällen.
         // Die Sollwerte stehen von Hand gerechnet in js/goldmaster.js, samt Herleitung
         // aus den Tabellen der BRi. Angelegt vor dem Einbau der Kinderbegutachtung:

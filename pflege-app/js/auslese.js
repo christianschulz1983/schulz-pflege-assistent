@@ -1370,6 +1370,8 @@ function applyImportedData(rev) {
     // Neuer Fall: Begruendungen frueher uebernommener Vorschlaege gehoeren nicht dazu
     if (typeof vorschlagGruende !== 'undefined') vorschlagGruende = {};
     if (typeof erfassungLaden === 'function') erfassungLaden({});
+    // Neuer Fall: die Zeiterfassung der vorigen Person zurücksetzen (js/zeit.js, Regel 74)
+    if (typeof zeitReset === 'function') zeitReset();
     // Unterlagen, Anlagen und gemerkte Stellungnahme der vorigen Person (js/anhang.js)
     if (typeof unterlagenZuruecksetzen === 'function') unterlagenZuruecksetzen(true);
     // extracted nur setzen, wenn es eine KI-Zusammenfassung gibt; sonst wird das

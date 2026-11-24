@@ -219,6 +219,8 @@ function init() {
     syncSpecialUI();
     // Altersklasse nach der BRi anzeigen (js/alter.js). Reine Anzeige.
     if (typeof alterHinweisZeigen === 'function') alterHinweisZeigen();
+    // Zeiterfassung je Fall (js/zeit.js). Baut die Karte in #zeit-bereich auf.
+    if (typeof renderZeiterfassung === 'function') renderZeiterfassung();
 }
 
 function fillTable(pref) {

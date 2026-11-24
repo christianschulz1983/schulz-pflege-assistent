@@ -3,11 +3,11 @@
 Diese Datei wird bei jeder Sitzung automatisch geladen. Sie ersetzt das fehlende
 Gedächtnis zwischen Sitzungen. Bei Änderungen an der Arbeitsweise hier nachtragen.
 
-**Mastercode: v66.96** (Stand 24.11.2026). Geprüfter, freigegebener Referenzstand –
-Git-Tag `v66.96-master` (Vorgänger `v66.95-master`). Selbsttest 2098/2098 grün, alle
+**Mastercode: v66.97** (Stand 24.11.2026). Geprüfter, freigegebener Referenzstand –
+Git-Tag `v66.97-master` (Vorgänger `v66.96-master`). Selbsttest 2111/2111 grün, alle
 JS-Dateien syntaktisch sauber, lokal und Remote identisch. Konfliktauflösung beim Einlesen
-(Regel 45) abgeschlossen; Komfort-Abläufe nach dem Übernehmen (Regeln 72-73) ergänzt. Dieser
-Stand ist der Wiederherstellungspunkt für alles Weitere.
+(Regel 45), Komfort-Abläufe nach dem Übernehmen (Regeln 72-73) und die Zeiterfassung je Fall
+(Regel 74) abgeschlossen. Dieser Stand ist der Wiederherstellungspunkt für alles Weitere.
 
 ## Was die App ist
 Lokale Web-App für einen Pflegeberater (Familiara GmbH). Liest deutsche Pflegegutachten
@@ -51,6 +51,7 @@ pflege-app/
   js/arztberichte.js  Mehrfach-Upload ärztlicher Unterlagen in die Erfassungstabellen
   js/unterlagen.js    Unterlagen als dokumentierten Eintrag in die Notizen
   js/nachimport.js    Komfort-Abläufe nach dem Übernehmen: Anhörungs-Kette, Unterlagen-Frage (Regeln 72-73)
+  js/zeit.js          Zeiterfassung je Fall: vier Phasen, 5-Minuten-Aufrundung, Kopier-Zeile (Regel 74)
   js/auftrag.js       Auftragsbogen S1/A1 einlesen (nur Erstantrag)
   js/nummerierung.js  Nummerierung des Gutachtens (4.x.y bzw. 5.x.y bei Medicproof)
   js/alter.js         Alter am Begutachtungstag, drei Altersklassen (Kinderbegutachtung)
@@ -1270,6 +1271,30 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Upload aus und trägt selbst nichts ein. Selbsttest „72/73": Ziele je Vorgang, Kettenschritte
    (Input-IDs), Dialog-Aufbau und -Abbau, `nachImportAblauf` richtet sich nach `appModus`.
 
+74. **Transparente Zeiterfassung je Fall** (`js/zeit.js`, Karte `#zeit-bereich` oben in Reiter 1).
+   Vier Phasen, je Start/Stopp, **es läuft immer nur EINE** (`zeitStart` faltet die vorige über
+   `zeitFold`): Vorbereitung → Spalte **Admin**, Telefonat → **ET**, Nachbereitung → **PS/GA**,
+   Vorbereitungsgespräch → **Coaching** (die Spalten des Reiters „Christian" in der Tabelle des
+   Verfassers). **Aufrundung auf 5 Minuten** (`zeitMinutenAufgerundet`: `Math.ceil(min/5 - 1e-9)*5`
+   – 6→10, 23→25, genau 5 bleibt 5, 0 bleibt 0). Gemessen wird über **Wanduhr-Zeitstempel**
+   (`zeitStartEpoch`), nicht über einen Zähler – so läuft der Timer nach einem Neuladen korrekt
+   weiter. Beim Laden eines Falls, dessen Timer länger als die **Kappung** (`ZEIT_LADE_KAPPUNG_MS`,
+   4 h) offen war, wird die Pause NICHT mitgezählt (ein über Nacht offener Timer bläht sonst auf).
+   - **Reine Erfassung, kein Einfluss auf die Rechnung** (Regel 11 unberührt). Die Zeiten
+     gehören zum Fall: `zeitState()` wandert als `zeiterfassung` in `fallDaten()`, `zeitLadeState`
+     stellt sie bei „Fall laden" wieder her, `zeitReset()` leert sie bei neuem Gutachten
+     (`applyImportedData`, Regel 26).
+   - **Kopier-Zeile für die Tabelle** (`zeitKopierZeile`, Knopf „📋 Zeile für die Tabelle
+     kopieren"): nur die vier Phasen-Werte **Tab-getrennt** (`Admin⇥ET⇥PS/GA⇥Coaching`), weil
+     diese Spalten in der Tabelle nebeneinanderstehen. Einfügen in die Admin-Zelle der Fallzeile
+     überschreibt so keine andere Spalte (Nummer, Nachname, Code). 0 wird als **leere Zelle**
+     kopiert, wie in der Tabelle des Verfassers.
+   - **Noch offen (zweiter Schritt, auf Wunsch):** Ein-Klick-Schreiben direkt in die Google-
+     Tabelle über ein kleines Google-Apps-Script des Verfassers – ohne Zugangsdaten im Code
+     (Regel 3). Bisher der Kopier-Weg.
+   Selbsttest „74": Aufrundung (6→10, 23→25, 5→5, 0→0), Kopier-Zeile, Phasenwechsel (nur eine
+   läuft, vorige gefaltet), Falldatei-Runde, Kappung bei langer Pause, Zurücksetzen.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1334,8 +1359,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2098 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe).
+Der Selbsttest umfasst 2111 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe + 13 Zeiterfassung).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pflegegradassistent für Berater v66.96</title>
+    <title>Pflegegradassistent für Berater v66.97</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
@@ -73,6 +73,9 @@
                 <button class="btn btn-secondary" onclick="zeigeStart(true)">Verfasser oder Vorgang ändern</button>
             </div>
         </div>
+
+        <!-- Zeiterfassung je Fall (js/zeit.js, Regel 74). Reine Erfassung, kein Einfluss auf die Rechnung. -->
+        <div id="zeit-bereich"></div>
 
         <!-- Nur im Erstantrag: der ausgefüllte Auftragsbogen (Blatt S1 und A1) liefert die
              Kundendaten, die sonst von Hand abgetippt werden. Siehe js/auftrag.js. -->
@@ -369,6 +372,7 @@ if (typeof pdfjsLib !== 'undefined') { try { pdfjsLib.GlobalWorkerOptions.worker
 <script src="js/arztberichte.js"></script>
 <script src="js/unterlagen.js"></script>
 <script src="js/nachimport.js"></script>
+<script src="js/zeit.js"></script>
 <script src="js/auftrag.js"></script>
 <script src="js/modus.js"></script>
 <script src="js/auswertung.js"></script>
