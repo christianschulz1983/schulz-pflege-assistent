@@ -637,12 +637,26 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    gelesen hatte – ein Lesefehler fiel nur auf, wenn zufällig die Modulsumme nicht passte,
    und **nicht gefundene Kriterien wurden still zu 0 („selbständig")**. Jetzt liest die KI
    immer mit; `werteVergleich(lokal, ki)` (js/auslese.js) vergleicht je Kriterium:
-   `beide` (gesichert), `konflikt`, `lokal`, `ki`, `fehlt`. Bei Streit gilt die
-   koordinatengenaue Lesung, **wenn sie sicher war**, sonst die KI. Ein fehlendes Kriterium
+   `beide` (gesichert), `konflikt`, `lokal`, `ki`, `fehlt`. Ein fehlendes Kriterium
    kommt **nicht** in `values_orig`. Die Prüfansicht zeigt `quellenBilanz` („x von 64 gelesen,
    y bestätigt, z abweichend …"), je Zeile Herkunft, Grund und Fundstelle
    (`quelleHinweisHtml`) und den Filter **„nur zu prüfende zeigen"** (`rvNurZuPruefen`);
    eine Handeingabe setzt die Zeile auf `korrigiert` (`rvQuelleKorrigiert`).
+   **Konfliktauflösung (v66.94): die KI gewinnt nur bei ECHTER Positions-Unsicherheit.**
+   Gemeldet (4.1.1 „überwiegend unselbständig" stand direkt unter dem Kriterium, wurde aber
+   als „selbständig" übertragen): Der Koordinatenleser hatte die **richtige** Spalte, war aber
+   als „unsicher: mehrere Kreuze" markiert (die leeren ○-Kreise in der Zeile mitgezählt) – und
+   die App nahm darum den falschen KI-Wert. Jetzt gilt bei Streit: Die Gründe `mehrere`,
+   `unvollstaendig` und `zahl` sagen **nichts** über die GEWÄHLTE Spalte (`posUnsicher` ist
+   dann false) – die koordinatengenaue Lesung bleibt tragend. Nur `abstand` (Kreuz passt zu
+   keiner Spalte) und `heuristik` (nur über eine Notlösung erkannt) sind echte
+   Positions-Unsicherheiten; **nur dann** gibt die lokale Lesung der KI nach
+   (`wert = (sicher || !posUnsicher) ? lWert : kWert`). Der Konflikt bleibt in beiden Fällen
+   als `konflikt` markiert – der Melder (Regel 70) fängt ihn, der Berater sieht beide Werte.
+   EINE Stelle (`werteVergleich`), gilt damit für **alle Items und alle vier Vorgänge**
+   (Widerspruch, Erstantrag, Höherstufung, Anhörung) und für Kinderfälle gleichermaßen.
+   Selbsttest „45d": `mehrere`/`unvollstaendig`/`zahl` → lokale Spalte bleibt; `abstand`/
+   `heuristik` → KI; Konflikt bleibt gemeldet; Scan ohne lokale Lesung → KI (`ki`).
 46. **Markierungserkennung ohne feste Koordinaten** (`pflege_server.py`). Die Kreuze sitzen je
    nach Gutachten (Medizinischer Dienst, Medicproof, Vorlage, Druckqualität) an
    unterschiedlichen Stellen. Deshalb: `_spalten_aus_marken()` bildet die Spalten **je Seite
@@ -1276,8 +1290,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2062 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage).
+Der Selbsttest umfasst 2082 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 6 Konfliktaufloesung).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

@@ -128,14 +128,23 @@ function werteVergleich(lokal, kiListe) {
         const gleich = (a, b) => (a == null || b == null) ? false
             : (m5 ? (a.count === b.count && a.period === b.period) : a === b);
         const sicher = l ? (l.sicher !== false) : false;
+        const grund = l ? (l.grund || '') : '';
+        // Bei einem Konflikt gilt die koordinatengenaue Lesung – sie hat die Markierung auf dem
+        // Blatt GEMESSEN, die KI schätzt sie im Bild. Gemeldet (4.1.1/4.1.4, Text-PDF): Der Leser
+        // hatte die richtige Spalte, war aber als „unsicher: mehrere Kreuze" markiert (die leeren
+        // ○-Kreise werden mitgezählt) – und die App nahm trotzdem den falschen KI-Wert.
+        // „mehrere"/„unvollstaendig"/„zahl" sagen nichts über die GEWÄHLTE Spalte; nur „abstand"
+        // und „heuristik" sind echte Positions-Unsicherheiten – NUR dann gibt die lokale Lesung
+        // dem KI-Wert nach. Der Konflikt bleibt in jedem Fall markiert (Melder/Prüfansicht, Regel 70).
+        const posUnsicher = /abstand|heuristik/.test(grund);
         let status, wert;
         if (lWert !== null && kWert !== null) {
             if (gleich(lWert, kWert)) { status = 'beide'; wert = lWert; }
-            else { status = 'konflikt'; wert = sicher ? lWert : kWert; }
+            else { status = 'konflikt'; wert = (sicher || !posUnsicher) ? lWert : kWert; }
         } else if (lWert !== null) { status = 'lokal'; wert = lWert; }
         else if (kWert !== null) { status = 'ki'; wert = kWert; }
         else { status = 'fehlt'; wert = null; }
-        quellen[i.nr] = { id: i.id, status: status, sicher: sicher, grund: l ? (l.grund || '') : '',
+        quellen[i.nr] = { id: i.id, status: status, sicher: sicher, grund: grund,
                           seite: l ? l.seite : null, y: l ? l.y : null, lokal: lWert, ki: kWert };
         if (wert === null) return;
         if (m5) werte.push({ id: i.id, val_obj_count: wert.count, val_obj_period: wert.period });

@@ -5705,14 +5705,14 @@ async function selbsttest() {
                 '4.1.1': { idx: 1, sicher: true, grund: '', seite: 2, y: 120 },
                 '4.1.2': { idx: 2, sicher: true, grund: '', seite: 2, y: 140 },
                 '4.1.3': { idx: 1, sicher: false, grund: 'unvollstaendig', seite: 2, y: 160 },
-                '4.1.4': { idx: 2, sicher: false, grund: 'mehrere', seite: 2, y: 180 },
+                '4.1.4': { idx: 2, sicher: false, grund: 'abstand', seite: 2, y: 180 },
                 '4.5.1': { count: 3, period: 'D', sicher: true, grund: '', seite: 5, y: 90 }
             };
             const ki34 = [
                 { id: kid('4.1.1'), val_num: 1 },                       // gleich -> gesichert
                 { id: kid('4.1.2'), val_num: 3 },                       // Streit, lokal sicher
                 { id: kid('4.1.3'), val_num: 1 },                       // lokal unsicher, KI bestätigt
-                { id: kid('4.1.4'), val_num: 3 },                       // Streit, lokal unsicher -> KI
+                { id: kid('4.1.4'), val_num: 3 },                       // Streit, echte Positions-Unsicherheit (abstand) -> KI
                 { id: kid('4.4.2'), val_num: 2 },                       // nur die KI
                 { id: kid('4.5.1'), val_obj_count: 3, val_obj_period: 'D' }
             ];
@@ -5723,7 +5723,7 @@ async function selbsttest() {
             pruefe('Quellen verschieden → Konflikt', q34['4.1.2'].status, 'konflikt');
             pruefe('Bei Streit gilt die sichere Tabellenlesung', wert('4.1.2').val_num, 2);
             pruefe('Unsicher gelesen, aber von der KI bestätigt → gesichert', q34['4.1.3'].status, 'beide');
-            pruefe('Bei Streit und unsicherer Tabelle gilt die KI', wert('4.1.4').val_num, 3);
+            pruefe('Bei Streit und echter Positions-Unsicherheit (abstand/heuristik) gilt die KI', wert('4.1.4').val_num, 3);
             pruefe('Nur die KI hat einen Wert', q34['4.4.2'].status, 'ki');
             pruefe('Modul 5 wird mit Häufigkeit und Zeitraum verglichen', q34['4.5.1'].status, 'beide');
             pruefe('Nicht gefundenes Kriterium wird als fehlend geführt', q34['4.6.6'].status, 'fehlt');
@@ -5743,7 +5743,7 @@ async function selbsttest() {
             pruefeWahr('Hinweis nennt beide Vorschläge',
                 hin.includes('Tabelle:') && hin.includes('KI:') && hin.includes('Seite 2'));
             pruefeWahr('Grund der Unsicherheit wird genannt',
-                quelleHinweisHtml(ITEMS.find(i => i.nr === '4.1.4'), q34['4.1.4']).includes('mehrere Kreuze'));
+                quelleHinweisHtml(ITEMS.find(i => i.nr === '4.1.4'), q34['4.1.4']).includes('Kreuz passt zu keiner Spalte'));
             pruefe('Werte werden lesbar gezeigt (Modul 5)',
                 wertText(ITEMS.find(i => i.nr === '4.5.1'), { count: 3, period: 'D' }), '3 pro Tag');
 
@@ -7385,6 +7385,30 @@ async function selbsttest() {
                 pruefeWahr('Melder berührt modulGegenprobe nicht (Modul 4 weiter gemeldet)',
                     abwB.some(a => /Modul 4/.test(a.modul)));
             }
+        }
+
+        // ---------- 45d. Konfliktauflösung: koordinatengenaue Lesung hat Vorrang ----------
+        /* Gemeldet (4.1.1/4.1.4, Text-PDF): Der koordinatengenaue Leser hatte die richtige
+           Spalte, war aber als „unsicher: mehrere Kreuze" markiert – die App nahm trotzdem den
+           falschen KI-Wert. Jetzt gilt bei Konflikt die lokale Lesung, außer bei echter
+           Positions-Unsicherheit (grund „abstand"/„heuristik"). Gilt für alle Items/Vorgänge/
+           Kinder, weil werteVergleich das EINE gemeinsame Einlese-Stück ist. */
+        if (typeof werteVergleich === 'function') {
+            const valFuer = (res, id) => { const e = res.werte.find(w => w.id === id); return e ? e.val_num : undefined; };
+            // 4.1.1 (id 1): lokal Spalte 2, unsicher wegen „mehrere"; KI Spalte 1 -> lokal (2) gewinnt
+            const rMehr = werteVergleich({ '4.1.1': { idx: 2, sicher: false, grund: 'mehrere' } }, [{ id: 1, val_num: 1 }]);
+            pruefe('Konflikt + grund „mehrere": koordinatengenaue Lesung (Spalte 2) gilt', valFuer(rMehr, 1), 2);
+            pruefe('… und die Zeile bleibt als Konflikt markiert', rMehr.quellen['4.1.1'].status, 'konflikt');
+            // grund „abstand": echte Positions-Unsicherheit -> KI (1) gilt
+            const rAbst = werteVergleich({ '4.1.1': { idx: 2, sicher: false, grund: 'abstand' } }, [{ id: 1, val_num: 1 }]);
+            pruefe('Konflikt + grund „abstand": KI-Wert (Spalte 1) gilt', valFuer(rAbst, 1), 1);
+            // lokal sicher: gilt ohnehin (unverändert)
+            const rSich = werteVergleich({ '4.1.1': { idx: 2, sicher: true, grund: '' } }, [{ id: 1, val_num: 1 }]);
+            pruefe('Konflikt + lokal sicher: koordinatengenaue Lesung gilt (unverändert)', valFuer(rSich, 1), 2);
+            // Scan: keine lokale Lesung -> KI gilt (unverändert)
+            const rScan = werteVergleich({}, [{ id: 1, val_num: 3 }]);
+            pruefe('Ohne lokale Lesung (Scan): KI-Wert gilt', valFuer(rScan, 1), 3);
+            pruefe('… als Status „ki"', rScan.quellen['4.1.1'].status, 'ki');
         }
 
         // ---------- 45c. Bild-Nachfrage (Stufe 3) – die reinen Bausteine ----------
