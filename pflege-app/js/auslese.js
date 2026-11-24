@@ -140,7 +140,20 @@ function werteVergleich(lokal, kiListe) {
         let status, wert;
         if (lWert !== null && kWert !== null) {
             if (gleich(lWert, kWert)) { status = 'beide'; wert = lWert; }
-            else { status = 'konflikt'; wert = (sicher || !posUnsicher) ? lWert : kWert; }
+            else {
+                status = 'konflikt';
+                // In Modul 5 ist die Häufigkeit eine ZAHL in der Spalte „Häufigkeit". Liest der
+                // koordinatengenaue Leser dort 0 (= keine Zahl gefunden) und die KI eine echte
+                // Häufigkeit, hat der Leser die Zahl verfehlt – dann gilt die KI. Gemeldet:
+                // 4.5.1 „Tabelle: 0 pro Woche, KI: 1 pro Woche" und 4.5.7 „Tabelle: 0 pro Woche,
+                // KI: 2 pro Tag", in der PDF stehen 1 bzw. 2. Eine gelesene 0 ist dort kein
+                // gemessener Wert, sondern „nichts gefunden" – analog zur Positions-Unsicherheit
+                // bei den Spaltenmodulen. Umgekehrt (lokal zählt eine Zahl, KI 0) bleibt die
+                // gemessene Zahl. Sonst (beide tragen eine Zahl) wie bei den Spaltenmodulen.
+                if (m5 && lWert.count === 0 && kWert.count > 0) wert = kWert;
+                else if (m5 && kWert.count === 0 && lWert.count > 0) wert = lWert;
+                else wert = (sicher || !posUnsicher) ? lWert : kWert;
+            }
         } else if (lWert !== null) { status = 'lokal'; wert = lWert; }
         else if (kWert !== null) { status = 'ki'; wert = kWert; }
         else { status = 'fehlt'; wert = null; }

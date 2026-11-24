@@ -657,6 +657,17 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    (Widerspruch, Erstantrag, Höherstufung, Anhörung) und für Kinderfälle gleichermaßen.
    Selbsttest „45d": `mehrere`/`unvollstaendig`/`zahl` → lokale Spalte bleibt; `abstand`/
    `heuristik` → KI; Konflikt bleibt gemeldet; Scan ohne lokale Lesung → KI (`ki`).
+   **Modul 5 (v66.95): eine gelesene 0 in der Häufigkeit ist „nichts gefunden", nicht 0.**
+   Gemeldet (4.5.1 „Tabelle: 0 pro Woche, KI: 1 pro Woche", 4.5.7 „Tabelle: 0 pro Woche,
+   KI: 2 pro Tag"; in der PDF stehen 1 bzw. 2): In Modul 5 steht die Häufigkeit als ZAHL in
+   der eigenen Spalte „Häufigkeit" (Regel 12c). Liest der koordinatengenaue Leser dort 0 und
+   die KI eine echte Häufigkeit (> 0), hat der Leser die Zahl verfehlt – die gelesene 0 ist
+   dort kein gemessener Wert, sondern „keine Zahl gefunden", also gilt bei Konflikt die KI.
+   Umgekehrt (lokal zählt eine Zahl, KI 0) bleibt die gemessene Zahl; tragen beide eine Zahl,
+   gilt wie bei den Spaltenmodulen die lokale Lesung (Konflikt bleibt markiert). Ebenfalls in
+   `werteVergleich`, damit für alle Items, alle vier Vorgänge und Kinderfälle. Selbsttest „45d"
+   erweitert: lokal 0 / KI 1 pro Woche → 1; lokal 0 / KI 2 pro Tag → 2; lokal 3 pro Tag / KI 0
+   → 3 pro Tag.
 46. **Markierungserkennung ohne feste Koordinaten** (`pflege_server.py`). Die Kreuze sitzen je
    nach Gutachten (Medizinischer Dienst, Medicproof, Vorlage, Druckqualität) an
    unterschiedlichen Stellen. Deshalb: `_spalten_aus_marken()` bildet die Spalten **je Seite
@@ -1290,8 +1301,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2082 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 6 Konfliktaufloesung).
+Der Selbsttest umfasst 2086 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

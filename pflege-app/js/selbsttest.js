@@ -7409,6 +7409,26 @@ async function selbsttest() {
             const rScan = werteVergleich({}, [{ id: 1, val_num: 3 }]);
             pruefe('Ohne lokale Lesung (Scan): KI-Wert gilt', valFuer(rScan, 1), 3);
             pruefe('… als Status „ki"', rScan.quellen['4.1.1'].status, 'ki');
+            // Modul 5 (Häufigkeit): gemeldet 4.5.1 „Tabelle 0 pro Woche, KI 1 pro Woche" und
+            // 4.5.7 „Tabelle 0 pro Woche, KI 2 pro Tag" – in der PDF 1 bzw. 2. Eine gelesene 0
+            // ist dort „keine Zahl gefunden", also gilt die echte KI-Häufigkeit.
+            const id451 = ITEMS.find(i => i.nr === '4.5.1').id;
+            const m5obj = (res, id) => { const e = res.werte.find(w => w.id === id); return e ? { count: e.val_obj_count, period: e.val_obj_period } : undefined; };
+            const rM5a = werteVergleich(
+                { '4.5.1': { count: 0, period: 'W', sicher: true, grund: '' } },
+                [{ id: id451, val_obj_count: 1, val_obj_period: 'W' }]);
+            pruefe('Modul 5: lokal 0, KI echte Häufigkeit → KI gilt (1 pro Woche)', m5obj(rM5a, id451), { count: 1, period: 'W' });
+            pruefe('… und die Zeile bleibt Konflikt', rM5a.quellen['4.5.1'].status, 'konflikt');
+            const id457 = ITEMS.find(i => i.nr === '4.5.7').id;
+            const rM5b = werteVergleich(
+                { '4.5.7': { count: 0, period: 'W', sicher: true, grund: '' } },
+                [{ id: id457, val_obj_count: 2, val_obj_period: 'D' }]);
+            pruefe('Modul 5: lokal 0, KI 2 pro Tag → KI gilt', m5obj(rM5b, id457), { count: 2, period: 'D' });
+            // Umgekehrt: lokal zählt eine echte Zahl, KI 0 → gemessene Zahl bleibt
+            const rM5c = werteVergleich(
+                { '4.5.1': { count: 3, period: 'D', sicher: true, grund: '' } },
+                [{ id: id451, val_obj_count: 0, val_obj_period: 'W' }]);
+            pruefe('Modul 5: lokal echte Zahl, KI 0 → gemessene Zahl bleibt (3 pro Tag)', m5obj(rM5c, id451), { count: 3, period: 'D' });
         }
 
         // ---------- 45c. Bild-Nachfrage (Stufe 3) – die reinen Bausteine ----------
