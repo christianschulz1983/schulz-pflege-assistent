@@ -184,8 +184,9 @@ function quellenBilanz(quellen) {
         const q = quellen[nr];
         b.gesamt++;
         b[q.status] = (b[q.status] || 0) + 1;
-        // Unsicher ist alles, was nur EINE Quelle hat oder beim Lesen Zweifel hinterließ
-        if (q.status !== 'fehlt' && q.status !== 'korrigiert' && q.status !== 'beide' && !q.sicher) b.unsicher++;
+        // Unsicher ist alles, was nur EINE Quelle hat, beim Lesen Zweifel hinterließ oder in
+        // einem Modul steht, dessen Summe von der gedruckten abweicht (Regel 77).
+        if (q.status !== 'fehlt' && q.status !== 'korrigiert' && q.status !== 'beide' && (!q.sicher || q.summeStrittig)) b.unsicher++;
         if (q.status === 'lokal' || q.status === 'ki') b.nurEine = (b.nurEine || 0) + 1;
     });
     b.gelesen = b.gesamt - b.fehlt;
@@ -197,6 +198,9 @@ function quellenBilanz(quellen) {
 function quelleZuPruefen(q) {
     if (!q) return false;
     if (q.status === 'konflikt' || q.status === 'fehlt') return true;
+    // Modulsumme weicht von der gedruckten „Summe der Einzelpunkte" ab (Regel 77): Dann ist
+    // in diesem Modul mindestens eine Zeile falsch gelesen – alle gelten als zu prüfen.
+    if (q.summeStrittig) return true;
     if (q.status === 'beide' || q.status === 'korrigiert') return false;
     return !q.sicher;
 }
@@ -223,7 +227,18 @@ const QUELLE_GRUND = {
 function quelleHinweisHtml(item, q) {
     if (!q) return '';
     const t = QUELLE_TEXT[q.status] || QUELLE_TEXT.lokal;
-    const teile = [`<span style="color:${t.farbe}">${escapeHtml(t.kurz)}</span>`];
+    const teile = [];
+    // Modulsumme weicht ab (Regel 77): laut und vor der Herkunft, damit der Berater sofort
+    // sieht, dass dieser Wert NICHT belastbar gelesen wurde – auch wenn „von der KI gelesen".
+    if (q.summeStrittig && q.status !== 'korrigiert') {
+        const si = q.summeInfo || {};
+        const zahlen = (si.ausKriterien != null && si.laut != null)
+            ? ' (gelesen ' + Math.round(si.ausKriterien) + ', laut Gutachten ' + Math.round(si.laut) + ')' : '';
+        teile.push('<span style="color:var(--red)">⚠ Modulsumme weicht ab' + zahlen + ' – bitte prüfen</span>');
+        teile.push('<span style="color:var(--text-muted)">' + escapeHtml(t.kurz) + '</span>');
+    } else {
+        teile.push(`<span style="color:${t.farbe}">${escapeHtml(t.kurz)}</span>`);
+    }
     if (q.status === 'konflikt') {
         teile.push('Tabelle: „' + escapeHtml(wertText(item, q.lokal)) + '“, KI: „' + escapeHtml(wertText(item, q.ki)) + '“');
     }
@@ -695,7 +710,7 @@ function normalizeImport(data) {
             }
         });
     }
-    return {
+    const rev = {
         stam: {
             betreffend: data.stam_betreffend || '', geboren: formatToYYYYMMDD(data.stam_geboren) || '',
             kasse: data.stam_kasse || '', versnr: data.stam_versnr || '',
@@ -741,6 +756,9 @@ function normalizeImport(data) {
         // Höherstufungsantrag: Angaben für die Erfassungsmaske, geprüft und an-/abwählbar
         vorbefund: (data.versorgung && typeof vorbefundAusImport === 'function') ? vorbefundAusImport(data.versorgung) : null
     };
+    // Modul-Erkenntnis bis auf die Kriteriumszeile tragen (Regel 77).
+    if (typeof modulSummeAufQuellen === 'function') modulSummeAufQuellen(rev);
+    return rev;
 }
 
 // Bearbeitungs-Handler (mutieren reviewData)
@@ -838,6 +856,41 @@ function modulGegenprobe(rev) {
         }
     }
     return abw;
+}
+
+/* Trägt die MODUL-Erkenntnis bis auf die Kriteriumszeile (Regel 77). Weicht die aus den
+   gelesenen Kriterien gerechnete Modulsumme von der vom Gutachten gedruckten „Summe der
+   Einzelpunkte" ab, ist in diesem Modul mindestens eine Zeile falsch gelesen. Dann darf KEINE
+   seiner Zeilen als belastbar „gelesen" durchgehen: jede Quelle bekommt summeStrittig=true,
+   sodass die Prüfansicht sie als „zu prüfen" zeigt – auch wenn sie „von der KI gelesen" wurde.
+   Das war der Kern des gemeldeten Problems: alles „selbständig" (Summe 0), gedruckt aber 9.
+   Verändert KEINE Bewertung (Regel 11); bereits vom Berater gesetzte oder beidseitig
+   bestätigte Zeilen bleiben unangetastet. */
+function modulSummeAufQuellen(rev) {
+    if (!rev || !rev.quellen || !rev.extracted || !rev.extracted.raws || !rev.valuesMap) return;
+    if (typeof calculateInternal !== 'function') return;
+    const stand = { special: 0, values: {} };
+    ITEMS.forEach(i => {
+        const v = rev.valuesMap[i.id];
+        stand.values[i.id] = (i.m === 5 && i.group !== 'D')
+            ? { count: (v && typeof v === 'object') ? Number(v.count) || 0 : 0,
+                period: (v && typeof v === 'object') ? (v.period || 'W') : 'W' }
+            : (Number(v) || 0);
+    });
+    const r = calculateInternal(stand);
+    for (let m = 1; m <= 6; m++) {
+        const laut = Number(rev.extracted.raws[m - 1]);
+        if (!Number.isFinite(laut)) continue;
+        const ausKriterien = r.raws[m - 1];
+        if (Math.round(ausKriterien) === Math.round(laut)) continue;   // Summe passt – nichts tun
+        ITEMS.filter(i => i.m === m && i.nr).forEach(i => {
+            const q = rev.quellen[i.nr];
+            // Beidseitig bestätigte oder handkorrigierte Zeilen bleiben, wie sie sind.
+            if (!q || q.status === 'korrigiert' || q.status === 'beide') return;
+            q.summeStrittig = true;
+            q.summeInfo = { ausKriterien: ausKriterien, laut: laut };
+        });
+    }
 }
 
 /* STUFE 2 der Auslese-Verbesserung – der „Melder". Fasst je Modul zu EINEM Urteil zusammen,
@@ -974,6 +1027,13 @@ function rvZeigeModulMelder() {
         + (strittig.length ? '#fffbeb' : '#f0fdf4') + ';border:1px solid '
         + (strittig.length ? '#fcd34d' : '#bbf7d0') + '">' + chips
         + '<div style="margin-top:6px;font-size:13px">' + text + '</div>' + knopf + '</div>';
+}
+
+// Gibt es strittige SPALTEN-Module (1,2,3,4,6), die eine Bild-Nachfrage lohnen? Grundlage der
+// automatischen Nachfrage nach dem Import (Regel 77). Modul 5 (Häufigkeiten) zählt hier nicht.
+function bildNachfrageAutoNoetig(rev) {
+    if (typeof modulSelbstpruefung !== 'function') return false;
+    return modulSelbstpruefung(rev).some(x => x.status === 'strittig' && x.nr !== 5);
 }
 
 /* ---------- STUFE 3 der Auslese-Verbesserung: gezielte Bild-Nachfrage ----------
@@ -1313,6 +1373,15 @@ function openImportReview(file, data, mimeType) {
     if (typeof rvZeigeStellungnahmePruefung === 'function') rvZeigeStellungnahmePruefung();
     if (typeof nameHinweisAnzeigen === 'function') nameHinweisAnzeigen();
     document.getElementById('review-overlay').classList.add('active');
+    // Vorbereitung (Regel 77): strittige Spalten-Module gleich AUTOMATISCH per Bild nachlesen,
+    // wenn ein KI-Schlüssel vorliegt – der Berater muss den Knopf nicht erst suchen. Best-effort;
+    // ohne Schlüssel oder Datei passiert nichts, der Knopf bleibt. Nichts wird eingetragen (Regel 11).
+    if (typeof bildNachfrageAutoNoetig === 'function' && bildNachfrageAutoNoetig(reviewData)
+        && letzterUpload && letzterUpload.base64
+        && typeof apiSchluesselVorhanden === 'function' && apiSchluesselVorhanden()
+        && typeof modulBildNachfrage === 'function') {
+        setTimeout(() => { try { modulBildNachfrage(); } catch (e) {} }, 400);
+    }
 }
 
 function closeReview() {

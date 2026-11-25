@@ -3,11 +3,13 @@
 Diese Datei wird bei jeder Sitzung automatisch geladen. Sie ersetzt das fehlende
 Gedächtnis zwischen Sitzungen. Bei Änderungen an der Arbeitsweise hier nachtragen.
 
-**Mastercode: v66.98** (Stand 25.11.2026). Geprüfter, freigegebener Referenzstand –
-Git-Tag `v66.98-master` (Vorgänger `v66.97-master`). Selbsttest 2128/2128 grün, alle
-JS-Dateien syntaktisch sauber, lokal und Remote identisch. Zuletzt: Upload ergänzt statt löscht
-samt „Neuer Fall"-Knopf (Regel 75), beschreibende Medikationsspalten (Regel 76), treuere
-Einleitung (Punkt 1) und Zeiterfassung (Regel 74). Wiederherstellungspunkt für alles Weitere.
+**Mastercode: v66.99** (Stand 25.11.2026). Geprüfter, freigegebener Referenzstand –
+Git-Tag `v66.99-master` (Vorgänger `v66.98-master`). Selbsttest 2136/2136 grün, alle
+JS-Dateien syntaktisch sauber, lokal und Remote identisch. Zuletzt: Modulsumme bis auf die
+Kriteriumszeile – eine abweichende Modulsumme markiert jedes Kriterium des Moduls als „zu
+prüfen", und für strittige Spalten-Module läuft die Bild-Nachfrage bei vorhandenem Schlüssel
+von selbst (Regel 77, bessere automatische Punkteübernahme als Vorbereitung).
+Wiederherstellungspunkt für alles Weitere.
 
 ## Was die App ist
 Lokale Web-App für einen Pflegeberater (Familiara GmbH). Liest deutsche Pflegegutachten
@@ -1342,6 +1344,43 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Notiz-Kurzfassung. Die inhaltliche Qualität ist nur mit gültigem KI-Schlüssel im echten
    Betrieb beurteilbar.
 
+77. **Modulsumme bis auf die Kriteriumszeile – „bitte prüfen" statt scheinbar gelesen**
+   (`modulSummeAufQuellen`, `quelleZuPruefen`, `quelleHinweisHtml`, `bildNachfrageAutoNoetig`
+   in `js/auslese.js`, `apiSchluesselVorhanden` in `js/ki.js`). Gemeldet mit Bild: Ein Modul-4
+   stand in der Prüfansicht in JEDER Zeile auf „selbständig / von der KI gelesen", obwohl die
+   PDF in Spalte 1 angekreuzt war und „Summe der Einzelpunkte 9" druckte. Der Melder (Regel 70)
+   markierte Modul 4 zwar als strittig, die EINZELZEILE sah aber weiter nach einer
+   zuverlässigen Lesung aus – der Berater hätte jede Zeile einzeln misstrauen müssen. Die
+   Vorgabe des Verfassers: „eine bessere Lösung, als Vorbereitung". Drei Teile, rein additiv
+   (Regel 11 unberührt – nichts wird automatisch eingetragen):
+   - **Die Modulsumme wird bis auf die Kriteriumszeile durchgereicht.** `modulSummeAufQuellen(rev)`
+     rechnet je Modul die gelesene Summe (`calculateInternal` aus `rev.valuesMap`) gegen die vom
+     Gutachten gedruckte „Summe der Einzelpunkte" (`rev.extracted.raws`). Weicht sie ab, bekommt
+     JEDES Kriterium dieses Moduls `q.summeStrittig = true` (mit `summeInfo{ausKriterien, laut}`) –
+     AUSSER es ist schon `korrigiert` (Handeingabe hat Vorrang) oder `beide` (lokaler Leser UND
+     KI stimmen überein; dann rechnet eher das Gutachten selbst falsch, Regel 12 – gemeldet,
+     nicht gebogen). Aufgerufen am Ende von `normalizeImport` (`return {` → `const rev = …`).
+   - **Die Prüfansicht zeigt es.** `quelleZuPruefen` ist bei `summeStrittig` wahr (die Zeile zählt
+     zu „zu prüfen" und erscheint im Filter „nur zu prüfende zeigen"), `quelleHinweisHtml` stellt
+     der Zeile ein rotes „⚠ Modulsumme weicht ab (… statt …) – bitte prüfen" voran, und
+     `quellenBilanz` zählt solche Zeilen als unsicher. So sieht der Berater sofort: Diese Zeile
+     ist NICHT verlässlich gelesen, obwohl dort eine Stufe steht.
+   - **Die Bild-Nachfrage (Regel 71) läuft von selbst.** `bildNachfrageAutoNoetig(rev)` ist wahr,
+     sobald ein Spalten-Modul (nicht Modul 5) strittig ist; `showReview` stößt dann
+     `modulBildNachfrage()` automatisch an – aber NUR, wenn die Datei noch im Speicher liegt
+     (`letzterUpload.base64`) und ein Schlüssel vorhanden ist (`apiSchluesselVorhanden()`, löst
+     den Schlüssel aus DOM/`userApiKey`/`apiKey` auf). Ohne Schlüssel bleibt es beim sichtbaren
+     „bitte prüfen" und dem Knopf von Hand. Der Vorschlag wird wie bisher angehakt übernommen
+     (Regel 11), nichts automatisch gesetzt.
+   **Ehrliche Grenze:** Verlässlich wird die Lesung erst durch den lokalen Koordinatenleser
+   (Text-PDF) oder die Bild-Nachfrage mit gültigem Schlüssel; beides ist ohne Schlüssel hier
+   nicht voll prüfbar. Was Regel 77 sicher leistet: Ein falsch als „selbständig" gelesenes Modul
+   gibt sich nicht mehr als zuverlässig aus, sondern verlangt sichtbar die Prüfung.
+   Wiederherstellungspunkt davor: Git-Tag `v66.98-master`. Selbsttest „77": `modulSummeAufQuellen`
+   markiert die Kriterien eines summenabweichenden Moduls, lässt `beide`/passende unberührt,
+   `quelleZuPruefen` wahr, `quelleHinweisHtml` zeigt die Warnung, `quellenBilanz` zählt sie,
+   `bildNachfrageAutoNoetig` wahr; Gegenprobe: bei passenden Summen wird nichts markiert.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1406,8 +1445,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2128 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe + 13 Zeiterfassung + 17 Ergaenzen-statt-Loeschen/Medikation).
+Der Selbsttest umfasst 2136 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe + 13 Zeiterfassung + 17 Ergaenzen-statt-Loeschen/Medikation + 8 Modulsumme-Kriteriumszeile).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

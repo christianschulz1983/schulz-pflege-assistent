@@ -167,6 +167,17 @@ async function kiModelleFuer(key) {
     return liste;
 }
 
+// Liegt ein KI-Schlüssel vor? Grundlage für die automatische Bild-Nachfrage (Regel 77) –
+// ohne Schlüssel wird nichts angestoßen.
+function apiSchluesselVorhanden() {
+    try {
+        const dom = document.getElementById('user-api-key') ? document.getElementById('user-api-key').value.trim() : "";
+        const key = (dom || (typeof userApiKey !== 'undefined' ? userApiKey.trim() : "")
+                         || (typeof apiKey !== 'undefined' ? apiKey.trim() : "")).replace(/[\s"'„“]/g, '');
+        return !!key;
+    } catch (e) { return false; }
+}
+
 // INTELLIGENTES KI-FALLBACK-SYSTEM FÜR MODELLANFRAGEN (VERMEIDET 404 BEI PERSÖNLICHEN KEYS UND UNTERDRÜCKT FEHLER-OVERLAYS)
 async function callGeminiWithFallback(payload, systemPrompt) {
     const domApiKey = document.getElementById('user-api-key') ? document.getElementById('user-api-key').value.trim() : "";

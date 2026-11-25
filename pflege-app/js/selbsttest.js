@@ -7610,6 +7610,36 @@ async function selbsttest() {
             }
         }
 
+        // ---------- 77. Modulsumme bis auf die Kriteriumszeile (bitte prüfen) ----------
+        /* Weicht die gelesene Modulsumme von der gedruckten „Summe der Einzelpunkte" ab, wird
+           JEDE Zeile des Moduls als „zu prüfen" markiert – auch „von der KI gelesen". Das war
+           der Kern des gemeldeten Problems (alles selbständig = Summe 0, gedruckt aber 9). */
+        if (typeof modulSummeAufQuellen === 'function') {
+            const vm77 = {}; ITEMS.forEach(i => { vm77[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+            const q77 = {};
+            ITEMS.filter(i => i.nr).forEach(i => { q77[i.nr] = { id: i.id, status: 'ki', sicher: true }; });
+            // Eine beidseitig bestätigte Zeile in Modul 4 darf NICHT mitmarkiert werden.
+            q77['4.4.1'] = { id: ITEMS.find(i=>i.nr==='4.4.1').id, status: 'beide', sicher: true };
+            const rev77 = { valuesMap: vm77, quellen: q77,
+                extracted: { raws: [0, 0, 0, 9, 0, 0], weights: [0, 0, 0, 0, 0, 0], total: 0, pg: 0 } };
+            modulSummeAufQuellen(rev77);
+            pruefeWahr('Modul 4 (gelesen 0 ≠ gedruckt 9): Kriterium wird strittig', rev77.quellen['4.4.2'].summeStrittig === true);
+            pruefeWahr('Beidseitig bestätigte Zeile bleibt unmarkiert', !rev77.quellen['4.4.1'].summeStrittig);
+            pruefeWahr('Modul mit passender Summe (1): Kriterium nicht markiert', !rev77.quellen['4.1.1'].summeStrittig);
+            pruefeWahr('summeStrittig gilt als „zu prüfen"', quelleZuPruefen(rev77.quellen['4.4.2']));
+            pruefeWahr('Hinweis nennt die Modulsummen-Abweichung',
+                /Modulsumme weicht ab/.test(quelleHinweisHtml(ITEMS.find(i=>i.nr==='4.4.2'), rev77.quellen['4.4.2'])));
+            pruefeWahr('Bilanz zählt die Modulsummen-strittigen Zeilen', quellenBilanz(rev77.quellen).zuPruefen >= 11);
+            if (typeof bildNachfrageAutoNoetig === 'function')
+                pruefeWahr('Auto-Bild-Nachfrage erkennt strittiges Spalten-Modul', bildNachfrageAutoNoetig(rev77));
+            // Gegenprobe: passende Summen markieren nichts
+            const rev77b = { valuesMap: vm77, quellen: (function () { const o = {}; ITEMS.filter(i => i.nr).forEach(i => { o[i.nr] = { id: i.id, status: 'ki', sicher: true }; }); return o; })(),
+                extracted: { raws: [0, 0, 0, 0, 0, 0], weights: [0, 0, 0, 0, 0, 0], total: 0, pg: 0 } };
+            modulSummeAufQuellen(rev77b);
+            pruefeWahr('Alle Summen passend: nichts wird markiert',
+                !Object.keys(rev77b.quellen).some(nr => rev77b.quellen[nr].summeStrittig));
+        }
+
         // ---------- 74. Zeiterfassung (js/zeit.js) ----------
         /* Vier Phasen, Aufrundung auf 5 Minuten, Phasenwechsel, Kopier-Zeile und die Runde
            durch die Falldatei. Reine Erfassung – kein Einfluss auf die Rechnung. Der
@@ -7648,12 +7678,14 @@ async function selbsttest() {
                 pruefe('Falldatei-Runde: Admin erhalten', Math.round(zeitSek.admin), 600);
                 pruefe('Falldatei-Runde: ET erhalten', Math.round(zeitSek.et), 1500);
 
-                // Alte laufende Marke (über der Kappung) bläht die Zeit nicht auf
-                zeitLadeState({ sek: { admin: 300, et: 0, psga: 0, coaching: 0 },
+                // Alte laufende Marke (über der Kappung) bläht die Zeit nicht auf. 150 s liegt
+                // bewusst nicht auf der 5-Minuten-Grenze – sonst kippt der laufende Millisekunden-
+                // Tick die exakte 5,00 auf 10. Würden die 6 h mitgezählt, stünde dort ein Vielfaches.
+                zeitLadeState({ sek: { admin: 150, et: 0, psga: 0, coaching: 0 },
                                 laufend: 'admin', start: Date.now() - (6 * 3600 * 1000) });
+                if (typeof zeitTickerStop === 'function') zeitTickerStop();
                 pruefe('Lange Pause wird nicht mitgezählt (Admin bleibt 5 Min)',
                     zeitMinutenAufgerundet('admin'), 5);
-                if (typeof zeitTickerStop === 'function') zeitTickerStop();
 
                 // Zurücksetzen leert alle Phasen
                 zeitReset();
