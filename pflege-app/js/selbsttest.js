@@ -7640,6 +7640,38 @@ async function selbsttest() {
                 !Object.keys(rev77b.quellen).some(nr => rev77b.quellen[nr].summeStrittig));
         }
 
+        // ---------- 78. Lokale Vorab-Füllung trägt keine unplausiblen Angaben ein ----------
+        /* Gemeldet mit Bild: Nach KI-Abbruch füllte die lokale Reserve den Namen mit
+           „Frau Vorgangsnummer Anja", die Versicherungs-Nr. mit „Hinweis" und die Diagnosen
+           mit Satzfragmenten. Lieber eine Lücke als eine geratene Angabe (Regeln 35/45/66/78). */
+        if (typeof localMetaToData === 'function') {
+            const fbBad = localMetaToData({ meta: {
+                betreffend: 'Frau Vorgangsnummer Anja', versnr: 'Hinweis',
+                geboren: '1950-01-01', kasse: 'Techniker Krankenkasse',
+                diagnoses: [
+                    { text: 'n wurden Antriebsminderung bei rezidivierende depressive Störung mit' },
+                    { text: 'Konzentrationsschwierigkeiten und Generalisierte Angststörung genannt' },
+                    { text: 'Diabetes mellitus Typ 2', icd: 'E11.9' },
+                    { text: 'Arterielle Hypertonie' }
+                ]
+            }});
+            pruefe('Unplausibler Name wird nicht vorab eingetragen', fbBad.stam_betreffend, '');
+            pruefe('„Hinweis" als Versicherungs-Nr. bleibt leer', fbBad.stam_versnr, '');
+            pruefe('Geburtsdatum bleibt erhalten', fbBad.stam_geboren, '1950-01-01');
+            pruefe('Kasse bleibt erhalten', fbBad.stam_kasse, 'Techniker Krankenkasse');
+            const dTexte = (fbBad.diagnoses || []).map(d => d.text);
+            pruefeWahr('Satzfragment (klein beginnend) fliegt raus',
+                dTexte.indexOf('n wurden Antriebsminderung bei rezidivierende depressive Störung mit') === -1);
+            pruefeWahr('Narrativer Rest („… genannt") fliegt raus',
+                !dTexte.some(t => /genannt\s*$/i.test(t)));
+            pruefeWahr('Echte Diagnose mit ICD bleibt', dTexte.indexOf('Diabetes mellitus Typ 2') > -1);
+            pruefeWahr('Echte Diagnose ohne ICD bleibt', dTexte.indexOf('Arterielle Hypertonie') > -1);
+            // Ein plausibler Name wird unverändert durchgereicht
+            const fbGood = localMetaToData({ meta: { betreffend: 'Anja Hobein', versnr: 'A123456789' } });
+            pruefe('Plausibler Name bleibt stehen', fbGood.stam_betreffend, 'Anja Hobein');
+            pruefe('Plausible Versicherungs-Nr. bleibt stehen', fbGood.stam_versnr, 'A123456789');
+        }
+
         // ---------- 74. Zeiterfassung (js/zeit.js) ----------
         /* Vier Phasen, Aufrundung auf 5 Minuten, Phasenwechsel, Kopier-Zeile und die Runde
            durch die Falldatei. Reine Erfassung – kein Einfluss auf die Rechnung. Der

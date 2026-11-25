@@ -68,11 +68,22 @@ function textDecktDokumentAb(local) {
 function diagnosenBereinigen(liste) {
     if (!Array.isArray(liste)) return [];
     const istZusammenfassung = t => /einschr[aä]nkungen\s+fanden\s+sich|gewichtete[rn]?\s+punkt|(?:^|[,;]\s*)im\s+modul\s+\d/i.test(t || '');
+    // Satzfragmente sind KEINE Diagnosen (Regel 78). Gemeldet nach KI-Abbruch und lokaler
+    // Vorab-Füllung: „n wurden Antriebsminderung bei rezidivierende depressive Störung mit"
+    // (ein zerrissener Satz, beginnt klein) und „… Generalisierte Angststörung genannt" (ein
+    // narrativer Rest). Eine echte Diagnose beginnt groß und endet nicht auf einem Erzählverb.
+    // Lieber eine Lücke als eine geratene Angabe (Regeln 35, 45, 66); der Hinweis sagt ohnehin,
+    // anhand der PDF zu prüfen. Fragmente werden übersprungen (nicht abgeschnitten – echte
+    // Diagnosen können danach noch folgen), die Zusammenfassung beendet die Liste.
+    const istFragment = t => /^[a-zäöüß]/.test((t || '').trim())
+        || /\b(genannt|festgestellt|beschrieben|angegeben|berichtet)\.?\s*$/i.test(t || '');
     const out = [];
     for (const d of liste) {
         const t = (d && d.text) || '';
         if (istZusammenfassung(t)) break;
-        if (t.trim()) out.push(d);
+        if (!t.trim()) continue;
+        if ((!d.icd || !String(d.icd).trim()) && istFragment(t)) continue;
+        out.push(d);
     }
     return out;
 }
@@ -80,11 +91,19 @@ function diagnosenBereinigen(liste) {
 // Lokal ausgelesene Stammdaten/Diagnosen/Texte (vom Server) ins Datenformat der App bringen.
 function localMetaToData(local) {
     const m = (local && local.meta) ? local.meta : {};
+    // Unplausible Angaben NICHT vorab eintragen (Regel 78). Die lokale Vorab-Füllung greift nur,
+    // wenn die KI ausfiel – dann steht Müll aus dem Briefkopf im Namen („Frau Vorgangsnummer
+    // Anja") oder in der Versicherungs-Nr. („Hinweis"). Lieber ein leeres Feld, das der Berater
+    // aus der PDF füllt, als eine geratene Angabe, die in jeden Schriftsatz wandert.
+    const name = m.betreffend || '';
+    const nameOk = !(typeof nameUnplausibel === 'function' && nameUnplausibel(name).length);
+    const vn = m.versnr || '';
+    const vnOk = /\d/.test(vn);   // eine Versicherungsnummer enthält immer Ziffern
     return {
-        stam_betreffend: m.betreffend || '',
+        stam_betreffend: nameOk ? name : '',
         stam_geboren: m.geboren || '',
         stam_kasse: m.kasse || '',
-        stam_versnr: m.versnr || '',
+        stam_versnr: vnOk ? vn : '',
         stam_bescheid: m.bescheid || '',
         stam_antrag: m.antrag || '',
         stam_organisation: m.organisation || '',

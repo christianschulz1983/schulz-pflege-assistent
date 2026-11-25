@@ -70,7 +70,12 @@ const NAME_UNPLAUSIBEL = [
     'zentrale', 'telefon', 'telefax', 'kundenservice', 'sachbearbeitung', 'sachbearbeiter',
     'pflegekasse', 'pflegeversicherung', 'krankenversicherung', 'krankenkasse', 'kasse',
     'gutachter', 'gutachterin', 'vorstand', 'geschäftsführer', 'widerspruchsstelle',
-    'stellungnahme', 'gutachten', 'muster', 'unbekannt'
+    'stellungnahme', 'gutachten', 'muster', 'unbekannt',
+    // Beschriftungen aus dem Briefkopf, die der lokale Leser als Namensteil mitnimmt
+    // (gemeldet: „Frau Vorgangsnummer Anja", „Hinweis" als Vorname/Versnr, Regel 78).
+    'vorgangsnummer', 'geschäftszeichen', 'geschaeftszeichen', 'aktenzeichen', 'kundennummer',
+    'versichertennummer', 'versicherungsnummer', 'versicherungsnr', 'hinweis', 'betreff',
+    'betreffend', 'anschrift', 'postanschrift', 'bescheiddatum', 'antragsdatum', 'datum', 'seite'
 ];
 
 // Bestandteile des Namens, die eher aus einem Briefkopf als von einem Menschen stammen.

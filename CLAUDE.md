@@ -3,12 +3,12 @@
 Diese Datei wird bei jeder Sitzung automatisch geladen. Sie ersetzt das fehlende
 Gedächtnis zwischen Sitzungen. Bei Änderungen an der Arbeitsweise hier nachtragen.
 
-**Mastercode: v66.99** (Stand 25.11.2026). Geprüfter, freigegebener Referenzstand –
-Git-Tag `v66.99-master` (Vorgänger `v66.98-master`). Selbsttest 2136/2136 grün, alle
-JS-Dateien syntaktisch sauber, lokal und Remote identisch. Zuletzt: Modulsumme bis auf die
-Kriteriumszeile – eine abweichende Modulsumme markiert jedes Kriterium des Moduls als „zu
-prüfen", und für strittige Spalten-Module läuft die Bild-Nachfrage bei vorhandenem Schlüssel
-von selbst (Regel 77, bessere automatische Punkteübernahme als Vorbereitung).
+**Mastercode: v67.00** (Stand 25.11.2026). Geprüfter, freigegebener Referenzstand –
+Git-Tag `v67.00-master` (Vorgänger `v66.99-master`). Selbsttest 2146/2146 grün, alle
+JS-Dateien syntaktisch sauber, lokal und Remote identisch. Zuletzt: Die lokale Vorab-Füllung
+nach einem KI-Abbruch trägt keine unplausiblen Angaben mehr ein – ein Briefkopf-Wort im Namen
+(„Frau Vorgangsnummer Anja"), eine ziffernlose Versicherungs-Nr. („Hinweis") und
+Diagnose-Satzfragmente bleiben leer statt geraten (Regel 78, lieber eine Lücke).
 Wiederherstellungspunkt für alles Weitere.
 
 ## Was die App ist
@@ -1381,6 +1381,35 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    `quelleZuPruefen` wahr, `quelleHinweisHtml` zeigt die Warnung, `quellenBilanz` zählt sie,
    `bildNachfrageAutoNoetig` wahr; Gegenprobe: bei passenden Summen wird nichts markiert.
 
+78. **Die lokale Vorab-Füllung trägt keine unplausiblen Angaben ein – lieber eine Lücke**
+   (`localMetaToData`, `diagnosenBereinigen` in `js/auslese.js`, `NAME_UNPLAUSIBEL` in
+   `js/namenspruefung.js`). Gemeldet mit Bild (Widerspruch, TK, Patientin Hobein): Die KI
+   wurde abgeschnitten (`KI_ABGESCHNITTEN`), die lokale Reserve füllte die Felder vorab (Regel
+   63) – und dabei stand im Namen „Frau Vorgangsnummer Anja", in der Versicherungs-Nr. „Hinweis"
+   und in den Diagnosen Satzfragmente („n wurden Antriebsminderung bei rezidivierende depressive
+   Störung mit", „… Generalisierte Angststörung genannt"). Das sind Briefkopf-Wörter und
+   zerrissene Sätze, keine Daten. Nach der Philosophie der Regeln 35/45/66 ist eine ehrliche
+   Lücke besser als eine geratene Angabe – die der Berater sonst übersieht und die in jeden
+   Schriftsatz und den Dateinamen wandert (Regel 51). Deshalb prüft die Vorab-Füllung jeden Wert:
+   - **Name:** Enthält er ein Briefkopf-/Beschriftungswort (`nameUnplausibel`), wird er NICHT
+     vorab eingetragen (leeres Feld). `NAME_UNPLAUSIBEL` ist um die gemeldeten Wörter erweitert
+     (`vorgangsnummer`, `hinweis`, `geschäftszeichen`, `aktenzeichen`, `kundennummer`,
+     `versicherungsnummer`, `betreff(end)`, `anschrift`, `datum`, `seite` …). Der bestehende
+     Prüfansicht-Hinweis „das sieht nicht nach einem Namen aus" (Regel 51) greift damit auch hier.
+   - **Versicherungs-Nr.:** bleibt leer, wenn sie keine Ziffer enthält – eine Versicherungsnummer
+     hat immer Ziffern, „Hinweis" nicht.
+   - **Diagnosen:** `diagnosenBereinigen` überspringt jetzt zusätzlich Satzfragmente OHNE ICD –
+     Zeilen, die klein beginnen oder auf einem Erzählverb enden (`genannt`, `festgestellt`,
+     `beschrieben`, `angegeben`, `berichtet`). Übersprungen (nicht abgeschnitten – echte
+     Diagnosen können danach folgen); die Zusammenfassung beendet die Liste weiterhin (Regel 66).
+     Eine Diagnose MIT ICD bleibt immer stehen.
+   **Nur die lokale Vorab-Füllung ist betroffen** (greift nur nach einem KI-Ausfall); die
+   KI-Auslese und die Rechnung bleiben unberührt (Regel 11). Das behebt nicht den KI-Abbruch
+   selbst (Regel 63 mildert ihn, voll nur mit gültigem Schlüssel prüfbar) – es sorgt dafür, dass
+   die Reserve keine Scheindaten zeigt. Selbsttest „78": unplausibler Name/Versnr bleiben leer,
+   echte Stammfelder bleiben, Satzfragmente fliegen raus, Diagnosen mit/ohne ICD bleiben,
+   plausibler Name/Versnr werden durchgereicht.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1445,8 +1474,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2136 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe + 13 Zeiterfassung + 17 Ergaenzen-statt-Loeschen/Medikation + 8 Modulsumme-Kriteriumszeile).
+Der Selbsttest umfasst 2146 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe + 13 Zeiterfassung + 17 Ergaenzen-statt-Loeschen/Medikation + 8 Modulsumme-Kriteriumszeile + 10 Unplausible-Vorab-Fuellung).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle
