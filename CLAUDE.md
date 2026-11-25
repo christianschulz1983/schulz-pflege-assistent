@@ -3,11 +3,11 @@
 Diese Datei wird bei jeder Sitzung automatisch geladen. Sie ersetzt das fehlende
 Gedächtnis zwischen Sitzungen. Bei Änderungen an der Arbeitsweise hier nachtragen.
 
-**Mastercode: v66.97** (Stand 24.11.2026). Geprüfter, freigegebener Referenzstand –
-Git-Tag `v66.97-master` (Vorgänger `v66.96-master`). Selbsttest 2111/2111 grün, alle
-JS-Dateien syntaktisch sauber, lokal und Remote identisch. Konfliktauflösung beim Einlesen
-(Regel 45), Komfort-Abläufe nach dem Übernehmen (Regeln 72-73) und die Zeiterfassung je Fall
-(Regel 74) abgeschlossen. Dieser Stand ist der Wiederherstellungspunkt für alles Weitere.
+**Mastercode: v66.98** (Stand 25.11.2026). Geprüfter, freigegebener Referenzstand –
+Git-Tag `v66.98-master` (Vorgänger `v66.97-master`). Selbsttest 2128/2128 grün, alle
+JS-Dateien syntaktisch sauber, lokal und Remote identisch. Zuletzt: Upload ergänzt statt löscht
+samt „Neuer Fall"-Knopf (Regel 75), beschreibende Medikationsspalten (Regel 76), treuere
+Einleitung (Punkt 1) und Zeiterfassung (Regel 74). Wiederherstellungspunkt für alles Weitere.
 
 ## Was die App ist
 Lokale Web-App für einen Pflegeberater (Familiara GmbH). Liest deutsche Pflegegutachten
@@ -1295,6 +1295,53 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Selbsttest „74": Aufrundung (6→10, 23→25, 5→5, 0→0), Kopier-Zeile, Phasenwechsel (nur eine
    läuft, vorige gefaltet), Falldatei-Runde, Kappung bei langer Pause, Zurücksetzen.
 
+75. **Ein Upload LÖSCHT NICHTS – er ergänzt nur** (`applyImportedData`, `neuerFallZuruecksetzen`
+   in `js/auslese.js`). Gemeldet: „Ich habe ein Gutachten hochgeladen und alle meine Eintragungen
+   waren verschwunden." Früher begann jeder Import einen neuen Fall und leerte Notizen, Befund,
+   Erfassung, Zeiterfassung, Anlagen, Stellungnahme und Stammfelder (das war Regel 26). Vorgabe
+   des Verfassers: beim Hochladen von Gutachten/Befunden „dürfen die bereits gemachten Angaben
+   nicht gelöscht werden, sondern nur sinnvoll ergänzt oder ausgetauscht werden". Jetzt:
+   - **`applyImportedData` bewahrt alles** Vorhandene – Notizen, Befund, Erfassung, **Zeiterfassung
+     (Punkt 4: der Timer läuft weiter)**, Anlagen, die geschriebene Stellungnahme, `stateZweit`
+     und die Kontinenzangabe. Gesetzt werden nur die **Bewertungen** des Gutachtens (der Zweck
+     des Imports, „ausgetauscht") und die Kopffelder aus der Rechnung (Regel 67).
+   - **Stammfelder: Ausgefülltes bleibt, Leeres wird gefüllt** (`fuelleLeer`; Handeintrag hat
+     Vorrang, Regel 11). Abweichungen zeigt die Prüfansicht, überschrieben wird nichts.
+   - **Diagnosen werden zusammengeführt** (vorhandene behalten, neue aus dem Gutachten ergänzen,
+     ohne Dubletten über ICD bzw. Wortlaut).
+   - **Ein echter neuer Fall läuft über `neuerFallZuruecksetzen()`** (Knopf „Neuer Fall" in
+     Reiter 1, mit Bestätigung über `neuerFallBestaetigen`/das Modal aus js/nachimport.js). Das
+     tut, was früher jeder Import tat: alles leeren. Wer eine andere Person beginnt, klickt das.
+   - **Timer nicht im Schriftstück** (Punkt 4): Die Zeiterfassung (`zeitState`) steht nur in der
+     Falldatei, nie in einem KI-Prompt oder der generierten Stellungnahme – geprüft.
+   Betroffene Bestandstests (die das alte Löschen absicherten) sind auf die neue Zusage
+   umgestellt: der Import bewahrt, `neuerFallZuruecksetzen` leert. Selbsttest „75": Upload bewahrt
+   Notizen/Erfassung/Stellungnahme/Timer, füllt nur leere Stammfelder, ergänzt Diagnosen; „Neuer
+   Fall" setzt alles zurück. **Gilt für alle vier Vorgänge und Kinderfälle.**
+76. **Medikation: beschreibende Angaben statt einzelner Präparate** (`js/erfassung.js`). Vorgabe
+   des Verfassers: nicht jedes einzelne Medikament eintragen – nur die **Anzahl** der Präparate,
+   ob **dauerhaft**, die **Darreichungsform** (Tablette/Tropfen/Dosieraerosol …), **wie oft am
+   Tag** und ob **nüchtern/nach den Mahlzeiten**. Umgesetzt als zusätzliche Spalten der
+   Medikationstabelle: `form` (`MEDIKATION_FORM`), `einnahme` (`MEDIKATION_EINNAHME`), `dauerhaft`
+   (`JA_NEIN`); `praeparate` heißt jetzt „Anzahl Medikamente", `anzahl` „Häufigkeit".
+   - **Rein beschreibend – die Bewertung ändert sich NICHT.** Nach der BRi (F 4.5.1) zählen
+     Applikationsort und Applikationshäufigkeit, nicht Form oder Einnahmezeitpunkt.
+     `medikationGezaehlt`/`modul5AusErfassung` lesen weiter nur `applikation`, `unterstuetzung`,
+     `anzahl`, `zeitraum` – unverändert (Regel 22 bleibt gültig). Die neuen Spalten sind offen
+     (`frei`) bei Form und Einnahme (beschreibend, Regel 24), `dauerhaft` ist ein ja/nein.
+   - Der Berater trifft wie bisher die Auswahl vor der Übernahme (Regel 11); Arztbericht-Übernahme
+     (`medikationGruppiert`) füllt die neuen Felder leer, wenn der Bericht sie nicht nennt.
+   Selbsttest „76": die drei neuen Spalten sind da, Applikationsort/Häufigkeit/Zeitraum (Scoring)
+   bleiben; die bestehende Scoring-Prüfung (13b) läuft unverändert grün.
+   **Punkt 1 (Einleitung treu zu den Notizen):** `allgemeinAufgabe` (`js/vorschlaege.js`, Widerspruch/
+   Erstantrag/Höherstufung) verlangt jetzt ausdrücklich, die KONKRETEN Angaben der Notizen zu
+   übernehmen (benannte Tätigkeiten, Häufigkeiten, wer wobei hilft), NICHT zu Floskeln zu
+   verallgemeinern, nichts Wesentliches wegzulassen und Rechtschreibung/Grammatik/Ausdruck zu
+   korrigieren. Je Prozess gerahmt (Widerspruch=Lücken, Erstantrag=Pflegebedarf,
+   Höherstufung=Verschlechterung). Die Anhörungs-Einleitung ist gerechnet (Dreiklang) plus
+   Notiz-Kurzfassung. Die inhaltliche Qualität ist nur mit gültigem KI-Schlüssel im echten
+   Betrieb beurteilbar.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1359,8 +1406,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2111 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe + 13 Zeiterfassung).
+Der Selbsttest umfasst 2128 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe + 13 Zeiterfassung + 17 Ergaenzen-statt-Loeschen/Medikation).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

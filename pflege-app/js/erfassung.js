@@ -46,6 +46,16 @@ const APPLIKATION = ['oral (Tabletten, Tropfen, Säfte)', 'über PEG', 'Augentro
    Zur Reihenfolge: Sie steigt vom geringsten zum größten Aufwand. */
 const MEDIKATION_HILFE = ['selbständig', 'Erinnerung', 'Bereitstellen', 'Stellen', 'Gabe durch Pflegeperson'];
 
+/* Beschreibende Angaben zur Medikation (Regel 76). Rein dokumentierend – sie verändern die
+   Bewertung NICHT (nach der BRi zählt der Applikationsort und die Häufigkeit, nicht Form oder
+   Einnahmezeitpunkt). Sie machen das Schriftstück aber genauer und entlasten den Berater vom
+   Eintippen jedes einzelnen Präparats. */
+const MEDIKATION_FORM = ['Tablette oder Kapsel', 'Tropfen', 'Saft oder Lösung',
+    'Dosieraerosol oder Pulverinhalator', 'Zäpfchen', 'Pflaster', 'Injektion',
+    'Salbe oder Creme', 'Augentropfen', 'Ohrentropfen', 'Nasenspray'];
+const MEDIKATION_EINNAHME = ['unabhängig', 'nüchtern', 'zu den Mahlzeiten', 'nach den Mahlzeiten', 'vor dem Schlafen'];
+const JA_NEIN = ['ja', 'nein'];
+
 const HILFSMITTEL_NUTZUNG = ['genutzt', 'ungenutzt'];
 
 /* Behandlungspflege: nur noch die eigentlichen pflegerischen Maßnahmen.
@@ -132,16 +142,23 @@ const ERFASSUNG_TABELLEN = [
         /* Eine Zeile je Applikationsort – die einzelnen Präparate werden nicht benannt.
            Nach der BRi zählt die Häufigkeit je Ort, nicht die Zahl der Arzneimittel. */
         hinweis: 'Nur ärztlich verordnete Dauermedikation. Eine Zeile je Applikationsort – nicht je '
-               + 'Medikament. Nach der BRi zählt die Applikationshäufigkeit, unabhängig davon, wie viele '
-               + 'Arzneimittel dort gegeben werden; Augen und Ohren zählen als je ein Ort. Die Zahl der '
-               + 'Präparate wird nur festgehalten und verändert die Bewertung nicht. Wird verabreicht, '
-               + 'wird das Stellen nicht zusätzlich gezählt. Alles außer „selbständig" fließt in Modul 5 ein.',
+               + 'Medikament; die einzelnen Präparate müssen nicht benannt werden, nur ihre Anzahl. '
+               + 'Nach der BRi zählt die Applikationshäufigkeit, unabhängig davon, wie viele Arzneimittel '
+               + 'dort gegeben werden; Augen und Ohren zählen als je ein Ort. Darreichungsform, '
+               + 'Einnahmezeitpunkt, Zahl der Präparate und „dauerhaft" werden nur festgehalten und '
+               + 'verändern die Bewertung NICHT. Wird verabreicht, wird das Stellen nicht zusätzlich '
+               + 'gezählt. Alles außer „selbständig" fließt in Modul 5 ein.',
         spalten: [
             { k: 'applikation', l: 'Applikationsort', typ: 'select', opt: APPLIKATION, frei: true,
               platzhalter: 'z. B. Nasenspray, Vaginalzäpfchen' },
-            { k: 'praeparate', l: 'Unterschiedliche Präparate', typ: 'number', b: '110px' },
-            { k: 'anzahl', l: 'Anzahl', typ: 'number', b: '80px' },
+            { k: 'form', l: 'Darreichungsform', typ: 'select', opt: MEDIKATION_FORM, frei: true,
+              b: '160px', platzhalter: 'eigene Form' },
+            { k: 'praeparate', l: 'Anzahl Medikamente', typ: 'number', b: '100px' },
+            { k: 'dauerhaft', l: 'Dauerhaft', typ: 'select', opt: JA_NEIN, b: '90px' },
+            { k: 'anzahl', l: 'Häufigkeit', typ: 'number', b: '90px' },
             { k: 'zeitraum', l: 'Zeitraum', typ: 'select', opt: HAEUFIGKEIT_ZEITRAUM, b: '120px' },
+            { k: 'einnahme', l: 'Einnahme', typ: 'select', opt: MEDIKATION_EINNAHME, frei: true, b: '150px',
+              platzhalter: 'eigene Angabe' },
             { k: 'unterstuetzung', l: 'Unterstützung', typ: 'select', opt: MEDIKATION_HILFE, b: '190px',
               frei: true, platzhalter: 'eigene Beschreibung der Hilfe' }
         ]

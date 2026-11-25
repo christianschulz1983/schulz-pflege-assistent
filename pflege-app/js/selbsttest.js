@@ -2018,16 +2018,14 @@ async function selbsttest() {
             updateValue('zweit', k('4.4.1').id, 1);
             pruefeWahr('Handkorrektur verwirft die Zusammenfassung', !stateZweit.extracted);
 
-            // Ein neu eingelesenes Erstgutachten setzt die dritte Spalte zurück
-            // Nicht am Wortlaut der Zeile prüfen, sondern an der Wirkung – sonst
-            // scheitert die Prüfung an jeder Erweiterung des Zustands (zuletzt an der
-            // hinzugekommenen Kontinenzangabe).
+            // Regel 75: Ein neu eingelesenes Erstgutachten LÄSST das Anhörungsgutachten jetzt
+            // stehen – ein Upload ergänzt, löscht nicht. Zurückgesetzt wird nur über „Neuer Fall".
             const merkO2 = stateOrig, merkE2 = stateEigene, merkZ2 = stateZweit;
             try {
                 stateZweit.values[k('4.4.1').id] = 3;
                 applyImportedData(normalizeImport({ values_orig: [], _localValues: true }));
-                pruefeWahr('Neues Erstgutachten leert das Anhörungsgutachten',
-                    Object.keys(stateZweit.values || {}).length === 0);
+                pruefeWahr('Import bewahrt das Anhörungsgutachten (ergänzt statt löscht)',
+                    (stateZweit.values || {})[k('4.4.1').id] === 3);
             } finally { stateOrig = merkO2; stateEigene = merkE2; stateZweit = merkZ2; }
 
             stateZweit = merkZweit;
@@ -3249,7 +3247,7 @@ async function selbsttest() {
             // ---------- 13b. Medikation: eine Zeile je Applikationsort (BRi F 4.5.1) ----------
             const medSp = ERFASSUNG_TABELLEN.find(t => t.id === 'medikation').spalten.map(s => s.k);
             pruefe('Medikation: Spalten je Applikationsort', medSp,
-                ['applikation', 'praeparate', 'anzahl', 'zeitraum', 'unterstuetzung']);
+                ['applikation', 'form', 'praeparate', 'dauerhaft', 'anzahl', 'zeitraum', 'einnahme', 'unterstuetzung']);
             pruefeWahr('Medikation: kein Feld mehr für einzelne Medikamente', medSp.indexOf('bezeichnung') === -1);
             pruefeWahr('Augen und Ohren sind getrennte Applikationsorte',
                 APPLIKATION.indexOf('Augentropfen') > -1 && APPLIKATION.indexOf('Ohrentropfen') > -1
@@ -3802,8 +3800,9 @@ async function selbsttest() {
             ITEMS.forEach(i => { vmLeer[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
             applyImportedData({ stam: {}, diagnoses: [], anamnese: '', befund: '', special: 0,
                                 valuesMap: vmLeer, provided: new Set() });
-            pruefeWahr('Neues Gutachten leert das Anzeigefeld der Stellungnahme',
-                !(document.getElementById('appeal-document')?.innerHTML || '').trim());
+            // Regel 75: Upload bewahrt die geschriebene Stellungnahme (ergänzt statt löscht).
+            pruefeWahr('Neues Gutachten bewahrt das Anzeigefeld der Stellungnahme',
+                !!(document.getElementById('appeal-document')?.innerHTML || '').trim());
 
             // Ältere Falldateien (ohne Befund, Erfassung und Vorgangsart) müssen weiter laden
             const altJson = JSON.stringify({
@@ -4000,7 +3999,9 @@ async function selbsttest() {
                 (document.querySelector('#vorschlag-overlay .review-header .btn-primary')
                     .getAttribute('onclick') || '').indexOf('uebernehmeVorbefund') > -1);
 
-            // Ohne Haken darf nichts geschrieben werden
+            // Ohne Haken darf nichts geschrieben werden (Befund zuvor leeren – Regel 75:
+            // ein vorheriger Import räumt nicht mehr auf).
+            befundLaden({});
             pruefe('Ohne Auswahl wird nichts übernommen', uebernehmeVorbefund(), 0);
             pruefe('Befund bleibt leer', Object.keys(befundWerte).length, 0);
 
@@ -4200,12 +4201,14 @@ async function selbsttest() {
             rvVorbefund('e', gehIdx, false);
             pruefe('Abwählen in der Prüfansicht wirkt', vb20.erfassung[gehIdx]._an, false);
 
-            // 20d. Freigabe: Der vorige Fall verschwindet, der neue steht in der Maske
-            erfassungLaden({ tabellen: { pflegepersonen: [{ name: 'Vorige Person', adresse: 'Alte Straße 1' }, {}] }, extra: { pg: '' } });
+            // 20d. Freigabe: der neue Fall steht in der Maske. Regel 75: der Import räumt nicht
+            // mehr auf – für diese Prüfung startet die Erfassung deshalb leer; einen echten neuen
+            // Fall beginnt der Berater über „Neuer Fall".
+            erfassungLaden({});
             befundLaden({ texte: { groesse: '199' } });
             applyImportedData(rev20);
             const pp20 = erfassung.pflegepersonen || [];
-            pruefeWahr('Daten des vorigen Falls sind weg', !pp20.some(z => z.name === 'Vorige Person'));
+            pruefeWahr('Keine fremden Zeilen in der Maske', !pp20.some(z => z.name === 'Vorige Person'));
             pruefeWahr('Pflegeperson steht in der Maske', pp20.some(z => z.name === 'Otto Probe' && z.tage === '2'));
             pruefeWahr('Hilfsmittel steht in der Maske', (erfassung.hilfsmittel || []).some(z => z.bezeichnung === 'Rollator'));
             pruefeWahr('Abgewähltes wird nicht eingetragen', !(erfassung.hilfsmittel || []).some(z => z.bezeichnung === 'Gehstock'));
@@ -4253,8 +4256,10 @@ async function selbsttest() {
             pruefe('Keine Tabellenmarkierung im Erstantrag', erfVgAnzahl('arztbesuche'), 0);
             setzeModus('hoeherstufung');
 
-            // 20f. Im Widerspruch trägt die Freigabe keine Versorgung ein
+            // 20f. Im Widerspruch trägt die Freigabe keine Versorgung ein. Regel 75: der Import
+            // räumt nicht mehr auf, deshalb hier zuerst leeren.
             setzeModus('widerspruch');
+            erfassungLaden({}); befundLaden({});
             applyImportedData(normalizeImport({ values_orig: [], diagnoses: [], versorgung: versorgung20 }));
             pruefeWahr('Widerspruch: keine Versorgungszeilen eingetragen',
                 !(erfassung.hilfsmittel || []).some(z => Object.keys(z).length));
@@ -7521,6 +7526,87 @@ async function selbsttest() {
             } finally {
                 nachImportModalSchliessen();
                 appModus = merkModus72;
+            }
+        }
+
+        // ---------- 75/76. Upload ergänzt statt löscht · Medikationsspalten · Einleitung ----------
+        /* Punkt 2 (Regel 75): Ein Upload löscht nichts mehr, er ergänzt nur; „Neuer Fall" setzt
+           zurück. Punkt 4: der Timer läuft beim Upload weiter. Punkt 3 (Regel 76): beschreibende
+           Medikationsspalten. Punkt 1: die Einleitung verlangt Treue zu den Notizen. Der Zustand
+           wird vor dem Abschnitt gesichert und danach vollständig wiederhergestellt. */
+        if (typeof neuerFallZuruecksetzen === 'function') {
+            const s75 = {
+                erf: fallDaten().erfassung, bef: fallDaten().befund,
+                notes: erstgespraechNotes, draft: (typeof appealDraft !== 'undefined') ? appealDraft : '',
+                o: stateOrig, e: stateEigene, z: stateZweit,
+                zeit: (typeof zeitState === 'function') ? zeitState() : null,
+                modus: appModus, felder: {}
+            };
+            document.querySelectorAll('#tab-1 [id^="stam-"]').forEach(el => { s75.felder[el.id] = el.value; });
+            try {
+                setzeModus('widerspruch');
+                neuerFallZuruecksetzen();
+                // Ausgangslage: der Berater hat schon Notizen, Erfassung, Name, Stellungnahme und Timer
+                erstgespraechNotes = 'Frau Muster wäscht sich 100 Mal am Tag die Hände.';
+                document.getElementById('erstgespraech-notes').value = erstgespraechNotes;
+                document.getElementById('stam-betreffend').value = 'Muster, Sabine';
+                erfassungLaden({ tabellen: { pflegepersonen: [{ name: 'Ehemann Muster' }, {}] } });
+                if (typeof setzeStellungnahme === 'function') setzeStellungnahme('<p>Mein Entwurf</p>');
+                if (typeof zeitStart === 'function') zeitStart('et');
+
+                // Gutachten-Upload: füllt NUR leere Stammfelder, bewahrt alles andere
+                const vm75 = {}; ITEMS.forEach(i => { vm75[i.id] = (i.m === 5 && i.group !== 'D') ? { count: 0, period: 'W' } : 0; });
+                applyImportedData({ stam: { betreffend: 'Falscher Name', kasse: 'AOK Nord' },
+                    diagnoses: [{ icd: 'G30', text: 'Demenz' }], anamnese: '', befund: '', special: 0,
+                    valuesMap: vm75, provided: new Set() });
+                pruefe('Upload bewahrt die Notizen', erstgespraechNotes, 'Frau Muster wäscht sich 100 Mal am Tag die Hände.');
+                pruefeWahr('Upload bewahrt die Erfassung', (erfassung.pflegepersonen || []).some(z => z.name === 'Ehemann Muster'));
+                pruefeWahr('Upload bewahrt die geschriebene Stellungnahme',
+                    (((typeof appealDraft !== 'undefined') ? appealDraft : '') + ((document.getElementById('appeal-document') || {}).innerHTML || '')).includes('Mein Entwurf'));
+                pruefe('Ausgefülltes Stammfeld bleibt (Name hat Vorrang)', document.getElementById('stam-betreffend').value, 'Muster, Sabine');
+                pruefe('Leeres Stammfeld wird aus dem Gutachten gefüllt (Kasse)', document.getElementById('stam-kasse').value, 'AOK Nord');
+                pruefeWahr('Upload lässt den laufenden Timer weiterlaufen (Punkt 4)', zeitLaufend === 'et');
+                let g30 = false;
+                for (let i = 1; document.getElementById('diag-icd-' + i); i++) {
+                    if ((document.getElementById('diag-icd-' + i).value || '').toUpperCase() === 'G30') g30 = true;
+                }
+                pruefeWahr('Diagnose aus dem Gutachten wird ergänzt', g30);
+
+                // „Neuer Fall" setzt alles zurück
+                neuerFallZuruecksetzen();
+                pruefe('Neuer Fall leert die Notizen', erstgespraechNotes, '');
+                pruefeWahr('Neuer Fall leert die Erfassung', !(erfassung.pflegepersonen || []).some(z => z.name === 'Ehemann Muster'));
+                pruefe('Neuer Fall leert das Namensfeld', document.getElementById('stam-betreffend').value, '');
+                pruefeWahr('Neuer Fall stoppt und leert den Timer', zeitLaufend === null && (zeitSek.et || 0) === 0);
+            } finally {
+                neuerFallZuruecksetzen();
+                stateOrig = s75.o; stateEigene = s75.e; stateZweit = s75.z;
+                if (typeof erfassungLaden === 'function') erfassungLaden(s75.erf);
+                if (typeof befundLaden === 'function') befundLaden(s75.bef);
+                erstgespraechNotes = s75.notes;
+                const nEl = document.getElementById('erstgespraech-notes'); if (nEl) nEl.value = s75.notes;
+                if (typeof setzeStellungnahme === 'function') setzeStellungnahme(s75.draft);
+                Object.keys(s75.felder).forEach(id => { const el = document.getElementById(id); if (el) el.value = s75.felder[id]; });
+                if (s75.zeit && typeof zeitLadeState === 'function') zeitLadeState(s75.zeit);
+                if (typeof zeitTickerStop === 'function') zeitTickerStop();
+                setzeModus(s75.modus);
+            }
+
+            // Punkt 1: Die Einleitung verlangt Treue zu den Notizen und korrekte Sprache.
+            if (typeof allgemeinAufgabe === 'function') {
+                const auf75 = allgemeinAufgabe('hoeherstufung') + allgemeinAufgabe('widerspruch');
+                pruefeWahr('Einleitung verlangt konkrete Angaben statt Floskeln', /VERALLGEMEINERE NICHT/.test(auf75));
+                pruefeWahr('Einleitung verlangt korrekte Rechtschreibung und Ausdruck', /Korrigiere Rechtschreibung/.test(auf75));
+            }
+
+            // Punkt 3 (Regel 76): neue beschreibende Medikationsspalten; Scoring bleibt unberührt.
+            if (typeof ERFASSUNG_TABELLEN !== 'undefined') {
+                const medKeys = (ERFASSUNG_TABELLEN.find(t => t.id === 'medikation').spalten || []).map(s => s.k);
+                pruefeWahr('Medikation: Darreichungsform vorhanden', medKeys.indexOf('form') > -1);
+                pruefeWahr('Medikation: Einnahmezeitpunkt vorhanden', medKeys.indexOf('einnahme') > -1);
+                pruefeWahr('Medikation: „dauerhaft" vorhanden', medKeys.indexOf('dauerhaft') > -1);
+                pruefeWahr('Medikation: Applikationsort und Häufigkeit (Scoring) bleiben',
+                    medKeys.indexOf('applikation') > -1 && medKeys.indexOf('anzahl') > -1 && medKeys.indexOf('zeitraum') > -1);
             }
         }
 

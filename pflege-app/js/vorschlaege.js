@@ -393,7 +393,15 @@ function allgemeinAufgabe(vorgang) {
         + `Zusammenhängender Fließtext, 2 bis 3 knappe Absätze (durch Leerzeile getrennt),\n`
         + 'KEINE Aufzählungszeichen, individuell auf diesen Fall bezogen.\n'
         + 'ZWINGEND: Er baut auf MEINEN NOTIZEN auf. Übernimm deren Feststellungen und forme die\n'
-        + 'Stichpunkte zu Fließtext aus, ohne Inhalte zu verändern oder hinzuzuerfinden.\n';
+        + 'Stichpunkte zu Fließtext aus, ohne Inhalte zu verändern oder hinzuzuerfinden.\n'
+        + 'TREUE ZU DEN NOTIZEN: Übernimm die KONKRETEN Angaben – benannte Tätigkeiten, '
+        + 'Häufigkeiten („mehrmals täglich", „in der Nacht"), wer wobei und wie oft hilft, '
+        + 'konkrete Einschränkungen. VERALLGEMEINERE NICHT zu Floskeln („erheblich eingeschränkt", '
+        + '„hoher Unterstützungsbedarf") und lass nichts Wesentliches aus den Notizen weg; bei '
+        + 'Platzmangel kürze die unwichtigeren Punkte, nicht die konkreten Beispiele.\n'
+        + 'SPRACHE: Korrigiere Rechtschreibung, Grammatik und Ausdruck. Der Text muss fehlerfrei '
+        + 'und in sachlichem, gepflegtem pflegefachlichem Deutsch formuliert sein (keine '
+        + 'Umgangssprache, keine Stichwort-Reste aus den Notizen).\n';
 
     // Diese Sperre ist der Kern der Änderung: keine Begründung, keine Richtlinien, keine Stufen.
     // Im Antrag heißt der nachfolgende Abschnitt anders – er ist keine Begründung je Kriterium.

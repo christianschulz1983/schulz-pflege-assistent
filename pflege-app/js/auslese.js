@@ -1325,55 +1325,73 @@ function closeReview() {
 
 // Übernimmt die (geprüften/korrigierten) Werte in die App.
 function applyImportedData(rev) {
+    /* PUNKT 2 (Regel 75): Ein Upload LÖSCHT NICHTS. Vorhandene Angaben – Notizen, Befund,
+       Erfassung, Zeiterfassung, Anlagen, die geschriebene Stellungnahme und ausgefüllte
+       Stammfelder – bleiben erhalten; das Gutachten ERGÄNZT nur (Vorgabe des Verfassers:
+       „nur sinnvoll ergänzt oder ausgetauscht, nie gelöscht"). Früher begann jeder Import
+       einen neuen Fall und leerte alles – getätigte Eintragungen waren verschwunden. Ein
+       echter neuer Fall läuft jetzt über neuerFallZuruecksetzen() (Knopf „Neuer Fall"). */
+    // Stammfelder und Diagnosen sichern, BEVOR init() die Diagnosezeilen neu baut.
+    const altStam = {};
+    document.querySelectorAll('#tab-1 [id^="stam-"]').forEach(el => { altStam[el.id] = (el.value || '').trim(); });
+    const altDiag = [];
+    for (let i = 1; document.getElementById('diag-icd-' + i) || document.getElementById('diag-txt-' + i); i++) {
+        const ic = ((document.getElementById('diag-icd-' + i) || {}).value || '').trim();
+        const tx = ((document.getElementById('diag-txt-' + i) || {}).value || '').trim();
+        if (ic || tx) altDiag.push({ icd: ic, text: tx });
+    }
+
     init();
-    // WICHTIG: zuerst ALLE Stammfelder leeren, damit keine Daten eines vorherigen Falls
-    // (anderer Person) stehen bleiben.
-    document.querySelectorAll('#tab-1 [id^="stam-"]').forEach(el => {
-        if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
-    });
     const setVal = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined && val !== null) el.value = val; };
-    setVal('stam-betreffend', rev.stam.betreffend);
-    setVal('stam-geboren', rev.stam.geboren);
-    const elKunde = document.getElementById('stam-kundennummer'); if (elKunde) elKunde.value = '';
-    setVal('stam-kasse', rev.stam.kasse);
-    setVal('stam-versnr', rev.stam.versnr);
-    setVal('stam-bescheid', rev.stam.bescheid);
-    setVal('stam-antrag', rev.stam.antrag);
-    setVal('stam-organisation', rev.stam.organisation);
-    setVal('stam-begutachtung', rev.stam.begutachtung);
-    setVal('stam-art', normalizeArt(rev.stam.art));
-    setVal('stam-pg-manual', rev.stam.pg);
-    setVal('stam-pts-manual', rev.stam.pts);
-    setVal('stam-anamnese', rev.anamnese);
-    setVal('stam-befund', rev.befund);
+    // Stammfelder: Ausgefülltes bleibt (Handeintrag hat Vorrang), Leeres wird aus dem Gutachten
+    // gefüllt. Abweichungen zeigt die Prüfansicht, überschrieben wird nichts (Regel 11).
+    const fuelleLeer = (id, val) => {
+        const el = document.getElementById(id); if (!el) return;
+        if (altStam[id]) el.value = altStam[id];
+        else if (val !== undefined && val !== null && String(val) !== '') el.value = val;
+    };
+    fuelleLeer('stam-betreffend', rev.stam.betreffend);
+    fuelleLeer('stam-geboren', rev.stam.geboren);
+    // Kundennummer steht nicht im Gutachten – einen Handeintrag behalten.
+    const elKunde = document.getElementById('stam-kundennummer');
+    if (elKunde && altStam['stam-kundennummer']) elKunde.value = altStam['stam-kundennummer'];
+    fuelleLeer('stam-kasse', rev.stam.kasse);
+    fuelleLeer('stam-versnr', rev.stam.versnr);
+    fuelleLeer('stam-bescheid', rev.stam.bescheid);
+    fuelleLeer('stam-antrag', rev.stam.antrag);
+    fuelleLeer('stam-organisation', rev.stam.organisation);
+    fuelleLeer('stam-begutachtung', rev.stam.begutachtung);
+    // Durchführungsart: nur füllen, wenn noch keine gewählt ist.
+    (function () {
+        const el = document.getElementById('stam-art'); if (!el) return;
+        if (altStam['stam-art']) el.value = altStam['stam-art'];
+        else if (rev.stam.art) el.value = normalizeArt(rev.stam.art);
+    })();
+    fuelleLeer('stam-anamnese', rev.anamnese);
+    fuelleLeer('stam-befund', rev.befund);
+    // GESAMTPUNKTE/PFLEGEGRAD (GUTACHTEN) werden unten aus der Rechnung gesetzt (Regel 67).
     // Geburts- und Begutachtungsdatum stehen jetzt fest – Altersklasse nachziehen.
     if (typeof kinderAnsichtAktualisieren === 'function') kinderAnsichtAktualisieren();
-    // Tabelle auf die Anzahl der eingelesenen Diagnosen erweitern und alle übernehmen
-    ensureDiagRows((rev.diagnoses || []).length);
-    (rev.diagnoses || []).forEach((d, idx) => { setVal(`diag-icd-${idx + 1}`, d.icd); setVal(`diag-txt-${idx + 1}`, d.text); });
+    // Diagnosen zusammenführen: vorhandene behalten, neue aus dem Gutachten ergänzen (ohne Dubletten).
+    const diagMerge = altDiag.slice();
+    (rev.diagnoses || []).forEach(d => {
+        const neu = { icd: (d.icd || '').trim(), text: (d.text || '').trim() };
+        if (!neu.icd && !neu.text) return;
+        const schon = diagMerge.some(x =>
+            (neu.icd && x.icd && x.icd.toUpperCase() === neu.icd.toUpperCase()) ||
+            (!neu.icd && !x.icd && x.text && neu.text && x.text.toLowerCase() === neu.text.toLowerCase()));
+        if (!schon) diagMerge.push(neu);
+    });
+    ensureDiagRows(Math.max(DIAG_MIN_ROWS, diagMerge.length));
+    diagMerge.forEach((d, idx) => { setVal(`diag-icd-${idx + 1}`, d.icd); setVal(`diag-txt-${idx + 1}`, d.text); });
 
-    // Kontinenzangabe: unbekannt, bis sie erhoben ist (Voraussetzung fuer 4.4.11/4.4.12)
-    stateOrig = { special: rev.special || 0, values: {}, kontinenz: { harn: null, stuhl: null } };
-    stateEigene = { special: rev.special || 0, values: {}, kontinenz: { harn: null, stuhl: null } };
-    // Ein neu eingelesenes Erstgutachten beginnt einen neuen Fall – ein etwaiges
-    // Zweitgutachten aus einem früheren Anhörungsverfahren gehört nicht dazu.
-    stateZweit = { special: 0, values: {}, kontinenz: { harn: null, stuhl: null } };
-    // Auch das Anzeigefeld leeren – sonst gehörte die Stellungnahme des vorigen Falls
-    // beim nächsten Speichern zu diesem hier.
-    if (typeof setzeStellungnahme === 'function') setzeStellungnahme(""); else appealDraft = "";
-    erstgespraechNotes = "";
-    /* Befunderhebung und Erfassungstabellen gehören ebenso zum Fall. Sie wurden bisher NICHT
-       geleert: Nach dem Einlesen eines neuen Gutachtens standen Pflegepersonen mit Namen und
-       Anschrift, Medikation und Befund der VORIGEN Person weiter in der Maske – und wurden mit
-       dem neuen Fall gespeichert. */
-    if (typeof befundLaden === 'function') befundLaden({});
-    // Neuer Fall: Begruendungen frueher uebernommener Vorschlaege gehoeren nicht dazu
-    if (typeof vorschlagGruende !== 'undefined') vorschlagGruende = {};
-    if (typeof erfassungLaden === 'function') erfassungLaden({});
-    // Neuer Fall: die Zeiterfassung der vorigen Person zurücksetzen (js/zeit.js, Regel 74)
-    if (typeof zeitReset === 'function') zeitReset();
-    // Unterlagen, Anlagen und gemerkte Stellungnahme der vorigen Person (js/anhang.js)
-    if (typeof unterlagenZuruecksetzen === 'function') unterlagenZuruecksetzen(true);
+    // Bewertungen des Gutachtens setzen – das ist der Zweck des Imports („ausgetauscht").
+    // Notizen, Befund, Erfassung, Zeiterfassung, Anlagen und die geschriebene Stellungnahme
+    // bleiben UNANGETASTET (Regel 75); stateZweit (Anhörung) und die Kontinenzangabe ebenso.
+    stateOrig = { special: rev.special || 0, values: {},
+                  kontinenz: (stateOrig && stateOrig.kontinenz) || { harn: null, stuhl: null } };
+    stateEigene = { special: rev.special || 0, values: {},
+                    kontinenz: (stateEigene && stateEigene.kontinenz) || { harn: null, stuhl: null } };
     // extracted nur setzen, wenn es eine KI-Zusammenfassung gibt; sonst wird das
     // Vorgutachten aus den (präzisen) Einzelkriterien berechnet.
     if (rev.extracted) {
@@ -1410,6 +1428,56 @@ function applyImportedData(rev) {
     if (typeof vorbefundImportUebernehmen === 'function') vorbefundImportUebernehmen(rev);
     if (typeof renderErfassung === 'function') renderErfassung();
     setTimeout(() => { autoResize(document.getElementById('stam-anamnese')); autoResize(document.getElementById('stam-befund')); }, 200);
+}
+
+/* Echter neuer Fall: alles zurücksetzen (Regel 75). Das tat früher jeder Gutachten-Import –
+   jetzt nur noch dieser Knopf, damit ein Upload keine Angaben mehr löscht. */
+function neuerFallZuruecksetzen() {
+    init();
+    document.querySelectorAll('#tab-1 [id^="stam-"]').forEach(el => {
+        if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+    });
+    ensureDiagRows(DIAG_MIN_ROWS);
+    for (let i = 1; document.getElementById('diag-icd-' + i); i++) {
+        const ic = document.getElementById('diag-icd-' + i), tx = document.getElementById('diag-txt-' + i);
+        if (ic) ic.value = ''; if (tx) tx.value = '';
+    }
+    stateOrig = { special: 0, values: {}, kontinenz: { harn: null, stuhl: null } };
+    stateEigene = { special: 0, values: {}, kontinenz: { harn: null, stuhl: null } };
+    stateZweit = { special: 0, values: {}, kontinenz: { harn: null, stuhl: null } };
+    if (typeof setzeStellungnahme === 'function') setzeStellungnahme(""); else appealDraft = "";
+    erstgespraechNotes = "";
+    const notes = document.getElementById('erstgespraech-notes'); if (notes) notes.value = "";
+    if (typeof befundLaden === 'function') befundLaden({});
+    if (typeof erfassungLaden === 'function') erfassungLaden({});
+    if (typeof vorschlagGruende !== 'undefined') vorschlagGruende = {};
+    if (typeof zeitReset === 'function') zeitReset();
+    if (typeof unterlagenZuruecksetzen === 'function') unterlagenZuruecksetzen(true);
+    if (typeof veraltetZuruecksetzen === 'function') veraltetZuruecksetzen();
+    if (typeof protokollLeeren === 'function') protokollLeeren();
+    fillTable('orig'); fillTable('own'); calculate('orig'); calculate('own'); syncSpecialUI();
+    if (typeof kinderAnsichtAktualisieren === 'function') kinderAnsichtAktualisieren();
+    if (typeof renderErfassung === 'function') renderErfassung();
+    if (typeof renderZeiterfassung === 'function') renderZeiterfassung();
+}
+
+// Knopf „Neuer Fall": erst nachfragen, dann zurücksetzen (nutzt das Modal aus js/nachimport.js).
+function neuerFallBestaetigen() {
+    if (typeof nachImportModal === 'function') {
+        nachImportModal('Neuen Fall beginnen?',
+            'Alle erfassten Angaben dieses Falls – Notizen, Befund, Erfassung, Zeiterfassung, '
+            + 'Anlagen und die geschriebene Stellungnahme – werden zurückgesetzt. Ihr zuletzt '
+            + 'gespeicherter Fall bleibt als Datei erhalten.',
+            [
+                { text: 'Abbrechen', kind: 'btn-secondary', fn: null },
+                { text: 'Ja, neuer Fall', kind: 'btn-primary', fn: function () {
+                    neuerFallZuruecksetzen();
+                    if (typeof showToast === 'function') showToast('Neuer Fall – alle Angaben zurückgesetzt.', 'success');
+                } }
+            ]);
+    } else if (confirm('Neuen Fall beginnen? Alle erfassten Angaben werden zurückgesetzt.')) {
+        neuerFallZuruecksetzen();
+    }
 }
 
 function applyReviewedImport() {
