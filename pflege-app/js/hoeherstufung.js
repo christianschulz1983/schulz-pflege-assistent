@@ -40,7 +40,22 @@ function befundBlock() {
         if (BEFUND_GRUPPEN_DOPPELT.indexOf(g.id) !== -1) return;
         const zeilen = [];
         g.eintraege.forEach(e => {
-            if (e.nba) return;                    // steht in den Lebensbereichen
+            if (e.nba) {
+                // Regel 80: NUR die kognitive Befunderhebung (Modul 2, Gruppe 'kognition')
+                // erscheint auf Wunsch des Verfassers als Tabelle. Vorher wurden NBA-Kriterien
+                // im Befund überall übersprungen (Regel 19) – sie standen nur im Lebensbereich.
+                // Jetzt wird ein EINGESCHRÄNKTES Modul-2-Kriterium mit seiner Einschätzung als
+                // Zeile aufgenommen; „unbeeinträchtigt" (Stufe 0) bleibt weg, damit die Tabelle
+                // nur die Befunde zeigt. Die NBA-Kriterien der Mobilität (Modul 1) und des
+                // Moduls 6 bleiben unverändert außen vor (Regel 19). Rein beschreibend –
+                // gerechnet wird weiter über die Lebensbereiche (Regel 11).
+                if (g.id === 'kognition' && typeof antragStufe === 'function') {
+                    const item = ITEMS.find(i => i.nr === e.nba);
+                    const lab = item ? antragStufe(item, stateEigene.values[item.id]) : null;
+                    if (lab) zeilen.push([nummernImText(item.nr + ' ' + item.title), lab]);
+                }
+                return;
+            }
             if (e.frei) {
                 const t = befundTexte[e.id];
                 if (t && t.trim()) zeilen.push([e.titel, t]);

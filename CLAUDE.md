@@ -3,12 +3,12 @@
 Diese Datei wird bei jeder Sitzung automatisch geladen. Sie ersetzt das fehlende
 Gedächtnis zwischen Sitzungen. Bei Änderungen an der Arbeitsweise hier nachtragen.
 
-**Mastercode: v67.01** (Stand 27.11.2026). Geprüfter, freigegebener Referenzstand –
-Git-Tag `v67.01-master` (Vorgänger `v67.00-master`). Selbsttest 2153/2153 grün, alle
-JS-Dateien syntaktisch sauber, lokal und Remote identisch. Zuletzt: Die psychischen
-Problemlagen (Modul 3) erscheinen jetzt als eigene Tabelle unter der Kognition im
-Schriftstück des Erst-/Höherstufungsantrags (Regel 79) – vorher standen sie nur als
-Einschätzungszeile im Lebensbereich und tauchten im Befund gar nicht auf.
+**Mastercode: v67.02** (Stand 27.11.2026). Geprüfter, freigegebener Referenzstand –
+Git-Tag `v67.02-master` (Vorgänger `v67.01-master`). Selbsttest 2156/2156 grün, alle
+JS-Dateien syntaktisch sauber, lokal und Remote identisch. Zuletzt: Die kognitive
+Befunderhebung (Modul 2) erscheint im Erst-/Höherstufungsantrag jetzt ebenfalls als Tabelle
+(Regel 80), passend zur Problemlagen-Tabelle (Regel 79) – nur die Kognition-Gruppe, Modul 1
+und 6 bleiben außen vor (Regel 19), die 7-Seiten-Grenze hält.
 Wiederherstellungspunkt für alles Weitere.
 
 ## Was die App ist
@@ -1433,6 +1433,27 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    Bewertung/Bemerkung, Überschrift und Spalten im HTML, Tabelle steht im Befundblock hinter
    der Kognition, ohne Problemlage leer.
 
+80. **Kognitive Befunderhebung (Modul 2) als Tabelle** (`befundBlock` in `js/hoeherstufung.js`).
+   Vorgabe des Verfassers (Höherstufungsantrag): „Da führe ich doch eine Befunderhebung der
+   Kognition und der Problemlagen durch. Das muss in einer Tabelle der generierten Stellungnahme
+   hinzugefügt werden." Die Problemlagen stehen seit Regel 79 als Tabelle; Regel 80 ergänzt die
+   Kognition. Vorher übersprang `befundBlock()` ALLE NBA-Kriterien (Regel 19) – sie standen nur
+   in den Lebensbereichen. Jetzt nimmt die Befundtabelle der Gruppe `kognition` jedes
+   EINGESCHRÄNKTE Modul-2-Kriterium (4.2.x) mit seiner Einschätzung als Zeile auf; „unbeeinträchtigt"
+   (Stufe 0) bleibt weg, damit die Tabelle nur die Befunde zeigt.
+   - **NUR die Gruppe `kognition`.** Der Befundkatalog hat NBA-Einträge auch in der Mobilität
+     (Modul 1: 4.1.x, u.a. „Positionswechsel im Bett") und im Modul 6 (4.6.x). Diese bleiben
+     unverändert außen vor (Regel 19) – sonst stünde das halbe Instrument doppelt im Befund und
+     der Antrag riss die 7-Seiten-Grenze (gemessen: 8). Deshalb die Bedingung `g.id === 'kognition'`.
+   - **Rein beschreibend, Regel 11 unberührt** – gerechnet wird weiter über die Lebensbereiche
+     (`antragBereiche`); die Tabelle liest nur `stateEigene` über `antragStufe`.
+   - **Bewusste Ausnahme zu Regel 19** für Modul 2 und 3, auf ausdrücklichen Wunsch: Die
+     Einschränkung steht im Befund (Tabelle) UND im Lebensbereich (Prosa/Einschätzung). Der
+     Bestandstest „Befundtabellen enthalten keine NBA-Kriterien" prüft Modul 1
+     („Positionswechsel im Bett") und bleibt deshalb gültig.
+   Selbsttest „80": eingeschränktes Modul-2-Kriterium erscheint mit seiner Einschätzung im
+   Befundblock, ein unbeeinträchtigtes bleibt weg.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1497,8 +1518,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2153 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe + 13 Zeiterfassung + 17 Ergaenzen-statt-Loeschen/Medikation + 8 Modulsumme-Kriteriumszeile + 10 Unplausible-Vorab-Fuellung + 7 Problemlagen-Tabelle).
+Der Selbsttest umfasst 2156 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe + 13 Zeiterfassung + 17 Ergaenzen-statt-Loeschen/Medikation + 8 Modulsumme-Kriteriumszeile + 10 Unplausible-Vorab-Fuellung + 7 Problemlagen-Tabelle + 3 Kognition-Tabelle).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

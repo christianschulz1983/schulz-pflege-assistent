@@ -3136,6 +3136,21 @@ async function selbsttest() {
                 pruefe('Problemlagen-Tabelle: ohne Problemlage leer', psycheTabelleHtml(), '');
                 psycheListe = merkPsy;
             }
+            // ---------- 80. Kognitive Befunderhebung (Modul 2) als Tabelle ----------
+            if (typeof befundBlock === 'function' && typeof antragStufe === 'function') {
+                const i5 = krit('4.2.5').id, i1 = krit('4.2.1').id;
+                const m5alt = stateEigene.values[i5], m1alt = stateEigene.values[i1];
+                stateEigene.values[i5] = 1;   // eingeschränkt → gehört in die Tabelle
+                stateEigene.values[i1] = 0;   // unbeeinträchtigt → bleibt weg
+                const bb80 = befundBlock();
+                const lab80 = antragStufe(krit('4.2.5'), 1);
+                pruefeWahr('Kognition-Tabelle: eingeschränktes Modul-2-Kriterium erscheint', bb80.includes('4.2.5'));
+                pruefeWahr('Kognition-Tabelle: unbeeinträchtigtes Kriterium bleibt weg', !bb80.includes('4.2.1'));
+                pruefeWahr('Kognition-Tabelle: Einschätzung des Kriteriums steht dabei',
+                    !!lab80 && bb80.includes(lab80));
+                if (m5alt === undefined) delete stateEigene.values[i5]; else stateEigene.values[i5] = m5alt;
+                if (m1alt === undefined) delete stateEigene.values[i1]; else stateEigene.values[i1] = m1alt;
+            }
             // Entfernen stellt den Wert des Vorgutachtens wieder her
             stateOrig.values[krit('4.3.9').id] = 1;
             psycheSetzen(0, 'wertung', '2');
