@@ -3,12 +3,12 @@
 Diese Datei wird bei jeder Sitzung automatisch geladen. Sie ersetzt das fehlende
 Gedächtnis zwischen Sitzungen. Bei Änderungen an der Arbeitsweise hier nachtragen.
 
-**Mastercode: v67.00** (Stand 25.11.2026). Geprüfter, freigegebener Referenzstand –
-Git-Tag `v67.00-master` (Vorgänger `v66.99-master`). Selbsttest 2146/2146 grün, alle
-JS-Dateien syntaktisch sauber, lokal und Remote identisch. Zuletzt: Die lokale Vorab-Füllung
-nach einem KI-Abbruch trägt keine unplausiblen Angaben mehr ein – ein Briefkopf-Wort im Namen
-(„Frau Vorgangsnummer Anja"), eine ziffernlose Versicherungs-Nr. („Hinweis") und
-Diagnose-Satzfragmente bleiben leer statt geraten (Regel 78, lieber eine Lücke).
+**Mastercode: v67.01** (Stand 27.11.2026). Geprüfter, freigegebener Referenzstand –
+Git-Tag `v67.01-master` (Vorgänger `v67.00-master`). Selbsttest 2153/2153 grün, alle
+JS-Dateien syntaktisch sauber, lokal und Remote identisch. Zuletzt: Die psychischen
+Problemlagen (Modul 3) erscheinen jetzt als eigene Tabelle unter der Kognition im
+Schriftstück des Erst-/Höherstufungsantrags (Regel 79) – vorher standen sie nur als
+Einschätzungszeile im Lebensbereich und tauchten im Befund gar nicht auf.
 Wiederherstellungspunkt für alles Weitere.
 
 ## Was die App ist
@@ -1410,6 +1410,29 @@ weil die Oberfläche über `onclick` auf globale Funktionen zugreift.
    echte Stammfelder bleiben, Satzfragmente fliegen raus, Diagnosen mit/ohne ICD bleiben,
    plausibler Name/Versnr werden durchgereicht.
 
+79. **Psychische Problemlagen (Modul 3) als Tabelle unter der Kognition**
+   (`psycheTabelleHtml`, `psycheTabellenZeilen` in `js/befund.js`, `befundBlock` in
+   `js/hoeherstufung.js`). Vorgabe des Verfassers (mit Bild, Höherstufungsantrag, Frau Schütz):
+   „Auch müssen die psychischen Problemlagen in einer Tabelle unter der Kognition erfasst
+   werden." Vorher gingen die in der Befunderhebung erfassten Problemlagen (4.3.x: Bezeichnung,
+   Häufigkeit, Bewertung, Bemerkung) NUR als Einschätzungszeile in den Lebensbereich Modul 3
+   (`antragBereiche`) – im Befund des Schriftstücks tauchten sie gar nicht auf, weil die
+   Katalog-Gruppe `psyche` keine statischen `eintraege` hat (ihr Inhalt ist die dynamische
+   `psycheListe`). Jetzt baut `befundBlock()` für die Gruppe `psyche` eine eigene Tabelle
+   („Psychische Problemlagen", Spalten Problemlage · Häufigkeit · Bewertung · Bemerkung) aus
+   `psycheListe`. Die Gruppe `psyche` folgt im Katalog unmittelbar auf `kognition`, deshalb
+   steht die Tabelle genau „unter der Kognition". Nur im Erst-/Höherstufungsantrag
+   (`befundBlock` wird nur dort genutzt).
+   - **Rein beschreibend, Regel 11 unberührt** – die Tabelle liest nur `psycheListe`, setzt
+     keine Bewertung. Die Rechnung läuft weiter über `psycheUebernehmen` → `setzeBewertung`.
+   - **Bewusste Ausnahme zur Doppel-Erfassung (Regel 17):** Die Problemlage steht nun im Befund
+     (beschreibend: welche Problemlage, wie oft, Bemerkung) UND im Lebensbereich Modul 3
+     (die Einschätzung/Wertung). Zwei verschiedene Zwecke, auf ausdrücklichen Wunsch.
+   - Keine Problemlage erfasst → `psycheTabelleHtml()` gibt '' zurück (keine leere Tabelle).
+   Selbsttest „79": eine Zeile je Problemlage, vier Spalten mit Bezeichnung/Häufigkeit/
+   Bewertung/Bemerkung, Überschrift und Spalten im HTML, Tabelle steht im Befundblock hinter
+   der Kognition, ohne Problemlage leer.
+
 ## Fachliche Fallstricke (aus der Handreichung des Verfassers)
 - Hilfsmittel, die laut Regel zu „selbständig" führen, begründen **keine** Einschränkung
   (Rollator und Gehstock bei 4.1.4, Treppengeländer bei 4.1.5, Haltegriffe bei 4.1.3).
@@ -1474,8 +1497,8 @@ sie beim Versand bei. Gutachten des Medizinischen Dienstes und der Medicproof Gm
 beide eingelesen, als Text-PDF wie als Scan. Im Hoeherstufungsantrag laesst sich die
 Befunderhebung und die Versorgungstabellen schon beim Einlesen des Vorgutachtens
 fuellen (Regel 21).
-Der Selbsttest umfasst 2146 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
-+ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe + 13 Zeiterfassung + 17 Ergaenzen-statt-Loeschen/Medikation + 8 Modulsumme-Kriteriumszeile + 10 Unplausible-Vorab-Fuellung).
+Der Selbsttest umfasst 2153 Pruefungen (1596 Bestand + 87 Golden Master + 25 Schwellen
++ 42 Alter + 139 Alterstabelle + 22 Kriterienliste + 26 Differenzrechnung + 40 bis 18 Monate + 16 Startauswahl + 19 Uebernahme Modul 5 + 6 Modul-5-Anzeige + 15 KI-Antwort + 3 Vorgutachten-Karte + 5 Notizen-Begruendung + 3 Lokale-Diagnosen + 5 Kopffeld-Uebernahme + 8 Kriteriumszuordnung + 5 Kopffeld-Korrektur + 6 Modulsummen-Melder + 8 Bild-Nachfrage + 10 Konfliktaufloesung + 12 Komfort-Abläufe + 13 Zeiterfassung + 17 Ergaenzen-statt-Loeschen/Medikation + 8 Modulsumme-Kriteriumszeile + 10 Unplausible-Vorab-Fuellung + 7 Problemlagen-Tabelle).
 
 **Im Bau: Begutachtung von Kindern** (BRi Kapitel 5, Seiten 143–251). Stufenplan, in
 dieser Reihenfolge: 0 Messlatte (erledigt) · 1 Pflegegrad-Schwellen an eine Stelle

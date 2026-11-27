@@ -58,6 +58,11 @@ function befundBlock() {
             if ((x.titel || '').trim() || (x.text || '').trim()) zeilen.push([x.titel || '', x.text || '']);
         });
         if (zeilen.length) html += tabellenBlock(g.titel, ['Kriterium', 'Befund'], zeilen);
+        // Psychische Problemlagen (Modul 3) als eigene Tabelle – direkt unter der Kognition
+        // (die Gruppe 'psyche' folgt im Katalog unmittelbar auf 'kognition'). Regel 79:
+        // Vorgabe des Verfassers, sie müssen in einer Tabelle erscheinen, nicht nur als
+        // Einschätzungszeile im Lebensbereich Modul 3. Rein beschreibend (Regel 11).
+        if (g.sonder === 'psyche' && typeof psycheTabelleHtml === 'function') html += psycheTabelleHtml();
     });
     return html;
 }

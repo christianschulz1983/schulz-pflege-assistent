@@ -1422,6 +1422,18 @@ function applyImportedData(rev) {
     // Stammfelder und Diagnosen sichern, BEVOR init() die Diagnosezeilen neu baut.
     const altStam = {};
     document.querySelectorAll('#tab-1 [id^="stam-"]').forEach(el => { altStam[el.id] = (el.value || '').trim(); });
+    // Die Mitschrift des Erstgesprächs sichern (Regel 75, Loch geschlossen). Sie steht NICHT
+    // unter „#tab-1 [id^=stam-]", sondern im Reiter „Einschätzung" (#erstgespraech-notes), den
+    // init() über innerHTML NEU aufbaut – dabei ging das Feld verloren und wurde nur aus der
+    // Variablen erstgespraechNotes wiederhergestellt. War die Variable nicht synchron, standen
+    // die Notizen nach einem Upload „wieder vollständig verschwunden" da. Deshalb den LIVE-Wert
+    // des Feldes sichern (Vorrang vor der Variablen – er ist, was der Berater sieht) und nach
+    // init() in Feld UND Variable zurückschreiben. Die Mitschrift ist die Hauptquelle der
+    // erzeugten Texte (Regel 49) und darf durch einen Import nie verloren gehen.
+    const altNotizFeld = (document.getElementById('erstgespraech-notes') || {}).value;
+    const altNotizen = (typeof altNotizFeld === 'string' && altNotizFeld.trim())
+        ? altNotizFeld
+        : (typeof erstgespraechNotes === 'string' ? erstgespraechNotes : '');
     const altDiag = [];
     for (let i = 1; document.getElementById('diag-icd-' + i) || document.getElementById('diag-txt-' + i); i++) {
         const ic = ((document.getElementById('diag-icd-' + i) || {}).value || '').trim();
@@ -1430,6 +1442,13 @@ function applyImportedData(rev) {
     }
 
     init();
+    // Mitschrift nach dem Neuaufbau des Reiters zurückschreiben – in Feld UND Variable, damit
+    // beide wieder synchron sind (Regel 75). Ein Upload ergänzt, er löscht nie.
+    erstgespraechNotes = altNotizen || '';
+    (function () {
+        const el = document.getElementById('erstgespraech-notes');
+        if (el) { el.value = erstgespraechNotes; if (typeof autoResize === 'function') autoResize(el); }
+    })();
     const setVal = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined && val !== null) el.value = val; };
     // Stammfelder: Ausgefülltes bleibt (Handeintrag hat Vorrang), Leeres wird aus dem Gutachten
     // gefüllt. Abweichungen zeigt die Prüfansicht, überschrieben wird nichts (Regel 11).

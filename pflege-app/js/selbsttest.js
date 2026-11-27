@@ -3112,6 +3112,30 @@ async function selbsttest() {
             pruefeWahr('Modul 3: Zusammenfassung nennt Kriterium und Häufigkeit',
                 psycheZusammenfassung()[0].includes('4.3.9')
                 && psycheZusammenfassung()[0].includes('täglich'));
+            // ---------- 79. Psychische Problemlagen als Tabelle unter der Kognition ----------
+            if (typeof psycheTabelleHtml === 'function') {
+                const zeilen = psycheTabellenZeilen();
+                pruefe('Problemlagen-Tabelle: eine Zeile je Problemlage', zeilen.length, 1);
+                pruefeWahr('Problemlagen-Tabelle: Bezeichnung, Häufigkeit, Bewertung, Bemerkung',
+                    zeilen[0].length === 4 && zeilen[0][0].includes('4.3.9')
+                    && zeilen[0][1] === 'täglich' && zeilen[0][3] === 'optische Halluzinationen abends');
+                const html79 = psycheTabelleHtml();
+                pruefeWahr('Problemlagen-Tabelle: Überschrift und Spalten im HTML',
+                    html79.includes('Psychische Problemlagen') && html79.includes('<th>Problemlage</th>')
+                    && html79.includes('optische Halluzinationen abends'));
+                // befundBlock setzt die Tabelle direkt hinter die Kognition-Gruppe
+                if (typeof befundBlock === 'function') {
+                    const bb = befundBlock();
+                    const pK = bb.indexOf('Kognition'), pP = bb.indexOf('Psychische Problemlagen');
+                    pruefeWahr('Problemlagen-Tabelle steht im Befundblock unter der Kognition',
+                        pP > -1 && (pK === -1 || pP > pK));
+                }
+                // Keine Problemlage → keine leere Tabelle
+                const merkPsy = psycheListe;
+                psycheListe = [];
+                pruefe('Problemlagen-Tabelle: ohne Problemlage leer', psycheTabelleHtml(), '');
+                psycheListe = merkPsy;
+            }
             // Entfernen stellt den Wert des Vorgutachtens wieder her
             stateOrig.values[krit('4.3.9').id] = 1;
             psycheSetzen(0, 'wertung', '2');
@@ -3803,6 +3827,28 @@ async function selbsttest() {
             // Regel 75: Upload bewahrt die geschriebene Stellungnahme (ergänzt statt löscht).
             pruefeWahr('Neues Gutachten bewahrt das Anzeigefeld der Stellungnahme',
                 !!(document.getElementById('appeal-document')?.innerHTML || '').trim());
+
+            // Regel 79: Die Mitschrift darf durch einen Upload NIE verloren gehen – auch dann
+            // nicht, wenn die Variable erstgespraechNotes nicht synchron zum Feld ist (init()
+            // baut den Reiter neu auf). Gemeldet: nach einem Upload „wieder vollständig
+            // verschwunden". Feld füllen, Variable bewusst entleeren (Desync), dann importieren.
+            const merkNotiz79 = erstgespraechNotes;
+            const feld79 = document.getElementById('erstgespraech-notes');
+            if (feld79) {
+                feld79.value = 'Mitschrift: Herr Focke benötigt Erinnerung an die Medikamenteneinnahme.';
+                erstgespraechNotes = '';   // Desync erzwingen
+                applyImportedData({ stam: {}, diagnoses: [], anamnese: '', befund: '', special: 0,
+                                    valuesMap: vmLeer, provided: new Set() });
+                pruefe('Upload bewahrt die Mitschrift trotz entleerter Variable (Feld)',
+                    document.getElementById('erstgespraech-notes').value,
+                    'Mitschrift: Herr Focke benötigt Erinnerung an die Medikamenteneinnahme.');
+                pruefe('Upload bewahrt die Mitschrift trotz entleerter Variable (Variable)',
+                    erstgespraechNotes,
+                    'Mitschrift: Herr Focke benötigt Erinnerung an die Medikamenteneinnahme.');
+                erstgespraechNotes = merkNotiz79;
+                const f2 = document.getElementById('erstgespraech-notes');
+                if (f2) f2.value = merkNotiz79 || '';
+            }
 
             // Ältere Falldateien (ohne Befund, Erfassung und Vorgangsart) müssen weiter laden
             const altJson = JSON.stringify({

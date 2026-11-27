@@ -454,6 +454,31 @@ function befundZusammenfassung() {
     return zeilen.join('\n');
 }
 
+/* Die erfassten Problemlagen als TABELLE für das Schriftstück (Regel 79). Vorgabe des
+   Verfassers: „Die psychischen Problemlagen müssen in einer Tabelle unter der Kognition
+   erfasst werden." Vorher standen sie nur als Einschätzungszeile im Lebensbereich Modul 3
+   und tauchten im Befund gar nicht auf. Eine Zeile je bestehender Problemlage mit
+   Bezeichnung, Häufigkeit, Bewertung und der Bemerkung aus der Befunderhebung. Rein
+   beschreibend – die Bewertung/Rechnung bleibt unberührt (Regel 11). Gibt '' zurück, wenn
+   keine Problemlage erfasst ist (dann keine leere Tabelle). */
+function psycheTabellenZeilen() {
+    if (typeof psycheListe === 'undefined' || !Array.isArray(psycheListe)) return [];
+    return psycheListe
+        .filter(z => typeof z.haeufigkeit === 'number' || z.wertung !== null || (z.bemerkung || '').trim())
+        .map(z => [
+            psycheTitel(z.nr),
+            (typeof z.haeufigkeit === 'number' && PSYCHE_HAEUFIGKEIT[z.haeufigkeit]) || '',
+            (z.wertung !== null && PSYCHE_WERTUNG[z.wertung]) || '',
+            (z.bemerkung || '').trim()
+        ]);
+}
+function psycheTabelleHtml() {
+    const zeilen = psycheTabellenZeilen();
+    if (!zeilen.length || typeof tabellenBlock !== 'function') return '';
+    return tabellenBlock('Psychische Problemlagen',
+        ['Problemlage', 'Häufigkeit', 'Bewertung', 'Bemerkung'], zeilen);
+}
+
 // Die erfassten Problemlagen als Textzeilen (für die KI und für das Dokument)
 function psycheZusammenfassung() {
     return psycheListe.filter(z => z.wertung !== null || typeof z.haeufigkeit === 'number').map(z => {
